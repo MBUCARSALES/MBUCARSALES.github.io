@@ -1001,6 +1001,7 @@
         <p>&copy; 2024 MBU CAR SALES. All rights reserved.</p>
         <p>Newcastle upon Tyne, England, United Kingdom</p>
     </footer>
+    <script>
         // Inventory data - All 9 cars from MBU Car Sales inventory
         const inventory = [
             // CAR 1: Nissan Primastar
@@ -1475,4 +1476,17 @@
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
-                const targ
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+
+// Initialize
+populateMakes();
+displayInventory(inventory);
+
+</script>
+</body>
+</html>
