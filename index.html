@@ -39,7 +39,16 @@
 
         .brand {
             flex: 1;
-        }
+        display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.logo {
+    height: 70px;
+    width: auto;
+    object-fit: contain;
+}
 
         h1 {
             font-size: 1.8rem;
@@ -655,6 +664,9 @@
     .brand {
         margin-bottom: 0.5rem;
     }
+           .logo {
+    height: 50px;
+}
 
     .header-call-btn {
         margin-bottom: 1rem;
@@ -728,9 +740,9 @@
     <header class="header">
     <div class="header-content">
         <div class="brand">
-            <h1>MBU CAR SALES</h1>
-            <p class="tagline">Offering a diverse range of well-priced, high-quality used vehicles</p>
-        </div>
+    <img src="images/Logo.jpeg" alt="MBU Car Sales" class="logo">
+    <p class="tagline">Offering a diverse range of well-priced, high-quality used vehicles</p>
+</div>
         <a href="tel:+447438510044" class="header-call-btn">
             📞 Call Us: +44 7438 510044
         </a>
