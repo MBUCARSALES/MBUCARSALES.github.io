@@ -736,15 +736,33 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="priceRange">Price Range</label>
-                        <select id="priceRange" name="priceRange">
-                            <option value="">All Prices</option>
-                            <option value="0-20000">Under £20,000</option>
-                            <option value="20000-40000">£20,000 - £40,000</option>
-                            <option value="40000-60000">£40,000 - £60,000</option>
-                            <option value="60000-80000">£60,000 - £80,000</option>
-                            <option value="80000-100000">£80,000 - £100,000</option>
-                            <option value="100000-999999">£100,000+</option>
+    <label for="maxPrice">Max Price</label>
+    <select id="maxPrice" name="maxPrice">
+        <option value="">All Prices</option>
+        <!-- Options will be populated dynamically -->
+    </select>
+</div>
+
+<script>
+// Example: max car price from your listings
+const maxCarPrice = 47500; // Replace with dynamic value from your data if needed
+
+// Round up to nearest 500
+const roundedMax = Math.ceil(maxCarPrice / 500) * 500;
+
+// Start from 2000, increment by 500
+const startPrice = 2000;
+const increment = 500;
+
+const priceSelect = document.getElementById("maxPrice");
+
+for (let price = startPrice; price <= roundedMax; price += increment) {
+    const option = document.createElement("option");
+    option.value = price;
+    option.textContent = `Up to £${price.toLocaleString()}`;
+    priceSelect.appendChild(option);
+}
+</script>
                         </select>
                     </div>
                     <button type="submit" class="btn full-width">Search Vehicles</button>
