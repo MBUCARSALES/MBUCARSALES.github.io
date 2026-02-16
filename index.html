@@ -783,7 +783,11 @@
                         Thank you! Your enquiry has been submitted successfully. A member of our team will be in touch shortly.
                     </div>
 
-                    <form id="sellCarForm">
+                    <form id="sellCarForm" action="https://formsubmit.co/mbusales39@gmail.com" method="POST">
+    <!-- FormSubmit Configuration -->
+    <input type="hidden" name="_subject" value="New Car Sale Enquiry - MBU Car Sales">
+    <input type="hidden" name="_captcha" value="false">
+    <input type="hidden" name="_template" value="table">
                         <div class="form-group">
                             <label>Vehicle Type <span class="required">*</span></label>
                             <div class="radio-group">
@@ -959,7 +963,11 @@
                         Thank you for contacting us! We'll get back to you as soon as possible.
                     </div>
 
-                    <form id="contactForm">
+                   <form id="contactForm" action="https://formsubmit.co/mbusales39@gmail.com" method="POST">
+    <!-- FormSubmit Configuration -->
+    <input type="hidden" name="_subject" value="New Contact Form Submission - MBU Car Sales">
+    <input type="hidden" name="_captcha" value="false">
+    <input type="hidden" name="_template" value="table">
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="contactName">Name <span class="required">*</span></label>
@@ -1420,55 +1428,11 @@
             document.getElementById('used-cars').scrollIntoView({ behavior: 'smooth' });
         });
 
-        // Sell Car Form submission
-        document.getElementById('sellCarForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            
-            // Get form data
-            const formData = new FormData(e.target);
-            const data = Object.fromEntries(formData);
-            
-            console.log('Sell Car Form Data:', data);
-            
-            // Show success message
-            document.getElementById('sellSuccessMessage').style.display = 'block';
-            
-            // Reset form
-            e.target.reset();
-            
-            // Hide success message after 5 seconds
-            setTimeout(() => {
-                document.getElementById('sellSuccessMessage').style.display = 'none';
-            }, 5000);
-            
-            // Scroll to success message
-            document.getElementById('sellSuccessMessage').scrollIntoView({ behavior: 'smooth', block: 'center' });
-        });
+        // Sell Car Form submission - Now handled by FormSubmit
+// FormSubmit will send emails directly to mbusales39@gmail.com
 
-        // Contact Form submission
-        document.getElementById('contactForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            
-            // Get form data
-            const formData = new FormData(e.target);
-            const data = Object.fromEntries(formData);
-            
-            console.log('Contact Form Data:', data);
-            
-            // Show success message
-            document.getElementById('contactSuccessMessage').style.display = 'block';
-            
-            // Reset form
-            e.target.reset();
-            
-            // Hide success message after 5 seconds
-            setTimeout(() => {
-                document.getElementById('contactSuccessMessage').style.display = 'none';
-            }, 5000);
-            
-            // Scroll to success message
-            document.getElementById('contactSuccessMessage').scrollIntoView({ behavior: 'smooth', block: 'center' });
-        });
+        // Contact Form submission - Now handled by FormSubmit
+// FormSubmit will send emails directly to mbusales39@gmail.com
 
         // Initialize
         populateMakes();
