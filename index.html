@@ -69,7 +69,22 @@
             border-bottom: 3px solid transparent;
             font-size: 0.95rem;
         }
+.header-call-btn {
+    background: white;
+    color: #001f3f;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
 
+.header-call-btn:hover {
+    background: #f0f0f0;
+    transform: scale(1.05);
+}
         .nav a:hover {
             border-bottom-color: white;
             background: rgba(255, 255, 255, 0.1);
@@ -629,17 +644,25 @@
             display: none;
         }
 
-        @media (max-width: 768px) {
-            .header-content {
-                flex-direction: column;
-                align-items: flex-start;
-                padding: 1rem 2rem;
-                min-height: auto;
-            }
+       @media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 1rem 2rem;
+        min-height: auto;
+    }
 
-            .brand {
-                margin-bottom: 1rem;
-            }
+    .brand {
+        margin-bottom: 0.5rem;
+    }
+
+    .header-call-btn {
+        margin-bottom: 1rem;
+        width: 100%;
+        text-align: center;
+        font-size: 0.9rem;
+        padding: 0.6rem 1rem;
+    }
 
             h1 {
                 font-size: 1.5rem;
@@ -703,12 +726,15 @@
 </head>
 <body>
     <header class="header">
-        <div class="header-content">
-            <div class="brand">
-                <h1>MBU CAR SALES</h1>
-                <p class="tagline">Offering a diverse range of well-priced, high-quality used vehicles</p>
-            </div>
-            <nav class="nav">
+    <div class="header-content">
+        <div class="brand">
+            <h1>MBU CAR SALES</h1>
+            <p class="tagline">Offering a diverse range of well-priced, high-quality used vehicles</p>
+        </div>
+        <a href="tel:+447438510044" class="header-call-btn">
+            📞 Call Us: +44 7438 510044
+        </a>
+        <nav class="nav">
                 <a href="#home">Home</a>
                 <a href="#used-cars">Used Cars</a>
                 <a href="#sell-car">Sell Your Car</a>
