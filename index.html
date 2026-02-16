@@ -743,25 +743,44 @@
     </select>
 </div>
 
+<!-- Search button -->
+<button id="searchVehicles" type="button">Search Vehicles</button>
+
 <script>
-// Example: max car price from your listings
-const maxCarPrice = 47500; // Replace with dynamic value from your data if needed
+// Get all car prices from your listings on the page
+// Example: assuming each car price is in an element with class "car-price"
+const carPrices = Array.from(document.querySelectorAll(".car-price"))
+    .map(el => parseInt(el.textContent.replace(/[£,]/g, ''))) // convert "£45,000" to 45000
+    .filter(price => !isNaN(price));
 
-// Round up to nearest 500
-const roundedMax = Math.ceil(maxCarPrice / 500) * 500;
+if (carPrices.length > 0) {
+    const maxCarPrice = Math.max(...carPrices);
+    const roundedMax = Math.ceil(maxCarPrice / 500) * 500;
 
-// Start from 2000, increment by 500
-const startPrice = 2000;
-const increment = 500;
+    const startPrice = 2000;
+    const increment = 500;
 
-const priceSelect = document.getElementById("maxPrice");
+    const priceSelect = document.getElementById("maxPrice");
 
-for (let price = startPrice; price <= roundedMax; price += increment) {
-    const option = document.createElement("option");
-    option.value = price;
-    option.textContent = `Up to £${price.toLocaleString()}`;
-    priceSelect.appendChild(option);
+    for (let price = startPrice; price <= roundedMax; price += increment) {
+        const option = document.createElement("option");
+        option.value = price;
+        option.textContent = `Up to £${price.toLocaleString()}`;
+        priceSelect.appendChild(option);
+    }
 }
+
+// Search button click handler
+document.getElementById("searchVehicles").addEventListener("click", () => {
+    const selectedPrice = document.getElementById("maxPrice").value;
+    // Example: redirect to results page with query param
+    // You can replace this with your filtering logic
+    if (selectedPrice) {
+        window.location.href = `/search-results?maxPrice=${selectedPrice}`;
+    } else {
+        window.location.href = `/search-results`;
+    }
+});
 </script>
                         </select>
                     </div>
