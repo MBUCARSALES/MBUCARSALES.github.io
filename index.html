@@ -36,28 +36,24 @@
             align-items: center;
             min-height: 90px;
         }
-
-        .brand {
+.brand {
     flex: 1;
     display: flex;
-    align-items: center;
-    gap: 1.5rem;
+    flex-direction: column;
+    gap: 0.3rem;
 }
 
-.logo {
-    height: 100px;
-    width: auto;
-    object-fit: contain;
-    flex-shrink: 0;
-    background: transparent;
-    mix-blend-mode: multiply;
+h1 {
+    font-size: 1.8rem;
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: 1px;
 }
 
 .tagline {
-    font-size: 0.95rem;
-    opacity: 0.9;
-    font-weight: 400;
-    line-height: 1.4;
+    font-size: 0.9rem;
+    opacity: 0.85;
+    font-weight: 300;
     margin: 0;
 }
 
@@ -219,9 +215,10 @@
         .inventory-wrapper {
             background: #000000;
             border-radius: 16px;
-            padding: 3rem 2rem;
+            padding: 3rem 1rem;
             box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
             position: relative;
+            overflow: visible;
         }
 
         .inventory-wrapper .section-title {
@@ -263,13 +260,14 @@
         }
 
         .carousel-container {
-            display: flex;
-            gap: 2rem;
-            overflow-x: auto;
-            scroll-behavior: smooth;
-            padding: 1.5rem 0.5rem 2rem 0.5rem;
-            scrollbar-width: thin;
-            scrollbar-color: #ffffff #333333;
+    display: flex;
+    gap: 2rem;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    padding: 1.5rem 0.5rem 2rem 0.5rem;
+    scrollbar-width: thin;
+    scrollbar-color: #ffffff #333333;
+}
         }
 
         .carousel-container::-webkit-scrollbar {
@@ -296,8 +294,8 @@
             overflow: hidden;
             box-shadow: 0 4px 20px rgba(255, 255, 255, 0.1);
             transition: all 0.3s ease;
-            min-width: 380px;
-            max-width: 380px;
+            min-width: 360px;
+            max-width: 360px;
             flex-shrink: 0;
         }
 
@@ -355,16 +353,16 @@
             margin-left: 0.5rem;
         }
 
-        .car-image {
-            width: 100%;
-            height: 220px;
-            background: linear-gradient(135deg, #003d7a 0%, #001f3f 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 3rem;
-        }
+       .car-image {
+    width: 100%;
+    height: 280px;
+    background: linear-gradient(135deg, #003d7a 0%, #001f3f 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 3rem;
+}
 
         .car-details {
             padding: 1.5rem;
@@ -652,37 +650,50 @@
         }
 
        @media (max-width: 768px) {
+    .header {
+        position: relative;
+    }
+
     .header-content {
         flex-direction: column;
         align-items: flex-start;
-        padding: 1rem 2rem;
+        padding: 0.75rem 1rem;
         min-height: auto;
     }
 
     .brand {
-    margin-bottom: 0.5rem;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
+        margin-bottom: 0.5rem;
+    }
+
+    h1 {
+        font-size: 1.3rem;
+        margin-bottom: 0.2rem;
+    }
+
+    .tagline {
+        font-size: 0.8rem;
+        line-height: 1.3;
+    }
+
+    .header-call-btn {
+        margin-bottom: 0.75rem;
+        width: 100%;
+        text-align: center;
+        font-size: 0.85rem;
+        padding: 0.5rem 1rem;
+    }
+
+    .nav {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .nav a {
+        padding: 0.5rem 0.8rem;
+        font-size: 0.85rem;
+    }
 }
-
-.logo {
-    height: 100px;
-}
-
-.tagline {
-    font-size: 0.85rem;
-}
-
-            .nav {
-                width: 100%;
-                flex-wrap: wrap;
-            }
-
-            .nav a {
-                padding: 0.6rem 1rem;
-                font-size: 0.9rem;
-            }
 
             .section-title {
                 font-size: 2rem;
@@ -694,9 +705,13 @@
             }
 
             .inventory-wrapper {
-                padding: 2rem 1rem;
+                padding: 2rem 0.5rem;
                 border-radius: 12px;
             }
+        .car-card {
+    min-width: 280px;
+    max-width: 280px;
+}
 
             .scroll-hint {
                 font-size: 0.9rem;
@@ -730,8 +745,8 @@
     <header class="header">
     <div class="header-content">
         
-        <div class="brand">
-    <img src="images/Logo.jpeg" alt="MBU Car Sales" class="logo">
+       <div class="brand">
+    <h1>MBU CAR SALES</h1>
     <p class="tagline">Offering a diverse range of well-priced, high-quality used vehicles</p>
 </div>
         <a href="tel:+447438510044" class="header-call-btn">
