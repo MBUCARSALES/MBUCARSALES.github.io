@@ -1,0 +1,167 @@
+# ============================================================================
+# SHAREABLE CAR PAGES
+# ----------------------------------------------------------------------------
+# WhatsApp, Facebook and iMessage read a page's preview tags BEFORE any
+# JavaScript runs. Our car pages fetch their data in the browser, so a shared
+# link shows the generic MBU logo rather than the car — which is a real loss
+# when WhatsApp is how most of your customers share cars with each other.
+#
+# This job writes a small static page per car at /c/<id>/ with the right
+# preview tags baked in: the car's photo, title, price and headline spec.
+# Humans landing there see the normal car page; crawlers see the tags.
+#
+# Runs every 30 minutes, so a car added at the auction is shareable properly
+# within half an hour.
+#
+# SETUP — GitHub repo → Settings → Secrets and variables → Actions:
+#   SUPABASE_URL       https://xxxx.supabase.co
+#   SUPABASE_ANON_KEY  the anon key (safe — it only reads published cars)
+#
+# Also: Settings → Actions → General → Workflow permissions
+#       → "Read and write permissions" (so it can commit the pages)
+# ============================================================================
+
+name: Build shareable car pages
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: share-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate pages
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          ANON_KEY:     ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${ANON_KEY:-}" ]; then
+            echo "Secrets not set — skipping."; exit 0
+          fi
+
+          node <<'SCRIPT'
+          const fs = require('fs');
+          const path = require('path');
+
+          const BASE = process.env.SUPABASE_URL.replace(/\/$/, '');
+          const KEY  = process.env.ANON_KEY;
+
+          // Read the site's own config so the URL and cloud name stay in one place
+          const cfgSrc = fs.readFileSync('assets/js/config.js', 'utf8');
+          const pick = re => (cfgSrc.match(re) || [])[1] || '';
+          const SITE  = (pick(/siteUrl:\s*'([^']*)'/) || 'https://mbucarsales.github.io').replace(/\/$/, '');
+          const CLOUD = pick(/cloudName:\s*'([^']*)'/);
+          const BRAND = pick(/name:\s*'([^']*)'/) || 'MBU Car Sales';
+
+          const esc = s => String(s == null ? '' : s)
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+          const gbp = n => n == null ? '' : '£' + Number(n).toLocaleString('en-GB');
+
+          function imageUrl(images) {
+            const first = Array.isArray(images) ? images[0] : null;
+            const id = first && (first.public_id || first.url || first);
+            if (!id) return SITE + '/assets/img/og-default.jpg';
+            if (/^https?:/.test(id) && !String(id).includes('res.cloudinary.com')) return id;
+            if (!CLOUD) return SITE + '/assets/img/og-default.jpg';
+            // 1200x630 is what WhatsApp and Facebook want
+            const t = 'c_fill,g_auto,w_1200,h_630,q_auto:good,f_jpg';
+            return String(id).includes('res.cloudinary.com')
+              ? String(id).replace(/\/upload\/(v\d+\/)?/, `/upload/${t}/$1`)
+              : `https://res.cloudinary.com/${CLOUD}/image/upload/${t}/${id}`;
+          }
+
+          (async () => {
+            const res = await fetch(
+              `${BASE}/rest/v1/cars_public?select=*&order=created_at.desc`,
+              { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } });
+            if (!res.ok) throw new Error('Supabase returned ' + res.status);
+            const cars = await res.json();
+            console.log(`Fetched ${cars.length} cars`);
+
+            const template = fs.readFileSync('car.html', 'utf8');
+            const outRoot = 'c';
+            fs.rmSync(outRoot, { recursive: true, force: true });
+            fs.mkdirSync(outRoot, { recursive: true });
+
+            const keep = new Set();
+
+            for (const car of cars) {
+              const sold  = car.status === 'sold';
+              const title = [car.year, car.make, car.model].filter(Boolean).join(' ') || 'Used car';
+              const specs = [
+                car.mileage != null ? Number(car.mileage).toLocaleString('en-GB') + ' miles' : null,
+                car.fuel, car.transmission,
+                car.engine_size ? Number(car.engine_size).toFixed(1) + 'L' : null
+              ].filter(Boolean).join(' · ');
+
+              const headline = sold
+                ? `${title} — now sold`
+                : `${title}${car.price != null ? ' — ' + gbp(car.price) : ''}`;
+
+              const desc = sold
+                ? `This one has sold, but we buy cars like it most weeks. ${specs}. Register your interest with ${BRAND}.`
+                : `${specs}. ${String(car.description || '').replace(/\s+/g, ' ').slice(0, 110)}`.trim();
+
+              // Take the real car page and swap in the tags a crawler reads,
+              // plus the car id so the page knows what to load without a
+              // query string.
+              let html = template
+                .replace(/<title>[\s\S]*?<\/title>/,
+                  `<title>${esc(headline)} — ${esc(BRAND)}</title>`)
+                .replace(/<meta name="description"[^>]*>/,
+                  `<meta name="description" content="${esc(desc)}">`)
+                .replace(/<meta property="og:title"[^>]*>/,
+                  `<meta property="og:title" content="${esc(headline)}">`)
+                .replace(/<meta property="og:description"[^>]*>/,
+                  `<meta property="og:description" content="${esc(desc)}">`)
+                .replace(/<meta property="og:image"[^>]*>/,
+                  `<meta property="og:image" content="${esc(imageUrl(car.images))}">\n` +
+                  `<meta property="og:image:width" content="1200">\n` +
+                  `<meta property="og:image:height" content="630">\n` +
+                  `<meta property="og:url" content="${SITE}/c/${car.id}/">\n` +
+                  `<meta name="twitter:card" content="summary_large_image">`)
+                // Assets are referenced relatively in car.html. From /c/<id>/
+                // they'd resolve inside that folder, so point them at the root.
+                .replace(/(src|href)="assets\//g, '$1="/assets/')
+                // MBU_LINK_PREFIX does the same for every link the page builds
+                // at runtime (nav, footer, breadcrumbs, similar cars).
+                .replace('<body>',
+                  `<body>\n<script>` +
+                  `window.MBU_FORCED_CAR_ID = ${JSON.stringify(car.id)};` +
+                  `window.MBU_LINK_PREFIX = '/';` +
+                  `</script>`);
+
+              const dir = path.join(outRoot, String(car.id));
+              fs.mkdirSync(dir, { recursive: true });
+              fs.writeFileSync(path.join(dir, 'index.html'), html);
+              keep.add(String(car.id));
+            }
+
+            console.log(`Wrote ${keep.size} share pages`);
+          })().catch(err => { console.error(err); process.exit(1); });
+          SCRIPT
+
+      - name: Commit if anything changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A c
+          if git diff --staged --quiet; then
+            echo "No changes."
+          else
+            git commit -m "Rebuild shareable car pages [skip ci]"
+            git push
+          fi
