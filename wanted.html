@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Car Finder — Tell Us What You’re Looking For | MBU Car Sales</title>
+<meta name="description" content="Can't see what you want? Tell MBU Car Sales in Newcastle what you're after and we'll look out for one at auction. No obligation, no deposit.">
+<link rel="canonical" href="https://mbucarsales.github.io/wanted.html">
+<meta property="og:title" content="Car Finder — MBU Car Sales">
+<meta property="og:description" content="Tell us what you're looking for and we'll find it at auction. No obligation, no deposit.">
+<meta name="theme-color" content="#0D1626">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/pages.css">
+</head>
+<body>
+
+<div id="site-header-slot"></div>
+
+<main id="main">
+
+  <section class="page-head">
+    <div class="container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="index.html">Home</a>
+        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Car Finder</span>
+      </nav>
+      <h1 id="pageTitle">Tell us what you’re looking for</h1>
+      <p id="pageIntro">
+        We’re at auction most weeks and see hundreds of cars that never make it onto
+        our website. Tell us the brief and we’ll keep an eye out — we’ll send you
+        photos and a price before we bid on anything, and you’re under no obligation.
+      </p>
+    </div>
+  </section>
+
+  <section class="section section--tight">
+    <div class="container">
+      <div class="contact-layout">
+
+        <!-- ============================== FORM -->
+        <div>
+          <div class="panel panel--pad-lg">
+            <div id="aboutCar" hidden></div>
+
+            <h2 style="font-size:var(--fs-xl);margin-bottom:6px">What are you after?</h2>
+            <p class="muted small" style="margin-bottom:26px">
+              Fill in as much or as little as you like — even just “a diesel estate
+              under £6,000” is enough for us to work with.
+            </p>
+
+            <form id="wantedForm" novalidate>
+              <div class="form-grid">
+
+                <div class="field">
+                  <label for="wMake">Make</label>
+                  <input class="input" id="wMake" list="makeList" placeholder="e.g. Ford — or leave blank" autocapitalize="words">
+                  <datalist id="makeList"></datalist>
+                </div>
+                <div class="field">
+                  <label for="wModel">Model</label>
+                  <input class="input" id="wModel" placeholder="e.g. Focus — or leave blank" autocapitalize="words">
+                </div>
+
+                <div class="field span-2">
+                  <span class="fg-title" style="font-size:var(--fs-sm);font-weight:700;color:var(--navy-900);text-transform:none;letter-spacing:0">Budget</span>
+                  <div class="range-row" style="margin-top:4px">
+                    <input class="input" id="wBudgetMin" type="number" inputmode="numeric" placeholder="£ from" min="0" step="250">
+                    <span>to</span>
+                    <input class="input" id="wBudgetMax" type="number" inputmode="numeric" placeholder="£ up to" min="0" step="250">
+                  </div>
+                  <span class="hint">Being straight about your budget saves us both time — we won’t push you past it.</span>
+                </div>
+
+                <div class="field">
+                  <label for="wBody">Body type</label>
+                  <select class="select" id="wBody">
+                    <option value="">Not fussed</option>
+                    <option value="hatchback">Hatchback</option>
+                    <option value="saloon">Saloon</option>
+                    <option value="estate">Estate</option>
+                    <option value="suv">SUV / 4x4</option>
+                    <option value="mpv">MPV / people carrier</option>
+                    <option value="coupe">Coupe</option>
+                    <option value="convertible">Convertible</option>
+                    <option value="van">Van</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="wFuel">Fuel</label>
+                  <select class="select" id="wFuel">
+                    <option value="">Not fussed</option>
+                    <option value="petrol">Petrol</option>
+                    <option value="diesel">Diesel</option>
+                    <option value="hybrid">Hybrid</option>
+                    <option value="electric">Electric</option>
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label for="wTrans">Gearbox</label>
+                  <select class="select" id="wTrans">
+                    <option value="">Not fussed</option>
+                    <option value="manual">Manual</option>
+                    <option value="automatic">Automatic</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="wMiles">Maximum mileage</label>
+                  <select class="select" id="wMiles">
+                    <option value="">Not fussed</option>
+                    <option value="30000">Under 30,000</option>
+                    <option value="50000">Under 50,000</option>
+                    <option value="70000">Under 70,000</option>
+                    <option value="90000">Under 90,000</option>
+                    <option value="120000">Under 120,000</option>
+                  </select>
+                </div>
+
+                <div class="field span-2">
+                  <span class="fg-title" style="font-size:var(--fs-sm);font-weight:700;color:var(--navy-900);text-transform:none;letter-spacing:0">How soon do you need it?</span>
+                  <div class="chip-row" id="wTimescale" style="margin-top:4px">
+                    <button class="chip" type="button" data-value="asap">As soon as possible</button>
+                    <button class="chip is-on" type="button" data-value="few_weeks">Next few weeks</button>
+                    <button class="chip" type="button" data-value="few_months">Next few months</button>
+                    <button class="chip" type="button" data-value="looking">Just looking for now</button>
+                  </div>
+                </div>
+
+                <div class="span-2">
+                  <label class="checkbox">
+                    <input type="checkbox" id="wPartEx">
+                    <span>I’ve got a car to part exchange</span>
+                  </label>
+                </div>
+                <div class="field span-2" id="wPartExWrap" hidden>
+                  <label for="wPartExDetails">What have you got?</label>
+                  <input class="input" id="wPartExDetails" placeholder="e.g. 2014 Astra, 90,000 miles, reg AB14 CDE">
+                </div>
+
+                <div class="field span-2">
+                  <label for="wNotes">Anything else?</label>
+                  <textarea class="textarea" id="wNotes"
+                            placeholder="Must have a tow bar, needs to be Isofix, avoid black, that sort of thing."></textarea>
+                </div>
+
+                <hr class="divider span-2" style="margin:8px 0">
+
+                <div class="field">
+                  <label for="wName">Your name <span class="req">*</span></label>
+                  <input class="input" id="wName" required autocomplete="name">
+                </div>
+                <div class="field">
+                  <label for="wPhone">Phone number <span class="req">*</span></label>
+                  <input class="input" id="wPhone" type="tel" required autocomplete="tel">
+                </div>
+                <div class="field span-2">
+                  <label for="wEmail">Email address</label>
+                  <input class="input" id="wEmail" type="email" autocomplete="email">
+                </div>
+
+                <div class="field span-2">
+                  <span class="fg-title" style="font-size:var(--fs-sm);font-weight:700;color:var(--navy-900);text-transform:none;letter-spacing:0">Best way to reach you</span>
+                  <div class="chip-row" id="wContact" style="margin-top:4px">
+                    <button class="chip is-on" type="button" data-value="whatsapp">WhatsApp</button>
+                    <button class="chip" type="button" data-value="call">Phone call</button>
+                    <button class="chip" type="button" data-value="email">Email</button>
+                  </div>
+                </div>
+
+                <div class="field span-2 hp-field">
+                  <label for="wCompany">Company</label>
+                  <input class="input" id="wCompany" tabindex="-1" autocomplete="off">
+                </div>
+
+                <div class="span-2">
+                  <label class="checkbox">
+                    <input type="checkbox" id="wConsent" required>
+                    <span>I’m happy for MBU Car Sales to store these details so they can let me know when something suitable comes in.</span>
+                  </label>
+                </div>
+
+                <div class="span-2 form-status" id="wStatus" role="status"></div>
+
+                <div class="span-2">
+                  <button class="btn btn--primary btn--lg" type="submit" id="wSubmit">Send my request</button>
+                  <p class="form-note" style="margin-top:12px">
+                    No deposit, no obligation, and we won’t pester you. If we find
+                    nothing suitable we’ll simply tell you.
+                  </p>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- ============================== SIDEBAR -->
+        <aside class="stack">
+          <div class="panel" style="background:linear-gradient(150deg,var(--navy-800),var(--navy-900));color:#fff;border:0">
+            <h3 style="color:#fff;font-size:var(--fs-lg);margin-bottom:10px">Rather just message us?</h3>
+            <p class="small" style="color:#B6C4D8;line-height:1.65;margin-bottom:18px">
+              Send us a WhatsApp with roughly what you’re after and your budget.
+              It works just as well.
+            </p>
+            <a class="btn btn--wa btn--block" id="wantedWa" href="#" target="_blank" rel="noopener">
+              Message us on WhatsApp
+            </a>
+          </div>
+
+          <div class="panel panel--flat">
+            <h3 style="font-size:var(--fs-md);margin-bottom:14px">Why bother asking us?</h3>
+            <ul class="feature-list" style="grid-template-columns:1fr;gap:12px" id="whyList"></ul>
+          </div>
+
+          <div class="panel">
+            <h3 style="font-size:var(--fs-md);margin-bottom:10px">Available right now</h3>
+            <p class="small muted" style="margin-bottom:16px">
+              Worth a look before you wait — we might already have something.
+            </p>
+            <a class="btn btn--outline btn--block" href="stock.html">See our current stock</a>
+          </div>
+        </aside>
+
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="site-footer-slot"></div>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/demo-data.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  const esc = MBU.esc;
+  const carId = MBU.param('car');       // set when arriving from a sold car
+
+  document.getElementById('whyList').innerHTML = [
+    'We see hundreds of cars at auction you’ll never get access to',
+    'You get photos and a price before we commit to anything',
+    'No deposit and no obligation at any point',
+    'If it turns out to be a bad car, we just don’t buy it'
+  ].map(t => `<li>${MBU.icon('check')}${esc(t)}</li>`).join('');
+
+  document.getElementById('wantedWa').innerHTML =
+    MBU.icon('whatsapp') + ' Message us on WhatsApp';
+  document.getElementById('wantedWa').href = MBU.waLink(
+    'Hi MBU Car Sales, I’m looking for a specific car.\n\nWhat I’m after:\nBudget:\nWhen I need it:'
+  );
+
+  /* Simple single-select chip groups */
+  function chipGroup(id, initial) {
+    let value = initial;
+    MBU.qsa('#' + id + ' .chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        MBU.qsa('#' + id + ' .chip').forEach(c => c.classList.remove('is-on'));
+        chip.classList.add('is-on');
+        value = chip.dataset.value;
+      });
+    });
+    return () => value;
+  }
+  const getTimescale = chipGroup('wTimescale', 'few_weeks');
+  const getContact   = chipGroup('wContact', 'whatsapp');
+
+  /* Part exchange reveal */
+  document.getElementById('wPartEx').addEventListener('change', e => {
+    document.getElementById('wPartExWrap').hidden = !e.target.checked;
+  });
+
+  /* Suggest makes we actually deal in */
+  MBU.getCars().then(cars => {
+    const makes = [...new Set(cars.map(c => c.make).filter(Boolean))].sort();
+    document.getElementById('makeList').innerHTML =
+      makes.map(m => `<option value="${esc(m)}">`).join('');
+  });
+
+  /* ------------------------------------------------------------------
+     Arriving from a sold car — pre-fill the brief with that car's details
+     so the customer barely has to type anything.
+     ------------------------------------------------------------------ */
+  if (carId) {
+    MBU.getCar(carId).then(car => {
+      if (!car) return;
+      const title = MBU.fmt.title(car);
+
+      document.getElementById('pageTitle').textContent = 'Want one like this?';
+      document.getElementById('pageIntro').textContent =
+        'That one has gone, but we buy cars like it most weeks. Tell us what you ' +
+        'need and we’ll look out for another — we’ll send you photos and a price ' +
+        'before we bid on anything.';
+
+      const about = document.getElementById('aboutCar');
+      about.hidden = false;
+      about.innerHTML = `
+        <div class="notice notice--blue" style="margin-bottom:26px">
+          ${MBU.imgTag(car.images && car.images[0], 'thumb', title,
+             'sold-ref-thumb')}
+          <div>
+            <strong>Based on the ${esc(title)}</strong>
+            Sold ${esc(MBU.fmt.ago(car.sold_at))}. We’ve filled in the details below
+            from that car — change anything that doesn’t suit.
+          </div>
+        </div>`;
+
+      const set = (id, v) => { if (v != null && v !== '') document.getElementById(id).value = v; };
+      set('wMake', car.make);
+      set('wModel', car.model);
+      set('wBody', car.body_type);
+      set('wFuel', car.fuel);
+      set('wTrans', car.transmission);
+      document.getElementById('wNotes').placeholder =
+        `Anything you'd want different from the ${title}? Colour, mileage, spec…`;
+    });
+  }
+
+  /* ---------------------------------------------------------------- SUBMIT */
+  const form = document.getElementById('wantedForm');
+  const status = document.getElementById('wStatus');
+  const btn = document.getElementById('wSubmit');
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    status.className = 'span-2 form-status';
+    if (document.getElementById('wCompany').value) return;   // bot
+
+    const v = id => document.getElementById(id).value.trim();
+    const int = id => { const n = parseInt(v(id).replace(/[^0-9]/g, ''), 10); return isNaN(n) ? null : n; };
+
+    if (!v('wName') || !v('wPhone') || !document.getElementById('wConsent').checked) {
+      status.className = 'span-2 form-status form-status--err is-shown';
+      status.textContent = 'Please give us your name and a phone number, and tick the box so we can get back to you.';
+      return;
+    }
+
+    btn.disabled = true; btn.textContent = 'Sending…';
+
+    const car = carId ? await MBU.getCar(carId) : null;
+
+    try {
+      await MBU.submitWanted({
+        kind: carId ? 'sold_interest' : 'wanted',
+        car_id: (car && /^[0-9a-f-]{36}$/i.test(String(car.id))) ? car.id : null,
+        car_title: car ? MBU.fmt.title(car) : null,
+        name: v('wName'),
+        phone: v('wPhone'),
+        email: v('wEmail'),
+        contact_pref: getContact(),
+        make: v('wMake') || null,
+        model: v('wModel') || null,
+        body_type: v('wBody') || null,
+        fuel: v('wFuel') || null,
+        transmission: v('wTrans') || null,
+        budget_min: int('wBudgetMin'),
+        budget_max: int('wBudgetMax'),
+        max_mileage: int('wMiles'),
+        timescale: getTimescale(),
+        part_ex: document.getElementById('wPartEx').checked,
+        part_ex_details: v('wPartExDetails') || null,
+        notes: v('wNotes') || null
+      });
+
+      if (car) MBU.track('interest_sent', car.id);
+
+      form.innerHTML = `
+        <div style="text-align:center;padding:34px 12px">
+          <div class="info-card-icon" style="margin:0 auto 18px;background:var(--green-100);color:var(--green-600)">${MBU.icon('checkCirc')}</div>
+          <h3 style="margin-bottom:10px">Thanks ${esc(v('wName').split(' ')[0])} — we’re on it</h3>
+          <p class="muted" style="max-width:46ch;margin:0 auto 22px;line-height:1.7">
+            We’ll keep an eye out and get in touch the moment something suitable
+            comes up. That might be this week or it might take a few — we’d rather
+            wait for the right one than push you a bad car.
+          </p>
+          <a class="btn btn--outline" href="stock.html">Have a look at what we’ve got now</a>
+        </div>`;
+      form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    } catch (err) {
+      console.error(err);
+      status.className = 'span-2 form-status form-status--err is-shown';
+      status.innerHTML = `Sorry, that didn’t send. Please call us on
+        <a href="${MBU.telLink()}" style="text-decoration:underline">${esc(MBU_CONFIG.business.phone)}</a>
+        or send it on WhatsApp instead.`;
+      btn.disabled = false; btn.textContent = 'Send my request';
+    }
+  });
+})();
+</script>
+
+<style>
+  .sold-ref-thumb {
+    width: 76px; height: 57px; object-fit: cover;
+    border-radius: var(--r-sm); flex: none;
+  }
+  .notice .sold-ref-thumb { margin-right: 2px; }
+</style>
+</body>
+</html>

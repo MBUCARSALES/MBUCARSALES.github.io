@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>MBU Admin</title>
+<meta name="robots" content="noindex, nofollow">
+
+<!-- Home-screen app -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MBU Admin">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0D1626">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- ======================================================== LOGIN -->
+<div class="login" id="loginView">
+  <div class="login-mark">MBU</div>
+  <h1>MBU Admin</h1>
+  <p>Sign in to add cars, mark them sold and check your enquiries.</p>
+
+  <div class="msg" id="loginMsg" role="status"></div>
+
+  <!-- Email + password. No email round-trip, works the same in Safari and
+       in the home-screen app, and the iPhone can remember it. -->
+  <form id="loginForm">
+    <div class="f">
+      <input class="in" id="loginEmail" type="email" inputmode="email"
+             autocomplete="username" placeholder="Your email address" required>
+    </div>
+    <div class="f">
+      <input class="in" id="loginPassword" type="password"
+             autocomplete="current-password" placeholder="Password" required>
+    </div>
+    <button class="btn btn--brass btn--block" type="submit" id="loginBtn">Sign in</button>
+  </form>
+
+  <p class="login-note" id="loginNote">
+    Tap “Save Password” when your iPhone offers —<br>
+    then you’ll never have to type it again.
+  </p>
+</div>
+
+<!-- ======================================================== APP -->
+<div class="app is-hidden" id="app">
+
+  <header class="topbar">
+    <button class="topbar-btn" id="backBtn" aria-label="Back" hidden>
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <span class="topbar-spacer" id="topbarSpacer"></span>
+    <h1 id="topTitle">Your stock</h1>
+    <button class="topbar-btn topbar-btn--brass" id="topAction" hidden></button>
+    <span class="topbar-spacer" id="topbarSpacer2"></span>
+  </header>
+
+  <!-- ---------------------------------------------- STOCK LIST -->
+  <section class="view" id="stockView">
+    <div class="segment" id="stockTabs">
+      <button data-tab="available" class="is-on">In stock</button>
+      <button data-tab="sold">Sold</button>
+      <button data-tab="draft">Drafts</button>
+    </div>
+    <div class="msg" id="stockMsg" role="status"></div>
+    <div id="stockList"></div>
+  </section>
+
+  <!-- ---------------------------------------------- CAR FORM -->
+  <section class="view is-hidden" id="formView">
+    <div class="msg" id="formMsg" role="status"></div>
+
+    <!-- Photos first: it is the thing that matters most -->
+    <div class="section-card">
+      <h2>Photos</h2>
+      <div id="photoArea"></div>
+      <input type="file" id="photoInput" accept="image/*" multiple hidden>
+      <p class="hint" style="margin-top:12px">
+        The first photo is the one customers see first. Tap a photo to make it the main one,
+        move it, or delete it.
+      </p>
+    </div>
+
+    <!-- Walkaround video -->
+    <div class="section-card">
+      <h2>Walkaround video</h2>
+      <div id="videoArea"></div>
+      <input type="file" id="videoInput" accept="video/*" hidden>
+      <p class="hint" style="margin-top:12px">
+        Optional, but it sells cars. Walk round it, start it up, show the inside.
+        <strong>Keep it under 45 seconds.</strong>
+      </p>
+    </div>
+
+    <!-- Reg lookup -->
+    <div class="section-card">
+      <h2>Number plate</h2>
+      <div class="plate-wrap">
+        <span class="plate-holder">
+          <input class="plate-input" id="fReg" placeholder="AB12 CDE"
+                 autocomplete="off" autocapitalize="characters" spellcheck="false">
+        </span>
+        <button class="btn btn--primary" id="lookupBtn" type="button" style="min-width:104px">Look up</button>
+      </div>
+      <p class="hint" id="lookupHint">
+        Type the plate and tap Look up — we’ll fill in as much as we can for you.
+      </p>
+    </div>
+
+    <!-- Basics -->
+    <div class="section-card">
+      <h2>The car</h2>
+      <div class="row-2">
+        <div class="f">
+          <label for="fMake">Make <span class="req">*</span></label>
+          <input class="in" id="fMake" placeholder="Ford" autocapitalize="words">
+        </div>
+        <div class="f">
+          <label for="fModel">Model <span class="req">*</span></label>
+          <input class="in" id="fModel" placeholder="Focus" autocapitalize="words">
+        </div>
+      </div>
+      <div class="f" style="margin-top:16px">
+        <label for="fVariant">Trim / version</label>
+        <input class="in" id="fVariant" placeholder="Titanium TDCi" autocapitalize="words">
+      </div>
+      <div class="row-2">
+        <div class="f">
+          <label for="fYear">Year <span class="req">*</span></label>
+          <input class="in" id="fYear" type="number" inputmode="numeric" placeholder="2017">
+        </div>
+        <div class="f">
+          <label for="fColour">Colour</label>
+          <input class="in" id="fColour" placeholder="Blue" autocapitalize="words">
+        </div>
+      </div>
+    </div>
+
+    <!-- Money -->
+    <div class="section-card">
+      <h2>Price &amp; mileage</h2>
+      <div class="f">
+        <label for="fPrice">Price <span class="req">*</span></label>
+        <div class="money"><input class="in" id="fPrice" type="number" inputmode="numeric" placeholder="0"></div>
+      </div>
+      <div class="f" style="margin-bottom:0">
+        <label for="fMileage">Mileage <span class="req">*</span></label>
+        <input class="in" id="fMileage" type="number" inputmode="numeric" placeholder="e.g. 68000">
+      </div>
+    </div>
+
+    <!-- Spec -->
+    <div class="section-card">
+      <h2>Specification</h2>
+      <div class="f">
+        <span class="lbl">Fuel</span>
+        <div class="chips" id="fFuel"></div>
+      </div>
+      <div class="f">
+        <span class="lbl">Gearbox</span>
+        <div class="chips" id="fTrans"></div>
+      </div>
+      <div class="f">
+        <span class="lbl">Body type</span>
+        <div class="chips" id="fBody"></div>
+      </div>
+      <div class="row-2">
+        <div class="f">
+          <label for="fEngine">Engine size</label>
+          <input class="in" id="fEngine" type="number" step="0.1" inputmode="decimal" placeholder="1.6">
+        </div>
+        <div class="f">
+          <label for="fDoors">Doors</label>
+          <select class="sel" id="fDoors">
+            <option value="">—</option><option>2</option><option>3</option>
+            <option>4</option><option>5</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="section-card">
+      <h2>History &amp; paperwork</h2>
+      <div class="row-2">
+        <div class="f">
+          <label for="fOwners">Previous owners</label>
+          <input class="in" id="fOwners" type="number" inputmode="numeric" placeholder="2">
+        </div>
+        <div class="f">
+          <label for="fMot">MOT expires</label>
+          <input class="in" id="fMot" type="date">
+        </div>
+      </div>
+      <div class="f" style="margin-top:16px">
+        <label for="fService">Service history</label>
+        <select class="sel" id="fService">
+          <option value="">—</option>
+          <option value="full">Full service history</option>
+          <option value="part">Part service history</option>
+          <option value="none">No service history</option>
+        </select>
+      </div>
+      <div class="f" style="margin-bottom:0">
+        <label for="fHpi">Vehicle history</label>
+        <select class="sel" id="fHpi">
+          <option value="clear">HPI Clear</option>
+          <option value="cat_s">Category S (structural, repaired)</option>
+          <option value="cat_n">Category N (non-structural, repaired)</option>
+          <option value="cat_d">Category D (older write-off)</option>
+          <option value="cat_c">Category C (older write-off)</option>
+        </select>
+      </div>
+      <div class="f" id="condWrap" style="margin-top:16px;margin-bottom:0" hidden>
+        <label for="fCondition">Explain the damage and repair <span class="req">*</span></label>
+        <textarea class="ta" id="fCondition"
+          placeholder="What was damaged, what you did to fix it, and why it's safe. Customers respect honesty here — it sells cars."></textarea>
+        <p class="hint">This shows in a highlighted box on the car’s page. Being upfront builds trust.</p>
+      </div>
+    </div>
+
+    <!-- Words -->
+    <div class="section-card">
+      <h2>Description</h2>
+      <div class="f" style="margin-bottom:12px">
+        <textarea class="ta" id="fDescription" style="min-height:150px"
+          placeholder="Talk about it like you would to a customer stood next to it. What's good, what's honest, why it's worth the money."></textarea>
+      </div>
+      <button class="btn btn--outline btn--sm btn--block" id="draftDescBtn" type="button">
+        Write one for me from the details above
+      </button>
+    </div>
+
+    <!-- Private figures -->
+    <div class="section-card" style="border:2px dashed var(--line)">
+      <h2 style="color:var(--amber-600)">🔒 Just for you — never on the website</h2>
+      <p class="hint" style="margin:-6px 0 16px">
+        Optional. Fill these in and the Insights tab can show you what you
+        actually made on each car. Customers can never see them.
+      </p>
+      <div class="row-2">
+        <div class="f">
+          <label for="fPurchase">What you paid</label>
+          <div class="money"><input class="in" id="fPurchase" type="number" inputmode="numeric" placeholder="0"></div>
+        </div>
+        <div class="f">
+          <label for="fPrep">Prep costs</label>
+          <div class="money"><input class="in" id="fPrep" type="number" inputmode="numeric" placeholder="0"></div>
+        </div>
+      </div>
+      <div class="f" style="margin-top:16px;margin-bottom:0">
+        <label for="fPrivateNotes">Private notes</label>
+        <textarea class="ta" id="fPrivateNotes" style="min-height:80px"
+          placeholder="Where you bought it, what needed doing, who to chase for the V5 — anything you want to remember."></textarea>
+      </div>
+    </div>
+
+    <!-- Features -->
+    <div class="section-card">
+      <h2>Equipment</h2>
+      <p class="hint" style="margin:-6px 0 14px">Tap anything this car has.</p>
+      <div class="chips" id="fFeatures"></div>
+      <button class="btn btn--outline btn--sm" id="addFeatureBtn" type="button" style="margin-top:12px">
+        + Add something else
+      </button>
+    </div>
+
+    <div style="height:12px"></div>
+  </section>
+
+  <!-- ---------------------------------------------- AUCTION / VALUE -->
+  <section class="view is-hidden" id="valueView">
+    <div class="section-card">
+      <h2>Check a car before you bid</h2>
+      <div class="plate-wrap">
+        <span class="plate-holder">
+          <input class="plate-input" id="vReg" placeholder="AB12 CDE"
+                 autocomplete="off" autocapitalize="characters" spellcheck="false"
+                 inputmode="text">
+        </span>
+        <button class="btn btn--primary" id="vLookup" type="button" style="min-width:96px">Check</button>
+      </div>
+      <p class="hint" id="vHint" style="margin-top:10px">
+        Pulls the DVLA record and the full MOT history — mileage every year,
+        every advisory, and anything that should worry you.
+      </p>
+    </div>
+
+    <div class="msg" id="vMsg" role="status"></div>
+    <div id="vResult"></div>
+  </section>
+
+  <!-- ---------------------------------------------- ENQUIRIES -->
+  <section class="view is-hidden" id="enqView">
+    <div class="segment" id="enqTabs">
+      <button data-tab="new" class="is-on">New</button>
+      <button data-tab="requests">Car requests</button>
+      <button data-tab="all">All</button>
+    </div>
+    <div id="enqList"></div>
+  </section>
+
+  <!-- ---------------------------------------------- INSIGHTS -->
+  <section class="view is-hidden" id="dataView">
+    <div class="segment" id="dataTabs">
+      <button data-tab="cars" class="is-on">Cars</button>
+      <button data-tab="ageing">Ageing</button>
+      <button data-tab="demand">Demand</button>
+    </div>
+    <div class="msg" id="dataMsg" role="status"></div>
+    <div id="dataBody"></div>
+  </section>
+
+  <!-- ---------------------------------------------- SETTINGS -->
+  <section class="view is-hidden" id="moreView">
+    <div class="section-card">
+      <h2>Signed in as</h2>
+      <p style="font-size:17px;font-weight:700" id="whoami">—</p>
+      <button class="btn btn--outline btn--block" id="signOutBtn" style="margin-top:16px">Sign out</button>
+    </div>
+
+    <div class="section-card">
+      <h2>Quick help</h2>
+      <div class="sheet-actions">
+        <div class="sheet-action" style="align-items:flex-start;padding-block:14px">
+          <div>
+            <strong style="display:block;margin-bottom:4px">Adding a car</strong>
+            <small>Tap the gold “Add a car” button, take or choose your photos, type the number
+            plate and hit Look up. Fill in price and mileage, then Publish.</small>
+          </div>
+        </div>
+        <div class="sheet-action" style="align-items:flex-start;padding-block:14px">
+          <div>
+            <strong style="display:block;margin-bottom:4px">Marking a car sold</strong>
+            <small>Tap the car in your list, then “Mark as sold”. It moves off the stock page
+            straight away and appears under Recently Sold — without the price.</small>
+          </div>
+        </div>
+        <div class="sheet-action" style="align-items:flex-start;padding-block:14px">
+          <div>
+            <strong style="display:block;margin-bottom:4px">Photos not uploading?</strong>
+            <small>Usually a weak signal. They’ll upload fine on wi-fi. Nothing is lost —
+            save it as a draft and add the photos later.</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <h2>The website</h2>
+      <a class="btn btn--outline btn--block" href="../index.html" target="_blank">Open the public website</a>
+    </div>
+
+    <div class="section-card">
+      <h2>Back up your data</h2>
+      <p class="hint" style="margin:-6px 0 14px">
+        Downloads everything as spreadsheets — cars, enquiries, car requests,
+        your price book and price history. Worth doing before year end, and
+        worth having if you ever lose access to anything.
+      </p>
+      <button class="btn btn--outline btn--block" id="exportAll">Export everything</button>
+      <div id="exportStatus" class="hint" style="margin-top:10px"></div>
+    </div>
+
+    <p style="text-align:center;color:var(--ink-4);font-size:13px;margin-top:24px">
+      MBU Admin · <span id="verLabel">v1.0</span>
+    </p>
+  </section>
+
+  <!-- ---------------------------------------------- TAB BAR -->
+  <nav class="tabbar" id="tabbar">
+    <button data-view="stock" class="is-on">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17v-4.2a2 2 0 0 1 .2-.9l2-4A2 2 0 0 1 7 6.8h10a2 2 0 0 1 1.8 1.1l2 4a2 2 0 0 1 .2.9V17"/><line x1="3" y1="14" x2="21" y2="14"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/></svg>
+      Stock
+    </button>
+    <button data-view="value">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m13.5 8.5-5 5"/><path d="m6.5 10.5 3.5 3.5-3 3a2.1 2.1 0 0 1-3-3Z"/><path d="M11 6 17 12l2.5-2.5a2.1 2.1 0 0 0 0-3l-3-3a2.1 2.1 0 0 0-3 0Z"/><line x1="3" y1="21" x2="13" y2="21"/></svg>
+      Value
+    </button>
+    <button data-view="enq">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M4.6 5.5 3 13v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5l-1.6-7.5A2 2 0 0 0 17.4 4H6.6a2 2 0 0 0-2 1.5Z"/></svg>
+      Inbox
+      <span class="tab-dot is-zero" id="enqDot"></span>
+    </button>
+    <button data-view="data">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="20" x2="21" y2="20"/><rect x="5" y="11" width="3.6" height="9" rx="1"/><rect x="10.2" y="6" width="3.6" height="14" rx="1"/><rect x="15.4" y="14" width="3.6" height="6" rx="1"/></svg>
+      Insights
+    </button>
+    <button data-view="more">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/></svg>
+      More
+    </button>
+  </nav>
+
+  <button class="fab" id="addFab">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Add a car
+  </button>
+
+  <!-- Sticky save bar (shown on the form) -->
+  <div class="savebar" id="saveBar" hidden>
+    <button class="btn btn--outline" id="saveDraftBtn">Save draft</button>
+    <button class="btn btn--brass" id="publishBtn">Publish</button>
+  </div>
+</div>
+
+<!-- ======================================================== SHEET -->
+<div class="sheet-back" id="sheetBack"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <h2 id="sheetTitle"></h2>
+  <p class="sheet-sub" id="sheetSub"></p>
+  <div class="sheet-actions" id="sheetActions"></div>
+  <button class="btn btn--ghost btn--block" id="sheetCancel" style="margin-top:10px">Cancel</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/features.js"></script>
+<script src="../assets/js/autotrader-adapter.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

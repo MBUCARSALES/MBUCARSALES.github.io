@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Car details — MBU Car Sales</title>
+<meta name="description" content="Full details, photos and specification for this used car at MBU Car Sales, Newcastle upon Tyne.">
+<meta property="og:title" content="MBU Car Sales — Newcastle upon Tyne">
+<meta property="og:description" content="Quality used cars, honestly priced and properly prepared.">
+<meta property="og:image" content="https://mbucarsales.github.io/assets/img/og-default.jpg">
+<meta name="theme-color" content="#0D1626">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/pages.css">
+</head>
+<body>
+
+<div id="site-header-slot"></div>
+
+<main id="main">
+  <div id="carRoot">
+    <section class="section">
+      <div class="container">
+        <div class="car-layout">
+          <div><div class="skeleton" style="aspect-ratio:4/3;border-radius:16px"></div></div>
+          <div><div class="skeleton" style="height:320px;border-radius:16px"></div></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer">
+  <button class="lightbox-close" id="lbClose" aria-label="Close">
+    <svg viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <button class="lightbox-nav lightbox-nav--prev" id="lbPrev" aria-label="Previous photo">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <img id="lbImg" src="" alt="">
+  <button class="lightbox-nav lightbox-nav--next" id="lbNext" aria-label="Next photo">
+    <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <span class="lightbox-counter" id="lbCount"></span>
+</div>
+
+<div id="site-footer-slot"></div>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/features.js"></script>
+<script src="assets/js/demo-data.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  const root = document.getElementById('carRoot');
+
+  // Normally the car comes from ?id=. The pre-rendered share pages under
+  // /c/<id>/ have no query string, so they set this instead — that's what
+  // lets a link forwarded on WhatsApp show the actual car in the preview.
+  const id = window.MBU_FORCED_CAR_ID || MBU.param('id');
+  const icon = MBU.icon, esc = MBU.esc, fmt = MBU.fmt;
+
+  if (!id) return notFound();
+
+  MBU.getCar(id).then(car => car ? render(car) : notFound());
+
+  /* ------------------------------------------------------------ 404 */
+  function notFound() {
+    // Tell the truth about which problem this is — "car not found" when the
+    // database is actually down sends people away for no reason.
+    if (MBU.loadFailed) {
+      root.innerHTML = `<section class="section"><div class="container"
+        style="max-width:640px">${MBU.loadErrorState()}</div></section>`;
+      return;
+    }
+    root.innerHTML = `
+      <section class="section">
+        <div class="container" style="max-width:640px">
+          ${MBU.emptyState(
+            'We can’t find that car',
+            'It may have been sold and removed from the site. Have a look at what we have in stock at the moment, or ask us what is on its way in.',
+            `<div class="cluster" style="justify-content:center">
+               <a class="btn btn--primary" href="${MBU.link('stock.html')}">Browse our stock</a>
+               <a class="btn btn--wa" target="_blank" rel="noopener"
+                  href="${MBU.waLink('Hi MBU Car Sales, I was looking at a car on your website that seems to have gone. What else have you got?')}">
+                  Ask us what’s available</a>
+             </div>`)}
+        </div>
+      </section>`;
+  }
+
+  /* --------------------------------------------------------- RENDER */
+  function render(car) {
+    const title = fmt.title(car);
+    const sub = fmt.subtitle(car);
+    const sold = car.status === 'sold';
+    const reserved = car.status === 'reserved';
+    const images = car.images && car.images.length ? car.images : [null];
+
+    /* --- page metadata --- */
+    // Never print a price for a sold car — not even in the browser tab.
+    document.title = `${title}${sub ? ' ' + sub : ''} — ${sold ? 'Sold' : fmt.price(car.price)} — MBU Car Sales`;
+    setMeta('description', (car.description || `${title} for sale at MBU Car Sales, Newcastle upon Tyne.`).slice(0, 158));
+    setMeta('og:title', `${title} — ${sold ? 'Sold' : fmt.price(car.price)}`, true);
+    setMeta('og:description', (car.description || 'Quality used cars from MBU Car Sales, Newcastle.').slice(0, 158), true);
+    if (car.images && car.images[0]) setMeta('og:image', MBU.img(car.images[0], 'hero'), true);
+
+    /* --- badges --- */
+    const flags = [];
+    if (sold) flags.push('<span class="badge badge--solid">SOLD</span>');
+    else if (reserved) flags.push('<span class="badge badge--amber badge--dot">Reserved</span>');
+    if (car.hpi_status === 'clear') flags.push(`<span class="badge badge--green">${icon('shield')}HPI Clear</span>`);
+    else if (car.hpi_status) flags.push(`<span class="badge badge--blue">${esc(MBU.label('hpi', car.hpi_status).split(' (')[0])}</span>`);
+    if (car.service_history === 'full') flags.push('<span class="badge badge--green">Full service history</span>');
+
+    /* --- key spec pills --- */
+    const pills = [
+      car.year && { i: 'calendar', t: car.year },
+      car.mileage != null && { i: 'gauge', t: fmt.miles(car.mileage) },
+      car.fuel && { i: 'fuel', t: MBU.label('fuel', car.fuel) },
+      car.transmission && { i: 'gearbox', t: MBU.label('transmission', car.transmission) },
+      car.engine_size && { i: 'engine', t: fmt.engine(car.engine_size) },
+      car.body_type && { i: 'car', t: MBU.label('body', car.body_type) },
+      car.doors && { i: 'door', t: car.doors + ' doors' },
+      car.colour && { i: 'palette', t: car.colour }
+    ].filter(Boolean);
+
+    /* --- full spec table --- */
+    const specs = [
+      ['Registration', car.registration ? fmt.reg(car.registration) : null],
+      ['Year', car.year],
+      ['Mileage', car.mileage != null ? fmt.miles(car.mileage) : null],
+      ['Fuel', car.fuel && MBU.label('fuel', car.fuel)],
+      ['Gearbox', car.transmission && MBU.label('transmission', car.transmission)],
+      ['Engine', car.engine_size && fmt.engine(car.engine_size)],
+      ['Body type', car.body_type && MBU.label('body', car.body_type)],
+      ['Doors', car.doors],
+      ['Colour', car.colour],
+      ['Previous owners', car.previous_owners],
+      ['MOT expires', car.mot_expiry && fmt.date(car.mot_expiry)],
+      ['Service history', car.service_history && MBU.label('service', car.service_history)],
+      ['Vehicle history', car.hpi_status && MBU.label('hpi', car.hpi_status)]
+    ].filter(([, v]) => v != null && v !== '');
+
+    const waHref = MBU.waCarLink(car);
+
+    root.innerHTML = `
+    <section class="page-head" style="padding-block:28px">
+      <div class="container">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="${MBU.link('index.html')}">Home</a>${chev()}
+          <a href="${MBU.link('stock.html')}">${sold ? 'Stock' : 'Our stock'}</a>${chev()}
+          <span>${esc(title)}</span>
+        </nav>
+        <div class="cluster" style="gap:10px;margin-bottom:10px">${flags.join('')}</div>
+        <h1 style="font-size:clamp(1.6rem,3.6vw,2.4rem)">${esc(title)}</h1>
+        ${sub ? `<p style="margin-top:6px;font-size:1.05rem">${esc(sub)}</p>` : ''}
+      </div>
+    </section>
+
+    <section class="section section--tight">
+      <div class="container">
+        <div class="car-layout">
+
+          <!-- ======================= LEFT: gallery + detail -->
+          <div>
+            ${MBU.hasVideo(car) ? `
+              <div class="walkaround">
+                <div class="walkaround-head">
+                  ${icon('camera')}
+                  <div>
+                    <strong>Walkaround video</strong>
+                    <span>Us showing you round the actual car — sound on.</span>
+                  </div>
+                </div>
+                <video controls playsinline preload="none"
+                       poster="${MBU.video(car.video, 'poster')}"
+                       src="${MBU.video(car.video, 'play')}"
+                       id="carVideo"></video>
+              </div>` : ''}
+
+            <div class="gallery">
+              <div class="gallery-main" id="galMain">
+                <img id="galImg" src="${MBU.img(images[0], 'hero')}" alt="${esc(title)}"
+                     onerror="this.onerror=null;this.src='${MBU.PLACEHOLDER}'">
+                ${flags.length ? `<div class="gallery-flags">${sold ? '<span class="badge badge--solid">SOLD</span>' : reserved ? '<span class="badge badge--amber badge--dot">Reserved</span>' : ''}</div>` : ''}
+                ${images.length > 1 ? `
+                  <button class="gallery-nav gallery-nav--prev" id="galPrev" aria-label="Previous photo">${icon('chevronL')}</button>
+                  <button class="gallery-nav gallery-nav--next" id="galNext" aria-label="Next photo">${icon('chevronR')}</button>
+                  <span class="gallery-counter" id="galCount">1 / ${images.length}</span>` : ''}
+              </div>
+              ${images.length > 1 ? `
+                <div class="thumbs" id="galThumbs">
+                  ${images.map((im, i) => `
+                    <button class="thumb${i === 0 ? ' is-on' : ''}" data-i="${i}" aria-label="Photo ${i + 1}">
+                      <img src="${MBU.img(im, 'thumb')}" alt="" loading="lazy"
+                           onerror="this.onerror=null;this.src='${MBU.PLACEHOLDER}'">
+                    </button>`).join('')}
+                </div>` : ''}
+            </div>
+
+            <div class="cluster" style="margin-top:22px;gap:8px">
+              ${pills.map(p => `<span class="spec-pill">${icon(p.i)}${esc(p.t)}</span>`).join('')}
+            </div>
+
+            ${car.condition_notes ? `
+              <div class="notice notice--amber" style="margin-top:22px">
+                ${icon('shield')}
+                <div><strong>About this car’s history — please read</strong>${esc(car.condition_notes)}</div>
+              </div>` : ''}
+
+            ${(!sold && MBU_CONFIG.warranty && MBU_CONFIG.warranty.enabled
+               && MBU_CONFIG.warranty.label
+               && (car.price || 0) >= (MBU_CONFIG.warranty.minPrice || 0)) ? `
+              <div class="notice notice--blue" style="margin-top:22px">
+                ${icon('shield')}
+                <div><strong>${esc(MBU_CONFIG.warranty.label)}</strong>${esc(MBU_CONFIG.warranty.detail || '')}</div>
+              </div>` : ''}
+
+            ${car.description ? `
+              <div class="car-section" style="margin-top:8px">
+                <h2>About this ${esc(car.make || 'car')}</h2>
+                ${esc(car.description).split(/\n+/).map(p => `<p>${p}</p>`).join('')}
+              </div>` : ''}
+
+            <div class="car-section">
+              <h2>Specification</h2>
+              <dl class="spec-table">
+                ${specs.map(([k, v]) => `
+                  <div class="spec-item"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}
+              </dl>
+            </div>
+
+            ${(car.features && car.features.length) ? `
+              <div class="car-section">
+                <h2>Equipment &amp; features</h2>
+                ${(window.MBU_FEATURES ? MBU_FEATURES.group(car.features) : [{ label: '', items: car.features }])
+                  .map(g => `
+                    <div class="feature-group">
+                      ${g.label ? `<h3 class="feature-group-title">${esc(g.label)}</h3>` : ''}
+                      <ul class="feature-list">
+                        ${g.items.map(f => `<li>${icon('check')}${esc(f)}</li>`).join('')}
+                      </ul>
+                    </div>`).join('')}
+              </div>` : ''}
+
+            <div class="car-section">
+              <h2>${sold ? 'Buying from us' : 'Buying this car'}</h2>
+              <div class="grid grid--3" style="gap:16px">
+                ${[
+                  ['shield', 'Checked before you see it', 'Serviced, MOT’d and road-tested by us. Anything that needed doing has been done.'],
+                  ['tag', 'Part exchange welcome', 'Bring your old car along and we will give you a straight price for it on the spot.'],
+                  ['people', 'No pressure', 'Take your time, bring a mechanic, drive it properly. We would rather you were sure.']
+                ].map(([ic, h, t]) => `
+                  <div class="panel panel--flat">
+                    <div class="info-card-icon" style="width:38px;height:38px;margin-bottom:10px">${icon(ic)}</div>
+                    <h3 style="font-size:var(--fs-md);margin-bottom:4px">${h}</h3>
+                    <p class="small muted" style="line-height:1.6">${t}</p>
+                  </div>`).join('')}
+              </div>
+            </div>
+
+            ${sold ? `
+            <!-- Sold: point at the car finder instead of an enquiry form -->
+            <div class="car-section" id="enquire">
+              <h2>Want one like this?</h2>
+              <p class="muted" style="margin-bottom:22px">
+                We’re at auction most weeks and see hundreds of cars that never make
+                it onto the website. Tell us what you need and we’ll look out for
+                another ${esc([car.make, car.model].filter(Boolean).join(' ') || 'one')} —
+                or something close to it.
+              </p>
+              <div class="panel panel--flat" style="text-align:center;padding:36px 24px">
+                <div class="info-card-icon" style="margin:0 auto 16px">${icon('heart')}</div>
+                <h3 style="margin-bottom:8px">Register your interest</h3>
+                <p class="muted small" style="max-width:44ch;margin:0 auto 22px;line-height:1.7">
+                  Takes a minute. No deposit, no obligation, and we’ll send you photos
+                  and a price before we bid on anything.
+                </p>
+                <a class="btn btn--brass btn--lg" href="${MBU.link('wanted.html?car=' + encodeURIComponent(car.id))}">
+                  Tell us what you’re after
+                </a>
+              </div>
+            </div>
+            ` : `
+            <!-- Enquiry form -->
+            <div class="car-section" id="enquire">
+              <h2>Ask us about this car</h2>
+              <p class="muted small" style="margin-bottom:20px">
+                Fastest way to reach us is WhatsApp, but if you would rather email then fill this in
+                and we will come back to you. We answer everything.
+              </p>
+              <form class="panel" id="carForm" novalidate>
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="cfName">Your name <span class="req">*</span></label>
+                    <input class="input" id="cfName" name="name" required autocomplete="name">
+                  </div>
+                  <div class="field">
+                    <label for="cfPhone">Phone number <span class="req">*</span></label>
+                    <input class="input" id="cfPhone" name="phone" type="tel" required autocomplete="tel">
+                  </div>
+                  <div class="field span-2">
+                    <label for="cfEmail">Email address</label>
+                    <input class="input" id="cfEmail" name="email" type="email" autocomplete="email">
+                  </div>
+                  <div class="field span-2">
+                    <label for="cfMsg">Your message</label>
+                    <textarea class="textarea" id="cfMsg" name="message">I’d like to know more about the ${esc(title)}${car.registration ? ' (' + esc(fmt.reg(car.registration)) + ')' : ''}. Is it still available and when could I come and see it?</textarea>
+                  </div>
+                  <div class="span-2">
+                    <label class="checkbox">
+                      <input type="checkbox" id="cfPartEx">
+                      <span>I’ve got a car to part exchange</span>
+                    </label>
+                  </div>
+                  <div class="field span-2" id="cfPartExWrap" hidden>
+                    <label for="cfPartExDetails">What have you got?</label>
+                    <input class="input" id="cfPartExDetails"
+                           placeholder="e.g. 2014 Astra, 90,000 miles, reg AB14 CDE">
+                    <span class="hint">Rough details are fine — we’ll give you a straight price when you come.</span>
+                  </div>
+
+                  ${MBU_CONFIG.finance && MBU_CONFIG.finance.enabled ? `
+                  <div class="span-2">
+                    <label class="checkbox">
+                      <input type="checkbox" id="cfFinance">
+                      <span>I’d be interested in finance options</span>
+                    </label>
+                  </div>` : ''}
+
+                  <div class="field span-2 hp-field">
+                    <label for="cfCompany">Company</label>
+                    <input class="input" id="cfCompany" name="company" tabindex="-1" autocomplete="off">
+                  </div>
+                  <div class="span-2">
+                    <label class="checkbox">
+                      <input type="checkbox" id="cfConsent" required>
+                      <span>I’m happy for MBU Car Sales to store these details so they can reply to my enquiry.</span>
+                    </label>
+                  </div>
+                  <div class="span-2 form-status" id="cfStatus" role="status"></div>
+                  <div class="span-2">
+                    <button class="btn btn--primary btn--lg" type="submit" id="cfSubmit">Send enquiry</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+            `}
+          </div>
+
+          <!-- ======================= RIGHT: buy panel -->
+          <aside>
+            <div class="buy-panel">
+              <div class="buy-panel-head">
+                ${sold
+                  ? `<div class="price" style="font-size:1.6rem;color:#fff">Now sold</div>
+                     <div class="price-sub">${car.sold_at ? 'Sold ' + esc(fmt.ago(car.sold_at)) : 'This car has found a new home'}</div>`
+                  : `<div class="price">${fmt.price(car.price)}</div>
+                     ${(car.previous_price && car.price != null && car.previous_price > car.price)
+                       ? `<div class="price-sub">
+                            <span style="text-decoration:line-through;opacity:.75">${fmt.price(car.previous_price)}</span>
+                            &nbsp;·&nbsp;<strong style="color:#fff">Reduced by ${fmt.price(car.previous_price - car.price)}</strong>
+                          </div>`
+                       : `<div class="price-sub">No admin fees. Part exchange welcome.</div>`}`}
+                ${car.registration ? `<div style="margin-top:16px"><span class="reg-plate">${esc(fmt.reg(car.registration))}</span></div>` : ''}
+              </div>
+              <div class="buy-panel-body">
+                ${sold ? `
+                  <p class="small muted" style="margin-bottom:6px">
+                    This one has gone — but we buy cars like it most weeks. Register your
+                    interest and we’ll look out for another at auction.
+                  </p>
+                  <a class="btn btn--brass btn--lg" href="${MBU.link('wanted.html?car=' + encodeURIComponent(car.id))}">
+                    ${icon('heart')} Want one like this?
+                  </a>
+                  <a class="btn btn--wa" href="${MBU.waLink('Hi MBU Car Sales, I saw the ' + title + ' has sold. Could you look out for another one like it?')}" target="_blank" rel="noopener">
+                    ${icon('whatsapp')} Ask on WhatsApp
+                  </a>
+                  <a class="btn btn--outline" href="${MBU.link('stock.html')}">See what’s in stock</a>
+                  <p class="buy-note">
+                    No deposit, no obligation. We’ll send you photos and a price
+                    before we bid on anything.
+                  </p>
+                ` : `
+                  <a class="btn btn--wa btn--lg" href="${waHref}" target="_blank" rel="noopener">
+                    ${icon('whatsapp')} Message on WhatsApp
+                  </a>
+                  <a class="btn btn--primary" href="${MBU.telLink()}">
+                    ${icon('phone')} ${esc(MBU_CONFIG.business.phone)}
+                  </a>
+                  <a class="btn btn--outline" href="#enquire">
+                    ${icon('mail')} Send an enquiry
+                  </a>
+                  <p class="buy-note">
+                    Viewings by appointment, seven days a week.<br>
+                    Message any time — we usually reply within the hour.
+                  </p>
+                `}
+                <hr class="divider" style="margin:8px 0">
+                <button class="btn btn--ghost btn--sm" id="shareBtn" type="button" style="width:100%">
+                  ${icon('share')} Share this car
+                </button>
+              </div>
+            </div>
+
+            <div class="panel panel--flat" style="margin-top:16px">
+              <h3 style="font-size:var(--fs-md);margin-bottom:12px">Where we are</h3>
+              <div class="cluster" style="gap:10px;align-items:flex-start">
+                ${icon('mapPin', 'muted')}
+                <div class="small muted" style="line-height:1.6">
+                  ${esc(MBU_CONFIG.business.town)}<br>${esc(MBU_CONFIG.business.region)}
+                </div>
+              </div>
+              <div class="cluster" style="gap:10px;align-items:flex-start;margin-top:12px">
+                ${icon('clock', 'muted')}
+                <div class="small muted" style="line-height:1.6" id="todayHours"></div>
+              </div>
+            </div>
+          </aside>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Similar cars -->
+    <section class="section section--tint" id="similarSection" hidden>
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">You might also like</span>
+          <h2>Similar cars in stock</h2>
+        </div>
+        <div class="grid grid--cars" id="similarGrid"></div>
+      </div>
+    </section>`;
+
+    wireGallery(images, title);
+    wireShare(car, title);
+    wireForm(car, title);
+    showTodayHours();
+    showSimilar(car);
+    MBU.reveal();
+
+    /* --- anonymous interest tracking (no cookies, see data.js) --- */
+    MBU.track('view', car.id, { status: car.status });
+    MBU.autoTrackLinks(car.id);          // counts WhatsApp and phone taps
+    MBU.trackGrid(document);             // counts clicks on "similar cars"
+  }
+
+  /* ------------------------------------------------------- GALLERY */
+  function wireGallery(images, title) {
+    let i = 0;
+    const img = document.getElementById('galImg');
+    const count = document.getElementById('galCount');
+    const thumbs = MBU.qsa('#galThumbs .thumb');
+
+    function show(n) {
+      i = (n + images.length) % images.length;
+      img.src = MBU.img(images[i], 'hero');
+      img.alt = `${title} — photo ${i + 1}`;
+      if (count) count.textContent = `${i + 1} / ${images.length}`;
+      thumbs.forEach((t, k) => t.classList.toggle('is-on', k === i));
+      const active = thumbs[i];
+      if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    }
+
+    const prev = document.getElementById('galPrev');
+    const next = document.getElementById('galNext');
+    prev && prev.addEventListener('click', e => { e.stopPropagation(); show(i - 1); });
+    next && next.addEventListener('click', e => { e.stopPropagation(); show(i + 1); });
+    thumbs.forEach(t => t.addEventListener('click', () => show(+t.dataset.i)));
+
+    /* swipe */
+    const main = document.getElementById('galMain');
+    let x0 = null;
+    main.addEventListener('touchstart', e => { x0 = e.changedTouches[0].clientX; }, { passive: true });
+    main.addEventListener('touchend', e => {
+      if (x0 === null) return;
+      const dx = e.changedTouches[0].clientX - x0;
+      if (Math.abs(dx) > 45) { show(dx < 0 ? i + 1 : i - 1); x0 = null; }
+    }, { passive: true });
+
+    /* lightbox */
+    const lb = document.getElementById('lightbox');
+    const lbImg = document.getElementById('lbImg');
+    const lbCount = document.getElementById('lbCount');
+    let j = 0;
+
+    function lbShow(n) {
+      j = (n + images.length) % images.length;
+      lbImg.src = MBU.img(images[j], 'full');
+      lbImg.alt = `${title} — photo ${j + 1}`;
+      lbCount.textContent = `${j + 1} / ${images.length}`;
+    }
+    function lbOpen() {
+      j = i; lbShow(j);
+      lb.classList.add('is-open');
+      document.body.style.overflow = 'hidden';
+      MBU.track('gallery_open', id);
+    }
+    function lbClose() { lb.classList.remove('is-open'); document.body.style.overflow = ''; show(j); }
+
+    main.addEventListener('click', e => { if (!e.target.closest('.gallery-nav')) lbOpen(); });
+    document.getElementById('lbClose').addEventListener('click', lbClose);
+    document.getElementById('lbPrev').addEventListener('click', e => { e.stopPropagation(); lbShow(j - 1); });
+    document.getElementById('lbNext').addEventListener('click', e => { e.stopPropagation(); lbShow(j + 1); });
+    lb.addEventListener('click', e => { if (e.target === lb) lbClose(); });
+
+    let lx = null;
+    lb.addEventListener('touchstart', e => { lx = e.changedTouches[0].clientX; }, { passive: true });
+    lb.addEventListener('touchend', e => {
+      if (lx === null) return;
+      const dx = e.changedTouches[0].clientX - lx;
+      if (Math.abs(dx) > 45) { lbShow(dx < 0 ? j + 1 : j - 1); lx = null; }
+    }, { passive: true });
+
+    document.addEventListener('keydown', e => {
+      if (lb.classList.contains('is-open')) {
+        if (e.key === 'Escape') lbClose();
+        if (e.key === 'ArrowLeft') lbShow(j - 1);
+        if (e.key === 'ArrowRight') lbShow(j + 1);
+      } else {
+        if (e.key === 'ArrowLeft') show(i - 1);
+        if (e.key === 'ArrowRight') show(i + 1);
+      }
+    });
+  }
+
+  /* --------------------------------------------------------- SHARE */
+  function wireShare(car, title) {
+    const btn = document.getElementById('shareBtn');
+    btn.addEventListener('click', async () => {
+      MBU.track('share', car.id);
+      // Always share the pre-rendered URL — that's the one with a proper
+      // preview, even if you're currently on the ?id= version.
+      const url = MBU.carUrl(car);
+      const data = { title: `${title} — MBU Car Sales`, text: `Have a look at this ${title} at MBU Car Sales`, url };
+      if (navigator.share) { try { await navigator.share(data); return; } catch { /* cancelled */ } }
+      try {
+        await navigator.clipboard.writeText(url);
+        btn.innerHTML = MBU.icon('check') + ' Link copied';
+        setTimeout(() => { btn.innerHTML = MBU.icon('share') + ' Share this car'; }, 2200);
+      } catch { prompt('Copy this link:', url); }
+    });
+  }
+
+  /* ---------------------------------------------------------- FORM */
+  function wireForm(car, title) {
+    const form = document.getElementById('carForm');
+    if (!form) return;                       // sold cars have no enquiry form
+    const status = document.getElementById('cfStatus');
+    const btn = document.getElementById('cfSubmit');
+
+    // Count someone starting the form, once — tells us how many begin
+    // but don't finish, which is the interesting number.
+    let started = false;
+    form.addEventListener('input', () => {
+      if (!started) { started = true; MBU.track('enquiry_start', car.id); }
+    }, { once: false });
+
+    // Part exchange details only appear once they say they have one
+    const px = document.getElementById('cfPartEx');
+    px && px.addEventListener('change', e => {
+      document.getElementById('cfPartExWrap').hidden = !e.target.checked;
+    });
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      status.className = 'span-2 form-status';
+
+      if (document.getElementById('cfCompany').value) return;   // bot
+
+      // NB: use getElementById, not form.name — HTMLFormElement.name is the
+      // form's own name attribute and shadows any input called "name".
+      const v = id => document.getElementById(id).value.trim();
+      const name = v('cfName');
+      const phone = v('cfPhone');
+      if (!name || !phone || !document.getElementById('cfConsent').checked) {
+        status.className = 'span-2 form-status form-status--err is-shown';
+        status.textContent = 'Please fill in your name and phone number, and tick the box so we can reply.';
+        return;
+      }
+
+      btn.disabled = true; btn.textContent = 'Sending…';
+      try {
+        await MBU.submitEnquiry({
+          kind: 'car',
+          car_id: String(car.id),
+          car_title: title,
+          name, phone,
+          email: v('cfEmail'),
+          message: v('cfMsg'),
+          part_ex: !!(px && px.checked),
+          part_ex_details: (px && px.checked) ? v('cfPartExDetails') : null,
+          finance_interest: !!(document.getElementById('cfFinance')
+                               && document.getElementById('cfFinance').checked),
+          details: { registration: car.registration || '', price: car.price }
+        });
+        MBU.track('enquiry_sent', car.id);
+        form.innerHTML = `
+          <div style="text-align:center;padding:28px 12px">
+            <div class="info-card-icon" style="margin:0 auto 16px;background:var(--green-100);color:var(--green-600)">${MBU.icon('checkCirc')}</div>
+            <h3 style="margin-bottom:8px">Thanks ${esc(name.split(' ')[0])} — message received</h3>
+            <p class="muted" style="max-width:44ch;margin:0 auto 20px">
+              We will be in touch shortly. If you would rather not wait, message us on WhatsApp and
+              you will usually get a reply within the hour.
+            </p>
+            <a class="btn btn--wa" href="${MBU.waCarLink(car)}" target="_blank" rel="noopener">
+              ${MBU.icon('whatsapp')} Message on WhatsApp instead
+            </a>
+          </div>`;
+      } catch (err) {
+        console.error(err);
+        status.className = 'span-2 form-status form-status--err is-shown';
+        status.innerHTML = `Sorry, that didn’t send. Please call us on
+          <a href="${MBU.telLink()}" style="text-decoration:underline">${esc(MBU_CONFIG.business.phone)}</a>
+          or message us on WhatsApp.`;
+        btn.disabled = false; btn.textContent = 'Send enquiry';
+      }
+    });
+  }
+
+  /* -------------------------------------------------- TODAY’S HOURS */
+  function showTodayHours() {
+    const el = document.getElementById('todayHours');
+    if (!el) return;
+    const names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const today = names[new Date().getDay()];
+    const row = MBU_CONFIG.business.openingHours.find(h => h.day === today);
+    el.innerHTML = row
+      ? `Open today<br><strong style="color:var(--navy-900)">${esc(row.hours)}</strong>`
+      : 'Viewings by appointment';
+  }
+
+  /* -------------------------------------------------- SIMILAR CARS */
+  function showSimilar(car) {
+    MBU.getAvailable().then(all => {
+      const others = all.filter(c => String(c.id) !== String(car.id));
+      if (!others.length) return;
+
+      const score = c => {
+        let s = 0;
+        if (c.body_type && c.body_type === car.body_type) s += 3;
+        if (c.make === car.make) s += 2;
+        if (c.fuel === car.fuel) s += 1;
+        if (car.price && c.price) s += Math.max(0, 3 - Math.abs(c.price - car.price) / Math.max(car.price, 1) * 6);
+        return s;
+      };
+      const picks = others.sort((a, b) => score(b) - score(a)).slice(0, 3);
+      document.getElementById('similarSection').hidden = false;
+      document.getElementById('similarGrid').innerHTML =
+        picks.map(c => `<div class="reveal">${MBU.carCard(c)}</div>`).join('');
+      MBU.reveal();
+    });
+  }
+
+  /* -------------------------------------------------------- HELPERS */
+  function chev() {
+    return `<svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+  function setMeta(key, value, isProperty) {
+    const attr = isProperty ? 'property' : 'name';
+    let el = document.querySelector(`meta[${attr}="${key}"]`);
+    if (!el) { el = document.createElement('meta'); el.setAttribute(attr, key); document.head.appendChild(el); }
+    el.setAttribute('content', value);
+  }
+})();
+</script>
+</body>
+</html>

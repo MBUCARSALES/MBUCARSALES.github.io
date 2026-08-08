@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MBU Car Sales — Quality Used Cars in Newcastle upon Tyne</title>
+<meta name="description" content="Hand-picked used cars, honestly priced and properly prepared. A father-and-son business in Newcastle upon Tyne. Browse our current stock or message us on WhatsApp.">
+<link rel="canonical" href="https://mbucarsales.github.io/">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MBU Car Sales">
+<meta property="og:title" content="MBU Car Sales — Quality Used Cars in Newcastle upon Tyne">
+<meta property="og:description" content="Hand-picked used cars, honestly priced and properly prepared. Browse our current stock.">
+<meta property="og:image" content="https://mbucarsales.github.io/assets/img/og-default.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0D1626">
+
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/icon-180.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/pages.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "AutoDealer",
+  "name": "MBU Car Sales",
+  "description": "Used car dealer in Newcastle upon Tyne offering hand-picked, properly prepared vehicles.",
+  "telephone": "+44 7438 510044",
+  "email": "mbusales39@gmail.com",
+  "url": "https://mbucarsales.github.io/",
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Newcastle upon Tyne",
+    "addressRegion": "Tyne and Wear",
+    "addressCountry": "GB"
+  },
+  "openingHoursSpecification": [
+    { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday"], "opens": "09:00", "closes": "22:00" },
+    { "@type": "OpeningHoursSpecification", "dayOfWeek": "Saturday", "opens": "09:00", "closes": "18:00" },
+    { "@type": "OpeningHoursSpecification", "dayOfWeek": "Sunday", "opens": "09:00", "closes": "12:00" }
+  ]
+}
+</script>
+</head>
+<body>
+
+<div id="site-header-slot"></div>
+
+<main id="main">
+
+  <!-- ================================================== HERO -->
+  <section class="hero">
+    <div class="hero-bg" style="background-image:url('https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=2000&q=70&auto=format&fit=crop')"></div>
+    <div class="container">
+      <div class="hero-inner">
+        <span class="eyebrow">Newcastle upon Tyne</span>
+        <h1>Used cars worth<br>your <em>trust</em>.</h1>
+        <p class="hero-sub">
+          We hand-pick every car from auction, prepare it properly in our own workshop,
+          and price it fairly. Father and son — you always deal with the people who
+          know the car inside out.
+        </p>
+        <div class="cluster hero-cta">
+          <a class="btn btn--brass btn--lg" href="stock.html">
+            View our stock
+            <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><polyline points="13 6 19 12 13 18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+          </a>
+          <a class="btn btn--onDark btn--lg" id="heroWa" href="#" target="_blank" rel="noopener">
+            Message on WhatsApp
+          </a>
+        </div>
+
+        <ul class="hero-trust" id="heroTrust"></ul>
+      </div>
+    </div>
+    <div class="hero-stat" id="heroStat" aria-hidden="true">
+      <b>—</b><span>Cars in stock</span>
+    </div>
+  </section>
+
+  <!-- ================================================== QUICK SEARCH -->
+  <div class="container quick-search-wrap">
+    <form class="quick-search" id="quickSearch" action="stock.html" method="get">
+      <div class="field">
+        <label for="qsMake">Make</label>
+        <select class="select" id="qsMake" name="make"><option value="">Any make</option></select>
+      </div>
+      <div class="field">
+        <label for="qsBody">Body type</label>
+        <select class="select" id="qsBody" name="body"><option value="">Any type</option></select>
+      </div>
+      <div class="field">
+        <label for="qsMax">Max price</label>
+        <select class="select" id="qsMax" name="maxPrice">
+          <option value="">No maximum</option>
+          <option value="3000">Up to £3,000</option>
+          <option value="5000">Up to £5,000</option>
+          <option value="7500">Up to £7,500</option>
+          <option value="10000">Up to £10,000</option>
+          <option value="15000">Up to £15,000</option>
+          <option value="25000">Up to £25,000</option>
+        </select>
+      </div>
+      <div class="qs-submit">
+        <button class="btn btn--primary btn--block" type="submit">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.9" fill="none"/><line x1="16.2" y1="16.2" x2="21" y2="21" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+          Search
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ================================================== LATEST STOCK -->
+  <section class="section">
+    <div class="container">
+      <div class="stock-toolbar" style="align-items:flex-end;margin-bottom:32px">
+        <div class="section-head" style="margin-bottom:0">
+          <span class="eyebrow">Available now</span>
+          <h2>Latest into stock</h2>
+          <p>Fresh in from auction, checked over and ready to view. Everything here is on site in Newcastle.</p>
+        </div>
+        <a class="btn btn--outline" href="stock.html">See all stock</a>
+      </div>
+
+      <div class="grid grid--cars" id="featuredGrid"></div>
+
+      <div class="center" style="margin-top:40px">
+        <a class="btn btn--primary btn--lg" href="stock.html">
+          Browse all our cars
+          <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><polyline points="13 6 19 12 13 18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================== WHY US -->
+  <section class="section section--tint">
+    <div class="container">
+      <div class="section-head section-head--center">
+        <span class="eyebrow" style="justify-content:center">Why buy from us</span>
+        <h2>A small business that has to get it right</h2>
+        <p>We are not a forecourt with a sales team on commission. Our name is on every car that leaves here, and word of mouth in Newcastle is the only advertising that has ever worked for us.</p>
+      </div>
+      <div class="grid grid--4" id="promiseGrid"></div>
+    </div>
+  </section>
+
+  <!-- ================================================== HOW IT WORKS -->
+  <section class="section">
+    <div class="container">
+      <div class="car-layout" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center">
+        <div>
+          <span class="eyebrow">How it works</span>
+          <h2 style="margin-bottom:16px">Straightforward from start to finish</h2>
+          <p class="lead" style="margin-bottom:36px">
+            No pressure, no haggling games, no admin fees bolted on at the end.
+            Here is exactly what happens when you find something you like.
+          </p>
+          <div class="steps" style="grid-template-columns:1fr;gap:28px">
+            <div class="step">
+              <h3>Get in touch</h3>
+              <p>Message us on WhatsApp or give us a ring. Tell us which car and when suits you — evenings and weekends are fine.</p>
+            </div>
+            <div class="step">
+              <h3>Come and see it</h3>
+              <p>We will have the car out, warmed up and ready. Take your time, bring someone who knows cars, take it for a drive. Ask us anything.</p>
+            </div>
+            <div class="step">
+              <h3>Drive it away</h3>
+              <p>Serviced, MOT'd and valeted before you collect. We handle the V5 transfer and you leave with the keys and the paperwork in order.</p>
+            </div>
+          </div>
+        </div>
+        <div class="reveal">
+          <img src="https://images.unsplash.com/photo-1625047509168-a7026f36de04?w=1000&q=75&auto=format&fit=crop"
+               alt="Preparing a car in the workshop"
+               style="border-radius:22px;box-shadow:var(--sh-3);aspect-ratio:4/5;object-fit:cover;width:100%"
+               onerror="this.style.display='none'">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================== CAR FINDER -->
+  <section class="section section--dark">
+    <div class="container">
+      <div class="section-head section-head--center">
+        <span class="eyebrow" style="justify-content:center">Can’t see what you want?</span>
+        <h2>Tell us what you’re after and we’ll find it</h2>
+        <p>We’re at auction most weeks. Give us the make, model and budget and we’ll
+           keep an eye out — no obligation, no deposit, and we’ll send you photos
+           before we bid on anything.</p>
+      </div>
+
+      <div class="steps" style="max-width:900px;margin:0 auto 40px">
+        <div class="step">
+          <h3>Tell us the brief</h3>
+          <p>Make, model, budget, mileage — as loose or as specific as you like.</p>
+        </div>
+        <div class="step">
+          <h3>We go looking</h3>
+          <p>We're at auction most weeks and see hundreds of cars you never will.</p>
+        </div>
+        <div class="step">
+          <h3>You decide</h3>
+          <p>We send photos and a price before we bid. No pressure, no commitment.</p>
+        </div>
+      </div>
+
+      <div class="center">
+        <a class="btn btn--brass btn--lg" href="wanted.html">Tell us what you’re looking for</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================== CTA -->
+  <section class="section">
+    <div class="container">
+      <div class="cta-band">
+        <div>
+          <h2>Got a car to sell?</h2>
+          <p>We buy outright — clean cars, damaged cars, non-runners, anything. Tell us what you have and we will come back with a no-obligation offer, usually the same day.</p>
+        </div>
+        <div class="cta-band-actions">
+          <a class="btn btn--brass btn--lg" href="sell.html">Get a free valuation</a>
+          <a class="btn btn--onDark btn--lg" id="ctaWa" href="#" target="_blank" rel="noopener">WhatsApp us</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="site-footer-slot"></div>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/demo-data.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  const B = MBU_CONFIG.business;
+
+  /* WhatsApp links */
+  const wa = MBU.waLink("Hi MBU Car Sales, I saw your website and I'm interested in your stock.");
+  const waSell = MBU.waLink("Hi MBU Car Sales, I have a car I'd like to sell. Can you give me a price?");
+  document.getElementById('heroWa').href = wa;
+  document.getElementById('ctaWa').href = waSell;
+
+  /* Trust bullets in the hero */
+  document.getElementById('heroTrust').innerHTML = [
+    'Every car HPI checked',
+    'Prepared in our own workshop',
+    'Part exchange welcome',
+    'Honest about any damage'
+  ].map(t => `<li>${MBU.icon('checkCirc')}${t}</li>`).join('');
+
+  /* Promise cards */
+  document.getElementById('promiseGrid').innerHTML = B.promises.map(p => `
+    <div class="info-card reveal">
+      <div class="info-card-icon">${MBU.icon(p.icon)}</div>
+      <h3>${MBU.esc(p.title)}</h3>
+      <p>${MBU.esc(p.text)}</p>
+    </div>`).join('');
+
+  /* Featured stock */
+  const grid = document.getElementById('featuredGrid');
+  grid.innerHTML = MBU.skeletonCards(6);
+
+  MBU.getFeatured().then(cars => {
+    if (!cars.length && MBU.loadFailed) {
+      grid.style.gridTemplateColumns = '1fr';
+      grid.innerHTML = MBU.loadErrorState();
+      return;
+    }
+    if (!cars.length) {
+      grid.innerHTML = MBU.emptyState(
+        'Nothing listed at the moment',
+        'We are between deliveries. New stock lands most weeks — message us and we will tell you what is on its way.',
+        `<a class="btn btn--wa" href="${wa}" target="_blank" rel="noopener">Ask what is coming in</a>`
+      );
+      grid.style.gridTemplateColumns = '1fr';
+      return;
+    }
+    grid.innerHTML = cars.map(c => `<div class="reveal">${MBU.carCard(c)}</div>`).join('');
+    MBU.reveal(grid);
+  });
+
+  /* Stock count in the hero */
+  MBU.getAvailable().then(cars => {
+    const stat = document.getElementById('heroStat');
+    if (cars.length) stat.querySelector('b').textContent = cars.length;
+    else stat.hidden = true;
+  });
+
+  /* Count clicks through to a car from the homepage grid */
+  MBU.trackGrid(grid);
+
+  /* Populate the quick-search dropdowns from real stock */
+  MBU.getAvailable().then(cars => {
+    const makes = [...new Set(cars.map(c => c.make).filter(Boolean))].sort();
+    const bodies = [...new Set(cars.map(c => c.body_type).filter(Boolean))].sort();
+    const mk = document.getElementById('qsMake');
+    const bd = document.getElementById('qsBody');
+    makes.forEach(m => mk.add(new Option(m, m)));
+    bodies.forEach(b => bd.add(new Option(MBU.label('body', b), b)));
+  });
+})();
+</script>
+</body>
+</html>

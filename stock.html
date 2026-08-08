@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Our Stock — MBU Car Sales, Newcastle upon Tyne</title>
+<meta name="description" content="Browse every used car currently in stock at MBU Car Sales in Newcastle upon Tyne. Filter by make, price, mileage, fuel and body type.">
+<link rel="canonical" href="https://mbucarsales.github.io/stock.html">
+<meta property="og:title" content="Our Stock — MBU Car Sales">
+<meta property="og:description" content="Browse every used car currently in stock at MBU Car Sales, Newcastle upon Tyne.">
+<meta property="og:image" content="https://mbucarsales.github.io/assets/img/og-default.jpg">
+<meta name="theme-color" content="#0D1626">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/pages.css">
+</head>
+<body>
+
+<div id="site-header-slot"></div>
+
+<main id="main">
+
+  <section class="page-head">
+    <div class="container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="index.html">Home</a>
+        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Our stock</span>
+      </nav>
+      <h1>Cars in stock</h1>
+      <p>Everything priced below is here in Newcastle, ready to view — and the price is what you pay, no admin fees.
+         Cars marked <strong>SOLD</strong> went in the last few weeks; if one of those is what you're after,
+         tell us and we'll look out for another at auction.</p>
+    </div>
+  </section>
+
+  <section class="section section--tight">
+    <div class="container">
+      <div class="stock-layout">
+
+        <!-- ============================================ FILTERS -->
+        <aside class="filters" id="filters" aria-label="Filter stock">
+          <div class="filters-head">
+            <h2>Filter</h2>
+            <button class="btn btn--ghost btn--sm" id="clearFilters" type="button">Clear all</button>
+          </div>
+
+          <div class="field">
+            <label for="fSearch">Search</label>
+            <input class="input" id="fSearch" type="search" placeholder="e.g. Golf, diesel, estate" autocomplete="off">
+          </div>
+
+          <div class="field">
+            <label for="fMake">Make</label>
+            <select class="select" id="fMake"><option value="">Any make</option></select>
+          </div>
+
+          <div class="field">
+            <label for="fModel">Model</label>
+            <select class="select" id="fModel"><option value="">Any model</option></select>
+          </div>
+
+          <div class="filter-group">
+            <span class="fg-title">Price (£)</span>
+            <div class="range-row">
+              <input class="input" id="fMinPrice" type="number" inputmode="numeric" placeholder="Min" min="0" step="250">
+              <span>to</span>
+              <input class="input" id="fMaxPrice" type="number" inputmode="numeric" placeholder="Max" min="0" step="250">
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <span class="fg-title">Year</span>
+            <div class="range-row">
+              <input class="input" id="fMinYear" type="number" inputmode="numeric" placeholder="From" min="1980" max="2030">
+              <span>to</span>
+              <input class="input" id="fMaxYear" type="number" inputmode="numeric" placeholder="To" min="1980" max="2030">
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="fMaxMiles">Maximum mileage</label>
+            <select class="select" id="fMaxMiles">
+              <option value="">Any mileage</option>
+              <option value="30000">Under 30,000</option>
+              <option value="50000">Under 50,000</option>
+              <option value="70000">Under 70,000</option>
+              <option value="90000">Under 90,000</option>
+              <option value="120000">Under 120,000</option>
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <span class="fg-title">Fuel</span>
+            <div class="chip-row" id="fFuel" data-key="fuel"></div>
+          </div>
+
+          <div class="filter-group">
+            <span class="fg-title">Gearbox</span>
+            <div class="chip-row" id="fTrans" data-key="transmission"></div>
+          </div>
+
+          <div class="filter-group">
+            <span class="fg-title">Body type</span>
+            <div class="chip-row" id="fBody" data-key="body_type"></div>
+          </div>
+
+          <div class="filter-group">
+            <span class="fg-title">Availability</span>
+            <label class="checkbox" style="font-weight:600">
+              <input type="checkbox" id="fHideSold">
+              <span>Hide recently sold cars</span>
+            </label>
+          </div>
+
+          <div class="filters-apply">
+            <button class="btn btn--primary btn--block" type="button" id="applyFilters">Show results</button>
+            <button class="btn btn--ghost btn--block" type="button" id="closeFilters">Close</button>
+          </div>
+        </aside>
+
+        <!-- ============================================ RESULTS -->
+        <div>
+          <div class="stock-toolbar">
+            <div class="result-count" id="resultCount">Loading stock…</div>
+            <div class="toolbar-right">
+              <button class="btn btn--outline btn--sm filter-open-btn" id="openFilters" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true" style="width:17px;height:17px"><path d="M3 5h18l-7 8v6l-4 2v-8Z" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linejoin="round"/></svg>
+                Filter
+              </button>
+              <label class="sr-only" for="fSort">Sort by</label>
+              <select class="select" id="fSort">
+                <option value="newest">Newest first</option>
+                <option value="price-asc">Price: low to high</option>
+                <option value="price-desc">Price: high to low</option>
+                <option value="miles-asc">Lowest mileage</option>
+                <option value="year-desc">Newest registration</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="active-filters" id="activeFilters"></div>
+
+          <div class="grid grid--cars" id="stockGrid"></div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="site-footer-slot"></div>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/demo-data.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  const $ = MBU.qs;
+  const grid = $('#stockGrid');
+  const countEl = $('#resultCount');
+  const activeEl = $('#activeFilters');
+
+  let ALL = [];
+  const state = {
+    search: '', make: '', model: '',
+    minPrice: '', maxPrice: '', minYear: '', maxYear: '', maxMiles: '',
+    fuel: [], transmission: [], body_type: [],
+    hideSold: false,
+    sort: 'newest'
+  };
+
+  grid.innerHTML = MBU.skeletonCards(6);
+
+  /* ---------------------------------------------------------- URL SYNC */
+  function readUrl() {
+    const p = new URLSearchParams(location.search);
+    ['search', 'make', 'model', 'minPrice', 'maxPrice', 'minYear', 'maxYear', 'maxMiles', 'sort']
+      .forEach(k => { if (p.get(k)) state[k] = p.get(k); });
+    ['fuel', 'transmission'].forEach(k => { if (p.get(k)) state[k] = p.get(k).split(','); });
+    if (p.get('body')) state.body_type = p.get('body').split(',');
+  }
+
+  function writeUrl() {
+    const p = new URLSearchParams();
+    Object.entries(state).forEach(([k, v]) => {
+      if (k === 'sort' && v === 'newest') return;
+      if (Array.isArray(v)) { if (v.length) p.set(k === 'body_type' ? 'body' : k, v.join(',')); }
+      else if (v) p.set(k, v);
+    });
+    const q = p.toString();
+    history.replaceState(null, '', q ? '?' + q : location.pathname);
+  }
+
+  /* ------------------------------------------------------------ FILTER */
+  function matches(c) {
+    const s = state;
+    if (s.hideSold && c.status === 'sold') return false;
+    // A sold car has no price, so price filters would wrongly exclude it.
+    // Judge sold cars on everything except price.
+    const isSold = c.status === 'sold';
+    if (s.make && c.make !== s.make) return false;
+    if (s.model && c.model !== s.model) return false;
+    if (!isSold && s.minPrice && (c.price == null || c.price < +s.minPrice)) return false;
+    if (!isSold && s.maxPrice && (c.price == null || c.price > +s.maxPrice)) return false;
+    if (s.minYear && (c.year == null || c.year < +s.minYear)) return false;
+    if (s.maxYear && (c.year == null || c.year > +s.maxYear)) return false;
+    if (s.maxMiles && (c.mileage == null || c.mileage > +s.maxMiles)) return false;
+    if (s.fuel.length && !s.fuel.includes(c.fuel)) return false;
+    if (s.transmission.length && !s.transmission.includes(c.transmission)) return false;
+    if (s.body_type.length && !s.body_type.includes(c.body_type)) return false;
+
+    if (s.search.trim()) {
+      const hay = [
+        c.make, c.model, c.variant, c.colour, c.registration,
+        MBU.label('fuel', c.fuel), MBU.label('transmission', c.transmission),
+        MBU.label('body', c.body_type), c.year, (c.features || []).join(' ')
+      ].join(' ').toLowerCase();
+      const ok = s.search.toLowerCase().split(/\s+/).filter(Boolean).every(t => hay.includes(t));
+      if (!ok) return false;
+    }
+    return true;
+  }
+
+  const SORTS = {
+    'newest':     (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
+    'price-asc':  (a, b) => (a.price ?? 1e9) - (b.price ?? 1e9),
+    'price-desc': (a, b) => (b.price ?? -1) - (a.price ?? -1),
+    'miles-asc':  (a, b) => (a.mileage ?? 1e9) - (b.mileage ?? 1e9),
+    'year-desc':  (a, b) => (b.year ?? 0) - (a.year ?? 0)
+  };
+
+  /* ------------------------------------------------------------ RENDER */
+  function chipLabels() {
+    const out = [];
+    const add = (key, label, clear) => out.push({ label, clear });
+    if (state.search) add('search', `"${state.search}"`, () => { state.search = ''; $('#fSearch').value = ''; });
+    if (state.make) add('make', state.make, () => { state.make = ''; state.model = ''; $('#fMake').value = ''; buildModels(); });
+    if (state.model) add('model', state.model, () => { state.model = ''; $('#fModel').value = ''; });
+    if (state.minPrice) add('minPrice', `From £${(+state.minPrice).toLocaleString()}`, () => { state.minPrice = ''; $('#fMinPrice').value = ''; });
+    if (state.maxPrice) add('maxPrice', `Up to £${(+state.maxPrice).toLocaleString()}`, () => { state.maxPrice = ''; $('#fMaxPrice').value = ''; });
+    if (state.minYear) add('minYear', `${state.minYear} onwards`, () => { state.minYear = ''; $('#fMinYear').value = ''; });
+    if (state.maxYear) add('maxYear', `Up to ${state.maxYear}`, () => { state.maxYear = ''; $('#fMaxYear').value = ''; });
+    if (state.maxMiles) add('maxMiles', `Under ${(+state.maxMiles).toLocaleString()} mi`, () => { state.maxMiles = ''; $('#fMaxMiles').value = ''; });
+    ['fuel', 'transmission', 'body_type'].forEach(key => {
+      state[key].forEach(v => {
+        const grp = key === 'body_type' ? 'body' : key;
+        add(key, MBU.label(grp, v), () => {
+          state[key] = state[key].filter(x => x !== v);
+          const el = document.querySelector(`[data-key="${key}"] .chip[data-value="${v}"]`);
+          el && el.classList.remove('is-on');
+        });
+      });
+    });
+    return out;
+  }
+
+  function render() {
+    writeUrl();   // keep the address bar shareable even when nothing matches
+    const list = ALL.filter(matches).sort(SORTS[state.sort] || SORTS.newest);
+
+    // Count available and sold separately — never imply sold cars are stock.
+    const avail = list.filter(c => c.status !== 'sold').length;
+    const soldN = list.length - avail;
+    countEl.innerHTML = list.length
+      ? `<b>${avail}</b> ${avail === 1 ? 'car' : 'cars'} available` +
+        (soldN ? ` <span class="muted">· ${soldN} recently sold</span>` : '')
+      : `<b>0</b> cars match`;
+
+    const chips = chipLabels();
+    activeEl.innerHTML = chips.map((c, i) =>
+      `<span class="af-chip">${MBU.esc(c.label)}<button type="button" data-i="${i}" aria-label="Remove filter">${MBU.icon('close')}</button></span>`
+    ).join('') + (chips.length > 1
+      ? `<button class="btn btn--ghost btn--sm" id="chipClearAll" type="button">Clear all</button>` : '');
+
+    activeEl.querySelectorAll('.af-chip button').forEach(btn => {
+      btn.addEventListener('click', () => { chips[+btn.dataset.i].clear(); update(); });
+    });
+    const clearAll = document.getElementById('chipClearAll');
+    clearAll && clearAll.addEventListener('click', reset);
+
+    if (!list.length && MBU.loadFailed) {
+      grid.style.gridTemplateColumns = '1fr';
+      grid.innerHTML = MBU.loadErrorState();
+      countEl.textContent = '';
+      return;
+    }
+
+    if (!list.length) {
+      grid.style.gridTemplateColumns = '1fr';
+      grid.innerHTML = MBU.emptyState(
+        ALL.length ? 'No cars match those filters' : 'No cars listed right now',
+        ALL.length
+          ? 'Try widening your search — or tell us what you are after and we will look out for one at auction.'
+          : 'New stock lands most weeks. Message us and we will let you know what is on its way.',
+        `<div class="cluster" style="justify-content:center">
+           ${ALL.length ? '<button class="btn btn--outline" id="emptyReset" type="button">Clear filters</button>' : ''}
+           <a class="btn btn--wa" target="_blank" rel="noopener"
+              href="${MBU.waLink('Hi MBU Car Sales, I am looking for a specific car. Can you keep an eye out?')}">
+              Tell us what you want</a>
+         </div>`
+      );
+      const er = document.getElementById('emptyReset');
+      er && er.addEventListener('click', reset);
+      return;
+    }
+
+    grid.style.gridTemplateColumns = '';
+    grid.innerHTML = list.map(c => `<div class="reveal">${MBU.carCard(c)}</div>`).join('');
+    MBU.reveal(grid);
+  }
+
+  /* Count clicks through to a car, once per grid */
+  MBU.trackGrid(grid);
+
+  function update() { render(); }
+
+  function reset() {
+    Object.assign(state, {
+      search: '', make: '', model: '', minPrice: '', maxPrice: '',
+      minYear: '', maxYear: '', maxMiles: '', fuel: [], transmission: [],
+      body_type: [], hideSold: false
+    });
+    const hs = $('#fHideSold'); if (hs) hs.checked = false;
+    ['#fSearch', '#fMake', '#fModel', '#fMinPrice', '#fMaxPrice', '#fMinYear', '#fMaxYear', '#fMaxMiles']
+      .forEach(sel => { const el = $(sel); if (el) el.value = ''; });
+    MBU.qsa('.chip.is-on').forEach(c => c.classList.remove('is-on'));
+    buildModels();
+    render();
+  }
+
+  /* ------------------------------------------------------------- BUILD */
+  function buildSelect(el, values, labelFn, placeholder) {
+    const current = el.value;
+    el.innerHTML = `<option value="">${placeholder}</option>`;
+    values.forEach(v => el.add(new Option(labelFn ? labelFn(v) : v, v)));
+    if (values.includes(current)) el.value = current;
+  }
+
+  function buildModels() {
+    const pool = state.make ? ALL.filter(c => c.make === state.make) : ALL;
+    const models = [...new Set(pool.map(c => c.model).filter(Boolean))].sort();
+    buildSelect($('#fModel'), models, null, 'Any model');
+    if (state.model && models.includes(state.model)) $('#fModel').value = state.model;
+    else state.model = '';
+  }
+
+  function buildChips(container, key, group) {
+    const values = [...new Set(ALL.map(c => c[key]).filter(Boolean))];
+    const order = Object.keys(MBU.labels[group] || {});
+    const rank = v => { const i = order.indexOf(v); return i === -1 ? 999 : i; };
+    values.sort((a, b) => rank(a) - rank(b) || String(a).localeCompare(String(b)));
+    container.innerHTML = values.map(v =>
+      `<button class="chip${state[key].includes(v) ? ' is-on' : ''}" type="button" data-value="${MBU.esc(v)}">${MBU.esc(MBU.label(group, v))}</button>`
+    ).join('');
+    container.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const v = chip.dataset.value;
+        chip.classList.toggle('is-on');
+        state[key] = chip.classList.contains('is-on')
+          ? state[key].concat(v)
+          : state[key].filter(x => x !== v);
+        render();
+      });
+    });
+  }
+
+  /* -------------------------------------------------------------- WIRE */
+  function wire() {
+    const deb = MBU.debounce(render, 200);
+    $('#fSearch').addEventListener('input', e => { state.search = e.target.value; deb(); });
+
+    $('#fMake').addEventListener('change', e => {
+      state.make = e.target.value; buildModels(); render();
+    });
+    $('#fModel').addEventListener('change', e => { state.model = e.target.value; render(); });
+    $('#fSort').addEventListener('change', e => { state.sort = e.target.value; render(); });
+
+    [['#fMinPrice', 'minPrice'], ['#fMaxPrice', 'maxPrice'],
+     ['#fMinYear', 'minYear'], ['#fMaxYear', 'maxYear']].forEach(([sel, key]) => {
+      $(sel).addEventListener('input', e => { state[key] = e.target.value; deb(); });
+    });
+    $('#fMaxMiles').addEventListener('change', e => { state.maxMiles = e.target.value; render(); });
+    $('#fHideSold').addEventListener('change', e => { state.hideSold = e.target.checked; render(); });
+
+    $('#clearFilters').addEventListener('click', reset);
+
+    /* Mobile filter drawer */
+    const filters = $('#filters');
+    const open = () => { filters.classList.add('is-open'); document.body.style.overflow = 'hidden'; };
+    const close = () => { filters.classList.remove('is-open'); document.body.style.overflow = ''; };
+    $('#openFilters').addEventListener('click', open);
+    $('#closeFilters').addEventListener('click', close);
+    $('#applyFilters').addEventListener('click', close);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && filters.classList.contains('is-open')) close();
+    });
+  }
+
+  /* -------------------------------------------------------------- INIT */
+  readUrl();
+
+  MBU.getStock().then(cars => {
+    ALL = cars;
+
+    const makes = [...new Set(cars.map(c => c.make).filter(Boolean))].sort();
+    buildSelect($('#fMake'), makes, null, 'Any make');
+
+    // Restore state into the controls
+    $('#fSearch').value = state.search;
+    $('#fMake').value = makes.includes(state.make) ? state.make : (state.make = '');
+    $('#fMinPrice').value = state.minPrice;
+    $('#fMaxPrice').value = state.maxPrice;
+    $('#fMinYear').value = state.minYear;
+    $('#fMaxYear').value = state.maxYear;
+    $('#fMaxMiles').value = state.maxMiles;
+    $('#fSort').value = state.sort;
+
+    buildModels();
+    buildChips($('#fFuel'), 'fuel', 'fuel');
+    buildChips($('#fTrans'), 'transmission', 'transmission');
+    buildChips($('#fBody'), 'body_type', 'body');
+
+    wire();
+    render();
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact Us — MBU Car Sales, Newcastle upon Tyne</title>
+<meta name="description" content="Get in touch with MBU Car Sales in Newcastle upon Tyne. Call, WhatsApp or email us — viewings by appointment, seven days a week.">
+<link rel="canonical" href="https://mbucarsales.github.io/contact.html">
+<meta property="og:title" content="Contact MBU Car Sales">
+<meta property="og:description" content="Call, WhatsApp or email us. Viewings by appointment, seven days a week.">
+<meta name="theme-color" content="#0D1626">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/pages.css">
+</head>
+<body>
+
+<div id="site-header-slot"></div>
+
+<main id="main">
+
+  <section class="page-head">
+    <div class="container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="index.html">Home</a>
+        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Contact</span>
+      </nav>
+      <h1>Get in touch</h1>
+      <p>Message us, ring us, or fill in the form below. We answer everything — and if we miss you, we will always call back.</p>
+    </div>
+  </section>
+
+  <section class="section section--tight">
+    <div class="container">
+      <div class="contact-layout">
+
+        <!-- ============================== FORM -->
+        <div>
+          <div class="panel panel--pad-lg">
+            <h2 style="font-size:var(--fs-xl);margin-bottom:6px">Send us a message</h2>
+            <p class="muted small" style="margin-bottom:26px">
+              Whether it is about a car on the site, part exchange, or something you are looking for
+              that we do not have yet — ask away.
+            </p>
+
+            <form id="contactForm" novalidate>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="ctName">Your name <span class="req">*</span></label>
+                  <input class="input" id="ctName" name="name" required autocomplete="name">
+                </div>
+                <div class="field">
+                  <label for="ctPhone">Phone number <span class="req">*</span></label>
+                  <input class="input" id="ctPhone" name="phone" type="tel" required autocomplete="tel">
+                </div>
+                <div class="field span-2">
+                  <label for="ctEmail">Email address</label>
+                  <input class="input" id="ctEmail" name="email" type="email" autocomplete="email">
+                </div>
+                <div class="field span-2">
+                  <label for="ctSubject">What is it about?</label>
+                  <select class="select" id="ctSubject" name="subject">
+                    <option>A car I have seen on the website</option>
+                    <option>Looking for a specific car</option>
+                    <option>Part exchange</option>
+                    <option>Selling my car to you</option>
+                    <option>Booking a viewing</option>
+                    <option>Something else</option>
+                  </select>
+                </div>
+                <div class="field span-2">
+                  <label for="ctMsg">Your message <span class="req">*</span></label>
+                  <textarea class="textarea" id="ctMsg" name="message" required
+                            placeholder="Tell us what you need and the best time to reach you."></textarea>
+                </div>
+                <div class="field span-2 hp-field">
+                  <label for="ctCompany">Company</label>
+                  <input class="input" id="ctCompany" name="company" tabindex="-1" autocomplete="off">
+                </div>
+                <div class="span-2">
+                  <label class="checkbox">
+                    <input type="checkbox" id="ctConsent" required>
+                    <span>I’m happy for MBU Car Sales to store these details so they can respond to my enquiry.</span>
+                  </label>
+                </div>
+                <div class="span-2 form-status" id="ctStatus" role="status"></div>
+                <div class="span-2">
+                  <button class="btn btn--primary btn--lg" type="submit" id="ctSubmit">Send message</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- ============================== DETAILS -->
+        <aside class="stack">
+          <div class="panel">
+            <h2 style="font-size:var(--fs-lg);margin-bottom:8px">Reach us</h2>
+
+            <div class="contact-row">
+              <div class="contact-row-icon" id="icWa"></div>
+              <div>
+                <h3>WhatsApp</h3>
+                <a id="waLink" href="#" target="_blank" rel="noopener">Start a chat</a>
+                <p>Quickest way to get hold of us. Send photos, ask anything.</p>
+              </div>
+            </div>
+
+            <div class="contact-row">
+              <div class="contact-row-icon" id="icPhone"></div>
+              <div>
+                <h3>Phone</h3>
+                <a id="telLink" href="#"></a>
+                <p>If we are under a car we will ring you straight back.</p>
+              </div>
+            </div>
+
+            <div class="contact-row">
+              <div class="contact-row-icon" id="icMail"></div>
+              <div>
+                <h3>Email</h3>
+                <a id="mailLink" href="#"></a>
+                <p>Best for anything you need in writing.</p>
+              </div>
+            </div>
+
+            <div class="contact-row">
+              <div class="contact-row-icon" id="icPin"></div>
+              <div>
+                <h3>Where we are</h3>
+                <p id="locationText" style="color:var(--ink-2)"></p>
+                <p style="margin-top:6px">Viewings by appointment — give us a ring first and we will have the car ready.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2 style="font-size:var(--fs-lg);margin-bottom:14px">Opening hours</h2>
+            <table class="hours-table" id="hoursTable"></table>
+            <p class="small muted" style="margin-top:16px;line-height:1.65" id="hoursNote"></p>
+          </div>
+
+          <div class="panel" style="background:linear-gradient(150deg,var(--navy-800),var(--navy-900));color:#fff;border:0">
+            <h3 style="color:#fff;font-size:var(--fs-lg);margin-bottom:8px">Follow the stock</h3>
+            <p class="small" style="color:#B6C4D8;line-height:1.65;margin-bottom:18px">
+              New arrivals usually go up on Instagram before they make it onto the website.
+            </p>
+            <a class="btn btn--onDark btn--block" id="igLink" href="#" target="_blank" rel="noopener">See our Instagram</a>
+          </div>
+        </aside>
+
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="site-footer-slot"></div>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/demo-data.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  const B = MBU_CONFIG.business, esc = MBU.esc;
+
+  /* Icons + links */
+  document.getElementById('icWa').innerHTML = MBU.icon('whatsapp');
+  document.getElementById('icPhone').innerHTML = MBU.icon('phone');
+  document.getElementById('icMail').innerHTML = MBU.icon('mail');
+  document.getElementById('icPin').innerHTML = MBU.icon('mapPin');
+
+  document.getElementById('waLink').href = MBU.waLink('Hi MBU Car Sales,');
+  const tel = document.getElementById('telLink');
+  tel.href = MBU.telLink(); tel.textContent = B.phone;
+  const mail = document.getElementById('mailLink');
+  mail.href = 'mailto:' + B.email; mail.textContent = B.email;
+
+  document.getElementById('locationText').innerHTML =
+    [B.addressLine, B.town, B.postcode, B.region].filter(Boolean).map(esc).join('<br>');
+
+  const ig = document.getElementById('igLink');
+  if (B.instagram) { ig.href = B.instagram; ig.innerHTML = MBU.icon('instagram') + ' See our Instagram'; }
+  else ig.closest('.panel').hidden = true;
+
+  /* Opening hours, with today highlighted */
+  const names = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const today = names[new Date().getDay()];
+  document.getElementById('hoursTable').innerHTML = B.openingHours.map(h =>
+    `<tr class="${h.day === today ? 'is-today' : ''}"><td>${esc(h.day)}</td><td>${esc(h.hours)}</td></tr>`
+  ).join('');
+  document.getElementById('hoursNote').textContent = B.hoursNote || '';
+
+  /* Form */
+  const form = document.getElementById('contactForm');
+  const status = document.getElementById('ctStatus');
+  const btn = document.getElementById('ctSubmit');
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    status.className = 'span-2 form-status';
+    if (document.getElementById('ctCompany').value) return;   // bot
+
+    const v = id => document.getElementById(id).value.trim();
+    if (!v('ctName') || !v('ctPhone') || !v('ctMsg') || !document.getElementById('ctConsent').checked) {
+      status.className = 'span-2 form-status form-status--err is-shown';
+      status.textContent = 'Please fill in your name, phone number and message, and tick the box so we can reply.';
+      return;
+    }
+
+    btn.disabled = true; btn.textContent = 'Sending…';
+    try {
+      await MBU.submitEnquiry({
+        kind: 'general',
+        name: v('ctName'), phone: v('ctPhone'), email: v('ctEmail'),
+        message: v('ctMsg'),
+        details: { subject: v('ctSubject') }
+      });
+      form.innerHTML = `
+        <div style="text-align:center;padding:34px 12px">
+          <div class="info-card-icon" style="margin:0 auto 18px;background:var(--green-100);color:var(--green-600)">${MBU.icon('checkCirc')}</div>
+          <h3 style="margin-bottom:10px">Thanks ${esc(v('ctName').split(' ')[0])} — message received</h3>
+          <p class="muted" style="max-width:44ch;margin:0 auto 22px;line-height:1.7">
+            We will get back to you as soon as we can. If it is urgent, WhatsApp is much faster.
+          </p>
+          <a class="btn btn--wa" href="${MBU.waLink('Hi MBU Car Sales, I have just sent a message through your website.')}"
+             target="_blank" rel="noopener">${MBU.icon('whatsapp')} Message on WhatsApp</a>
+        </div>`;
+    } catch (err) {
+      console.error(err);
+      status.className = 'span-2 form-status form-status--err is-shown';
+      status.innerHTML = `Sorry, that didn’t send. Please call us on
+        <a href="${MBU.telLink()}" style="text-decoration:underline">${esc(B.phone)}</a> or message us on WhatsApp.`;
+      btn.disabled = false; btn.textContent = 'Send message';
+    }
+  });
+})();
+</script>
+</body>
+</html>

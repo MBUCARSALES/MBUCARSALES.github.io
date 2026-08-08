@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — MBU Car Sales</title>
+<meta name="description" content="How MBU Car Sales collects, uses and stores your personal information.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0D1626">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/pages.css">
+</head>
+<body>
+
+<div id="site-header-slot"></div>
+
+<main id="main">
+  <section class="page-head">
+    <div class="container">
+      <h1>Privacy Policy</h1>
+      <p>How we handle the information you give us. Last updated <span id="updated"></span>.</p>
+    </div>
+  </section>
+
+  <section class="section section--tight">
+    <div class="container">
+      <div class="prose">
+
+        <p>
+          MBU Car Sales (“we”, “us”) is the data controller for the personal information collected
+          through this website. This page explains what we collect, why, and what your rights are
+          under UK data protection law.
+        </p>
+
+        <h2>What we collect</h2>
+        <p>We only collect information you choose to give us through the forms on this site:</p>
+        <ul>
+          <li>Your name, phone number and (optionally) email address</li>
+          <li>The content of any message or enquiry you send us</li>
+          <li>If you are selling a vehicle: its registration, make, model, mileage, condition and history</li>
+          <li>If you ask us to find you a car: what you are looking for and your budget</li>
+        </ul>
+        <p>
+          We do not use advertising cookies, tracking pixels or analytics that identify you personally.
+        </p>
+
+        <h2>How we measure interest in our cars</h2>
+        <p>
+          We count how many times each car is looked at, how often the photos are opened, and how
+          often someone taps to call or message us. This tells us which cars people like and which
+          are priced wrongly. It is ordinary business sense, not surveillance.
+        </p>
+        <p>
+          Deliberately, this counting stores <strong>nothing at all on your device</strong> — no
+          cookies, no local storage, no fingerprint — and records no IP addresses. A random,
+          throwaway reference exists only while your browser tab is open, purely so that refreshing
+          a page is not counted ten times. It is discarded the moment you close the tab and cannot
+          be linked to you, your device, or any previous visit.
+        </p>
+        <p>
+          Because nothing is stored on your device and nothing identifies you, this needs no cookie
+          banner and involves no personal data. That is why you have not been asked to consent to
+          anything.
+        </p>
+
+        <h2>Why we collect it</h2>
+        <p>
+          To reply to your enquiry, arrange a viewing, provide a valuation, or complete a sale.
+          That is it. The lawful basis is your consent when you submit a form, and our legitimate
+          interest in responding to people who contact our business.
+        </p>
+
+        <h2>Who else sees it</h2>
+        <p>
+          Enquiries are stored securely in a database hosted by Supabase and, where you have given us
+          an email address, may be forwarded to our own business inbox. Photographs on this website
+          are hosted by Cloudinary. These providers process data on our behalf and do not use it for
+          their own purposes.
+        </p>
+        <p>
+          We do not sell, rent or share your details with anyone else for marketing. If a sale
+          proceeds, we may need to share your details with the DVLA to transfer the V5C, and with a
+          finance provider only if you specifically ask us to arrange finance.
+        </p>
+
+        <h2>How long we keep it</h2>
+        <p>
+          Enquiries that do not lead to a sale are deleted within 12 months. Records relating to an
+          actual vehicle sale are kept for six years, as we are required to for tax and consumer
+          protection purposes.
+        </p>
+
+        <h2>Your rights</h2>
+        <p>Under UK GDPR you have the right to:</p>
+        <ul>
+          <li>Ask what personal data we hold about you</li>
+          <li>Ask us to correct anything that is wrong</li>
+          <li>Ask us to delete your data, where we are not legally required to keep it</li>
+          <li>Withdraw your consent at any time</li>
+          <li>Complain to the Information Commissioner’s Office (ICO) at
+              <a href="https://ico.org.uk" target="_blank" rel="noopener">ico.org.uk</a></li>
+        </ul>
+        <p>
+          To exercise any of these, just email us at <a id="emailLink" href="#"></a> or ring
+          <a id="phoneLink" href="#"></a> and we will sort it out.
+        </p>
+
+        <h2>Cookies</h2>
+        <p>
+          This website does not set any tracking or advertising cookies. Your browser may store small
+          amounts of data locally so the site works properly, but nothing that identifies you and
+          nothing that is sent to third parties for profiling.
+        </p>
+
+        <h2>Changes to this policy</h2>
+        <p>
+          If we change how we handle your information we will update this page and change the date at
+          the top.
+        </p>
+
+        <hr class="divider">
+        <p class="small muted">
+          Questions about anything on this page? Get in touch — we would rather explain it properly
+          than have you wondering.
+        </p>
+        <a class="btn btn--outline" href="contact.html">Contact us</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="site-footer-slot"></div>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+  document.getElementById('updated').textContent =
+    new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const e = document.getElementById('emailLink');
+  e.href = 'mailto:' + MBU_CONFIG.business.email; e.textContent = MBU_CONFIG.business.email;
+  const p = document.getElementById('phoneLink');
+  p.href = MBU.telLink(); p.textContent = MBU_CONFIG.business.phone;
+</script>
+</body>
+</html>

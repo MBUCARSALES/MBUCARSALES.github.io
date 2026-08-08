@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sell Your Car — MBU Car Sales, Newcastle upon Tyne</title>
+<meta name="description" content="We buy cars and vans outright in Newcastle upon Tyne — clean, damaged, non-runners or on finance. Free no-obligation valuation, usually the same day.">
+<link rel="canonical" href="https://mbucarsales.github.io/sell.html">
+<meta property="og:title" content="Sell Your Car — MBU Car Sales">
+<meta property="og:description" content="We buy cars and vans outright. Free no-obligation valuation, usually the same day.">
+<meta name="theme-color" content="#0D1626">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/pages.css">
+</head>
+<body>
+
+<div id="site-header-slot"></div>
+
+<main id="main">
+
+  <section class="page-head">
+    <div class="container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="index.html">Home</a>
+        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Sell your car</span>
+      </nav>
+      <h1>Sell us your car</h1>
+      <p>We buy outright and pay on collection. Clean cars, scruffy cars, damaged cars, non-runners, cars still on finance — tell us what you have and we will give you an honest number.</p>
+    </div>
+  </section>
+
+  <section class="section section--tight">
+    <div class="container">
+      <div class="contact-layout">
+
+        <!-- ============================== FORM -->
+        <div>
+          <div class="panel panel--pad-lg">
+            <h2 style="font-size:var(--fs-xl);margin-bottom:6px">Get a free valuation</h2>
+            <p class="muted small" style="margin-bottom:26px">
+              The more you tell us, the closer our first number will be. Takes about a minute —
+              nothing here commits you to anything.
+            </p>
+
+            <form id="sellForm" novalidate>
+              <div class="form-grid">
+
+                <div class="field span-2">
+                  <span class="fg-title" style="font-size:var(--fs-sm);font-weight:700;color:var(--navy-900);text-transform:none;letter-spacing:0">What are you selling? <span class="req">*</span></span>
+                  <div class="chip-row" id="vehType" style="margin-top:4px">
+                    <button class="chip is-on" type="button" data-value="Car">Car</button>
+                    <button class="chip" type="button" data-value="Van">Van</button>
+                    <button class="chip" type="button" data-value="Motorbike">Motorbike</button>
+                    <button class="chip" type="button" data-value="Other">Something else</button>
+                  </div>
+                </div>
+
+                <div class="field span-2">
+                  <label for="sfReg">Registration number <span class="req">*</span></label>
+                  <input class="input" id="sfReg" name="registration" required
+                         placeholder="e.g. AB12 CDE" autocomplete="off"
+                         style="text-transform:uppercase;font-weight:700;letter-spacing:.06em">
+                  <span class="hint">This tells us most of what we need to know about the vehicle.</span>
+                </div>
+
+                <div class="field">
+                  <label for="sfMake">Make <span class="req">*</span></label>
+                  <input class="input" id="sfMake" name="make" required placeholder="e.g. Ford">
+                </div>
+                <div class="field">
+                  <label for="sfModel">Model <span class="req">*</span></label>
+                  <input class="input" id="sfModel" name="model" required placeholder="e.g. Focus Titanium">
+                </div>
+
+                <div class="field">
+                  <label for="sfMileage">Mileage <span class="req">*</span></label>
+                  <input class="input" id="sfMileage" name="mileage" type="number" inputmode="numeric"
+                         required min="0" placeholder="e.g. 68000">
+                </div>
+                <div class="field">
+                  <label for="sfYear">Year</label>
+                  <input class="input" id="sfYear" name="year" type="number" inputmode="numeric"
+                         min="1950" max="2030" placeholder="e.g. 2017">
+                </div>
+
+                <div class="field">
+                  <label for="sfHpi">Vehicle history <span class="req">*</span></label>
+                  <select class="select" id="sfHpi" name="hpi" required>
+                    <option value="">Please choose…</option>
+                    <option>HPI clear</option>
+                    <option>Category S (structural, repaired)</option>
+                    <option>Category N (non-structural, repaired)</option>
+                    <option>Still on finance</option>
+                    <option>Previously written off, unsure of category</option>
+                    <option>Not sure</option>
+                  </select>
+                  <span class="hint">Be straight with us — it will not stop us buying, and we would rather know now.</span>
+                </div>
+
+                <div class="field">
+                  <label for="sfService">Service history <span class="req">*</span></label>
+                  <select class="select" id="sfService" name="service" required>
+                    <option value="">Please choose…</option>
+                    <option>Full service history</option>
+                    <option>Part service history</option>
+                    <option>No service history</option>
+                    <option>Not sure</option>
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label for="sfMot">MOT status</label>
+                  <select class="select" id="sfMot" name="mot">
+                    <option value="">Please choose…</option>
+                    <option>Long MOT (6+ months)</option>
+                    <option>Short MOT (under 6 months)</option>
+                    <option>No MOT / expired</option>
+                    <option>Not sure</option>
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label for="sfCondition">Overall condition</label>
+                  <select class="select" id="sfCondition" name="condition">
+                    <option value="">Please choose…</option>
+                    <option>Excellent — nothing wrong with it</option>
+                    <option>Good — a few marks, drives fine</option>
+                    <option>Fair — needs some work</option>
+                    <option>Damaged — accident or bodywork damage</option>
+                    <option>Non-runner</option>
+                  </select>
+                </div>
+
+                <div class="field span-2">
+                  <label for="sfNotes">Anything else we should know?</label>
+                  <textarea class="textarea" id="sfNotes" name="notes"
+                            placeholder="Damage, warning lights, mechanical faults, missing keys, outstanding finance amount — anything at all. We would much rather hear it now than find it later."></textarea>
+                </div>
+
+                <div class="field span-2">
+                  <label for="sfPrice">What are you hoping to get for it?</label>
+                  <input class="input" id="sfPrice" name="asking" inputmode="numeric" placeholder="e.g. £4,500 — or leave blank and we'll make you an offer">
+                  <span class="hint">Optional. If you have a figure in mind it saves us both some time.</span>
+                </div>
+
+                <hr class="divider span-2" style="margin:8px 0">
+
+                <div class="field">
+                  <label for="sfName">Your name <span class="req">*</span></label>
+                  <input class="input" id="sfName" name="name" required autocomplete="name">
+                </div>
+                <div class="field">
+                  <label for="sfPhone">Phone number <span class="req">*</span></label>
+                  <input class="input" id="sfPhone" name="phone" type="tel" required autocomplete="tel">
+                </div>
+                <div class="field span-2">
+                  <label for="sfEmail">Email address</label>
+                  <input class="input" id="sfEmail" name="email" type="email" autocomplete="email">
+                  <span class="hint">Optional — but handy if we need to send you anything in writing.</span>
+                </div>
+
+                <div class="field span-2 hp-field">
+                  <label for="sfCompany">Company</label>
+                  <input class="input" id="sfCompany" name="company" tabindex="-1" autocomplete="off">
+                </div>
+
+                <div class="span-2">
+                  <label class="checkbox">
+                    <input type="checkbox" id="sfConsent" required>
+                    <span>I’m happy for MBU Car Sales to store these details so they can get back to me with a valuation.</span>
+                  </label>
+                </div>
+
+                <div class="span-2 form-status" id="sfStatus" role="status"></div>
+
+                <div class="span-2">
+                  <button class="btn btn--primary btn--lg" type="submit" id="sfSubmit">Get my valuation</button>
+                  <p class="form-note" style="margin-top:12px">
+                    No obligation, no pushy follow-ups. If our number is not right for you, that is
+                    absolutely fine — just tell us and we will leave you be.
+                  </p>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- ============================== SIDEBAR -->
+        <aside class="stack">
+          <div class="panel" style="background:linear-gradient(150deg,var(--navy-800),var(--navy-900));color:#fff;border:0">
+            <h3 style="color:#fff;font-size:var(--fs-lg);margin-bottom:10px">Prefer to just message us?</h3>
+            <p class="small" style="color:#B6C4D8;line-height:1.65;margin-bottom:18px">
+              Send us the registration and a couple of photos on WhatsApp and we will usually
+              come back with a price the same day. Honestly, it is the quickest way.
+            </p>
+            <a class="btn btn--wa btn--block" id="sellWa" href="#" target="_blank" rel="noopener">
+              Send us a WhatsApp
+            </a>
+            <a class="btn btn--onDark btn--block" id="sellTel" href="#" style="margin-top:10px">
+              Or give us a ring
+            </a>
+          </div>
+
+          <div class="panel">
+            <h3 style="font-size:var(--fs-md);margin-bottom:16px">How it works</h3>
+            <div class="steps" style="grid-template-columns:1fr;gap:22px">
+              <div class="step">
+                <h3 style="font-size:var(--fs-md)">Tell us about it</h3>
+                <p>Fill in the form or send us a message. Registration and mileage is enough to start.</p>
+              </div>
+              <div class="step">
+                <h3 style="font-size:var(--fs-md)">We make an offer</h3>
+                <p>Usually the same day. It is a real number, not a teaser we chip away at later.</p>
+              </div>
+              <div class="step">
+                <h3 style="font-size:var(--fs-md)">We collect and pay</h3>
+                <p>We come to you, check it over, and pay by bank transfer before we take the keys.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel panel--flat">
+            <h3 style="font-size:var(--fs-md);margin-bottom:12px">We will buy it even if…</h3>
+            <ul class="feature-list" style="grid-template-columns:1fr;gap:10px" id="willBuyList"></ul>
+          </div>
+        </aside>
+
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="site-footer-slot"></div>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/demo-data.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  const esc = MBU.esc;
+
+  document.getElementById('sellWa').href = MBU.waLink(
+    'Hi MBU Car Sales, I have a vehicle I would like to sell.\n\nReg:\nMileage:\nAnything I should mention:\n\n(I can send photos too)'
+  );
+  document.getElementById('sellTel').href = MBU.telLink();
+  document.getElementById('sellTel').innerHTML = MBU.icon('phone') + ' ' + esc(MBU_CONFIG.business.phone);
+  document.getElementById('sellWa').innerHTML = MBU.icon('whatsapp') + ' Send us a WhatsApp';
+
+  document.getElementById('willBuyList').innerHTML = [
+    'It has accident or bodywork damage',
+    'It is a Category S or N',
+    'It has no MOT or it has failed',
+    'It will not start or it is off the road',
+    'There is finance still outstanding on it',
+    'It has high mileage or no service history'
+  ].map(t => `<li>${MBU.icon('check')}${esc(t)}</li>`).join('');
+
+  /* Vehicle type chips */
+  let vehicleType = 'Car';
+  MBU.qsa('#vehType .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      MBU.qsa('#vehType .chip').forEach(c => c.classList.remove('is-on'));
+      chip.classList.add('is-on');
+      vehicleType = chip.dataset.value;
+    });
+  });
+
+  /* Registration formatting */
+  const reg = document.getElementById('sfReg');
+  reg.addEventListener('input', () => { reg.value = reg.value.toUpperCase(); });
+
+  /* Submit */
+  const form = document.getElementById('sellForm');
+  const status = document.getElementById('sfStatus');
+  const btn = document.getElementById('sfSubmit');
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    status.className = 'span-2 form-status';
+
+    if (document.getElementById('sfCompany').value) return;   // bot
+
+    const required = [
+      ['sfReg', 'registration'], ['sfMake', 'make'], ['sfModel', 'model'],
+      ['sfMileage', 'mileage'], ['sfHpi', 'vehicle history'], ['sfService', 'service history'],
+      ['sfName', 'name'], ['sfPhone', 'phone number']
+    ];
+    const missing = required.filter(([id]) => !document.getElementById(id).value.trim());
+    if (missing.length || !document.getElementById('sfConsent').checked) {
+      status.className = 'span-2 form-status form-status--err is-shown';
+      status.textContent = missing.length
+        ? 'Please fill in: ' + missing.map(m => m[1]).join(', ') + '.'
+        : 'Please tick the box so we are able to get back to you.';
+      const first = missing[0] && document.getElementById(missing[0][0]);
+      first && first.focus();
+      return;
+    }
+
+    const v = id => document.getElementById(id).value.trim();
+    btn.disabled = true; btn.textContent = 'Sending…';
+
+    try {
+      await MBU.submitEnquiry({
+        kind: 'sell',
+        name: v('sfName'),
+        phone: v('sfPhone'),
+        email: v('sfEmail'),
+        message: v('sfNotes'),
+        details: {
+          vehicle_type: vehicleType,
+          registration: v('sfReg'),
+          make: v('sfMake'),
+          model: v('sfModel'),
+          year: v('sfYear'),
+          mileage: v('sfMileage'),
+          hpi: v('sfHpi'),
+          service_history: v('sfService'),
+          mot: v('sfMot'),
+          condition: v('sfCondition'),
+          asking_price: v('sfPrice')
+        }
+      });
+
+      form.innerHTML = `
+        <div style="text-align:center;padding:34px 12px">
+          <div class="info-card-icon" style="margin:0 auto 18px;background:var(--green-100);color:var(--green-600)">${MBU.icon('checkCirc')}</div>
+          <h3 style="margin-bottom:10px">Thanks ${esc(v('sfName').split(' ')[0])} — we’ve got that</h3>
+          <p class="muted" style="max-width:46ch;margin:0 auto 22px;line-height:1.7">
+            We will look at your ${esc(v('sfMake'))} ${esc(v('sfModel'))} and come back to you with a
+            number, usually the same day. If you have photos to hand, sending them on WhatsApp
+            will help us be more accurate.
+          </p>
+          <a class="btn btn--wa" href="${MBU.waLink('Hi, I have just submitted a valuation request for my ' + v('sfMake') + ' ' + v('sfModel') + ' (' + v('sfReg') + '). Here are some photos.')}"
+             target="_blank" rel="noopener">${MBU.icon('whatsapp')} Send photos on WhatsApp</a>
+        </div>`;
+      form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    } catch (err) {
+      console.error(err);
+      status.className = 'span-2 form-status form-status--err is-shown';
+      status.innerHTML = `Sorry, that didn’t send. Please call us on
+        <a href="${MBU.telLink()}" style="text-decoration:underline">${esc(MBU_CONFIG.business.phone)}</a>
+        or send the details on WhatsApp and we will sort it from there.`;
+      btn.disabled = false; btn.textContent = 'Get my valuation';
+    }
+  });
+})();
+</script>
+</body>
+</html>
