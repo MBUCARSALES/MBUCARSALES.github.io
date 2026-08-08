@@ -1,0 +1,146 @@
+# ============================================================================
+# WEEKLY SUMMARY
+# ----------------------------------------------------------------------------
+# Sunday evening email: what came in, what sold, what people looked at, and
+# what they asked for. The point is that the numbers arrive without anyone
+# having to remember to go and look at them.
+#
+# SETUP — GitHub repo → Settings → Secrets and variables → Actions:
+#   SUPABASE_URL         https://xxxx.supabase.co
+#   SUPABASE_SERVICE_KEY the "service_role" key (Supabase → Settings → API)
+#   WEB3FORMS_KEY        the same key from config.js
+#   SUMMARY_EMAIL        where to send it
+#
+# ⚠️  The service_role key bypasses all security rules. It is safe here because
+#     GitHub secrets are encrypted and never printed, but never put that key in
+#     config.js or anywhere in the website itself.
+# ============================================================================
+
+name: Weekly summary
+
+on:
+  schedule:
+    - cron: '0 18 * * 0'     # Sundays, 6pm UTC
+  workflow_dispatch:
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build and send the summary
+        env:
+          SUPABASE_URL:  ${{ secrets.SUPABASE_URL }}
+          SERVICE_KEY:   ${{ secrets.SUPABASE_SERVICE_KEY }}
+          WEB3FORMS_KEY: ${{ secrets.WEB3FORMS_KEY }}
+          TO_EMAIL:      ${{ secrets.SUMMARY_EMAIL }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SERVICE_KEY:-}" ]; then
+            echo "Secrets not set — skipping."; exit 0
+          fi
+
+          SINCE=$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)
+          echo "Summarising since $SINCE"
+
+          api() {
+            curl -sS --fail-with-body \
+              -H "apikey: $SERVICE_KEY" \
+              -H "Authorization: Bearer $SERVICE_KEY" \
+              "$SUPABASE_URL/rest/v1/$1"
+          }
+
+          CARS=$(api "cars?select=id,make,model,year,price,status,created_at,sold_at,purchase_price,sale_price,prep_cost,listed_at")
+          STATS=$(api "car_stats?select=make,model,year,status,views,enquiries,whatsapp_clicks,phone_clicks,days_in_stock")
+          REQS=$(api "wanted_requests?select=make,model,budget_max,created_at&created_at=gte.$SINCE")
+
+          BODY=$(SINCE="$SINCE" node -e '
+            const since = new Date(process.env.SINCE);
+            const read = fd => JSON.parse(require("fs").readFileSync(fd, "utf8") || "[]");
+            const [cars, stats, reqs] = [0,1,2].map(i => read(3 + i));
+
+            const gbp = n => n == null ? "—" : "£" + Number(n).toLocaleString("en-GB");
+            const name = c => [c.year, c.make, c.model].filter(Boolean).join(" ") || "Untitled";
+
+            const addedIn = cars.filter(c => new Date(c.created_at) >= since);
+            const soldIn  = cars.filter(c => c.sold_at && new Date(c.sold_at) >= since);
+            const live    = cars.filter(c => c.status === "available" || c.status === "reserved");
+
+            const margin = soldIn.reduce((n, c) =>
+              (c.sale_price != null && c.purchase_price != null)
+                ? n + (c.sale_price - c.purchase_price - (c.prep_cost || 0)) : n, 0);
+
+            const liveStats = stats.filter(s => s.status === "available" || s.status === "reserved");
+            const top = liveStats.slice().sort((a,b) => (b.views||0)-(a.views||0)).slice(0,5);
+            const sitting = liveStats.filter(s => (s.days_in_stock||0) >= 60)
+                                     .sort((a,b) => (b.days_in_stock||0)-(a.days_in_stock||0));
+            const ignored = liveStats.filter(s => (s.views||0) >= 25 &&
+              ((s.whatsapp_clicks||0)+(s.phone_clicks||0)+(s.enquiries||0)) === 0);
+
+            const demand = {};
+            reqs.forEach(r => {
+              const k = [r.make, r.model].filter(Boolean).join(" ") || "Not specified";
+              demand[k] = (demand[k] || 0) + 1;
+            });
+            const wanted = Object.entries(demand).sort((a,b) => b[1]-a[1]).slice(0,5);
+
+            const L = [];
+            L.push("THIS WEEK AT MBU CAR SALES");
+            L.push("=".repeat(34), "");
+            L.push(`Cars in:      ${addedIn.length}`);
+            L.push(`Cars sold:    ${soldIn.length}`);
+            L.push(`In stock now: ${live.length}`);
+            if (margin) L.push(`Margin:       ${gbp(margin)}`);
+            L.push("");
+
+            if (soldIn.length) {
+              L.push("SOLD THIS WEEK");
+              soldIn.forEach(c => L.push(`  · ${name(c)}`));
+              L.push("");
+            }
+            if (addedIn.length) {
+              L.push("NEW IN");
+              addedIn.forEach(c => L.push(`  · ${name(c)} — ${gbp(c.price)}`));
+              L.push("");
+            }
+            if (top.length && top[0].views) {
+              L.push("MOST LOOKED AT");
+              top.forEach(s => L.push(`  · ${name(s)} — ${s.views||0} views, ${(s.enquiries||0)+(s.whatsapp_clicks||0)+(s.phone_clicks||0)} contacts`));
+              L.push("");
+            }
+            if (sitting.length) {
+              L.push("SITTING TOO LONG — worth a price review");
+              sitting.slice(0,5).forEach(s => L.push(`  · ${name(s)} — ${s.days_in_stock} days`));
+              L.push("");
+            }
+            if (ignored.length) {
+              L.push("PLENTY OF LOOKS, NO CONTACT — usually price or photos");
+              ignored.slice(0,5).forEach(s => L.push(`  · ${name(s)} — ${s.views} views, nobody rang`));
+              L.push("");
+            }
+            if (wanted.length) {
+              L.push("WHAT PEOPLE ASKED FOR THIS WEEK");
+              wanted.forEach(([k,n]) => L.push(`  · ${k} — ${n} request${n===1?"":"s"}`));
+              L.push("");
+            }
+            if (!addedIn.length && !soldIn.length && !reqs.length) {
+              L.push("Quiet week — nothing in, nothing out, no new requests.");
+              L.push("");
+            }
+            L.push("—");
+            L.push("Sent automatically. Full detail is in the Insights tab of the app.");
+            process.stdout.write(L.join("\n"));
+          ' 3<<<"$CARS" 4<<<"$STATS" 5<<<"$REQS")
+
+          echo "$BODY"
+
+          if [ -n "${WEB3FORMS_KEY:-}" ] && [ -n "${TO_EMAIL:-}" ]; then
+            jq -n --arg k "$WEB3FORMS_KEY" --arg e "$TO_EMAIL" --arg m "$BODY" \
+              '{access_key:$k, subject:"MBU — your week in review", from_name:"MBU Car Sales", email:$e, message:$m}' \
+            | curl -sS -X POST https://api.web3forms.com/submit \
+                -H "Content-Type: application/json" -H "Accept: application/json" \
+                --data @- > /dev/null
+            echo "Summary emailed to $TO_EMAIL"
+          else
+            echo "No email secrets set — summary printed above only."
+          fi
