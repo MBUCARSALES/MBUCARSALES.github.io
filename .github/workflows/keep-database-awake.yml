@@ -1,0 +1,50 @@
+# ============================================================================
+# KEEP THE DATABASE AWAKE
+# ----------------------------------------------------------------------------
+# A free Supabase project pauses itself after 7 days with no activity. If that
+# happened over a quiet fortnight, the website would show no cars and you'd
+# have no idea why.
+#
+# This pings the database every 3 days so it never gets the chance.
+#
+# ONE-TIME SETUP (2 minutes):
+#   GitHub repo → Settings → Secrets and variables → Actions → New secret
+#     Name:   SUPABASE_URL       Value: https://xxxxxxxx.supabase.co
+#     Name:   SUPABASE_ANON_KEY  Value: your long anon key
+#
+# Both are already public in assets/js/config.js — they're stored as secrets
+# here purely to keep the log output tidy.
+# ============================================================================
+
+name: Keep database awake
+
+on:
+  schedule:
+    - cron: '0 7 */3 * *'   # every 3 days at 07:00 UTC
+  workflow_dispatch:         # ...or run it by hand from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ]; then
+            echo "SUPABASE_URL secret not set — skipping."
+            exit 0
+          fi
+
+          status=$(curl -s -o /tmp/out.txt -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/cars_public?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+
+          echo "HTTP $status"
+
+          if [ "$status" != "200" ]; then
+            echo "::error::Database did not respond properly (HTTP $status)."
+            cat /tmp/out.txt
+            exit 1
+          fi
+
+          echo "Database is awake and responding."
