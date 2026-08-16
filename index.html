@@ -91,8 +91,8 @@
         <select class="select" id="qsMake" name="make"><option value="">Any make</option></select>
       </div>
       <div class="field">
-        <label for="qsBody">Body type</label>
-        <select class="select" id="qsBody" name="body"><option value="">Any type</option></select>
+        <label for="qsModel">Model</label>
+        <select class="select" id="qsModel" name="model"><option value="">Any model</option></select>
       </div>
       <div class="field">
         <label for="qsMax">Max price</label>
@@ -301,14 +301,27 @@
   /* Count clicks through to a car from the homepage grid */
   MBU.trackGrid(grid);
 
-  /* Populate the quick-search dropdowns from real stock */
+  /* Quick search: Make → Model → Max price.
+     Picking a make narrows the model list to that make's cars only. */
   MBU.getAvailable().then(cars => {
-    const makes = [...new Set(cars.map(c => c.make).filter(Boolean))].sort();
-    const bodies = [...new Set(cars.map(c => c.body_type).filter(Boolean))].sort();
     const mk = document.getElementById('qsMake');
-    const bd = document.getElementById('qsBody');
-    makes.forEach(m => mk.add(new Option(m, m)));
-    bodies.forEach(b => bd.add(new Option(MBU.label('body', b), b)));
+    const md = document.getElementById('qsModel');
+
+    [...new Set(cars.map(c => c.make).filter(Boolean))].sort()
+      .forEach(m => mk.add(new Option(m, m)));
+
+    function fillModels() {
+      const chosen = mk.value;
+      const pool = chosen ? cars.filter(c => c.make === chosen) : cars;
+      const models = [...new Set(pool.map(c => c.model).filter(Boolean))].sort();
+
+      md.innerHTML = '<option value="">Any model</option>';
+      models.forEach(m => md.add(new Option(m, m)));
+      md.disabled = models.length === 0;
+    }
+
+    mk.addEventListener('change', fillModels);
+    fillModels();
   });
 })();
 </script>

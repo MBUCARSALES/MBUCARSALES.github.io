@@ -1,0 +1,25 @@
+# ============================================================================
+# Files that live in this folder but must NEVER be published to the website
+# ----------------------------------------------------------------------------
+# Anything committed to this repository is readable by anyone at
+# mbucarsales.github.io/<filename>. These docs contain internal notes about
+# how the business runs and where the system is weakest — no passwords, but
+# no reason to publish them either.
+#
+# Keeping them here (rather than somewhere else on your Mac) means any future
+# Claude chat can read them for context without you having to re-explain the
+# whole project. They just never leave your machine.
+# ============================================================================
+
+HANDOVER.md
+SETUP.md
+ROADMAP.md
+DAD-GUIDE.md
+MAINTENANCE.md
+
+# Mac clutter
+.DS_Store
+**/.DS_Store
+
+# Scratch space — put anything you don't want published in here
+_private/

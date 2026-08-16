@@ -80,6 +80,11 @@ html {
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
   scroll-padding-top: calc(var(--header-h) + 16px);
+  /* Belt and braces against sideways scroll on phones. Setting it on <body>
+     alone doesn't stop it — the viewport still scrolls, which drags the
+     sticky header off to the left with it. */
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 body {
@@ -91,7 +96,11 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  max-width: 100%;
 }
+
+/* Nothing should ever be able to force the page wider than the screen */
+img, video, svg, table, pre { max-width: 100%; }
 
 img, svg, video { display: block; max-width: 100%; }
 img { height: auto; }

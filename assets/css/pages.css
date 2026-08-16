@@ -303,6 +303,18 @@
 }
 @media (max-width: 980px) { .car-layout { grid-template-columns: 1fr; } }
 
+/* Grid and flex children default to min-width:auto, which means a wide child
+   (the photo thumbnail strip is 96px × however many photos) pushes the whole
+   column wider than the phone screen. That shunts the page sideways and the
+   sticky header goes with it, cutting off the logo and the title.
+   min-width:0 lets the column shrink and the thumbnails scroll on their own. */
+.car-layout > *,
+.stock-layout > *,
+.contact-layout > * { min-width: 0; }
+
+.gallery { min-width: 0; max-width: 100%; }
+.thumbs  { max-width: 100%; }
+
 /* Walkaround video — sits above the photos because it does the most work */
 .walkaround {
   border: 1px solid var(--line);

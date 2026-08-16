@@ -1099,7 +1099,8 @@
       if (!g('#fPrice')) problems.push('price');
       if (!g('#fMileage')) problems.push('mileage');
       if (!state.photos.some(p => p.public_id)) problems.push('at least one photo');
-      if (g('#fHpi') !== 'clear' && !g('#fCondition')) problems.push('an explanation of the damage');
+      // The damage explanation is encouraged but NOT required — you can
+      // publish a Cat S/N car without it and add the wording later.
     }
     if (state.photos.some(p => p.uploading)) {
       return msg('#formMsg', 'Hang on — photos are still uploading.', 'warn');
