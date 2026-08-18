@@ -270,7 +270,7 @@
             <div class="car-section" id="enquire">
               <h2>Want one like this?</h2>
               <p class="muted" style="margin-bottom:22px">
-                We’re at auction most weeks and see hundreds of cars that never make
+                We’re out looking at cars most weeks and see plenty that never make
                 it onto the website. Tell us what you need and we’ll look out for
                 another ${esc([car.make, car.model].filter(Boolean).join(' ') || 'one')} —
                 or something close to it.
@@ -280,7 +280,7 @@
                 <h3 style="margin-bottom:8px">Register your interest</h3>
                 <p class="muted small" style="max-width:44ch;margin:0 auto 22px;line-height:1.7">
                   Takes a minute. No deposit, no obligation, and we’ll send you photos
-                  and a price before we bid on anything.
+                  and a price before we commit to anything.
                 </p>
                 <a class="btn btn--brass btn--lg" href="${MBU.link('wanted.html?car=' + encodeURIComponent(car.id))}">
                   Tell us what you’re after
@@ -374,7 +374,7 @@
                 ${sold ? `
                   <p class="small muted" style="margin-bottom:6px">
                     This one has gone — but we buy cars like it most weeks. Register your
-                    interest and we’ll look out for another at auction.
+                    interest and we’ll look out for another for you.
                   </p>
                   <a class="btn btn--brass btn--lg" href="${MBU.link('wanted.html?car=' + encodeURIComponent(car.id))}">
                     ${icon('heart')} Want one like this?
@@ -385,7 +385,7 @@
                   <a class="btn btn--outline" href="${MBU.link('stock.html')}">See what’s in stock</a>
                   <p class="buy-note">
                     No deposit, no obligation. We’ll send you photos and a price
-                    before we bid on anything.
+                    before we commit to anything.
                   </p>
                 ` : `
                   <a class="btn btn--wa btn--lg" href="${waHref}" target="_blank" rel="noopener">

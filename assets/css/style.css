@@ -226,6 +226,11 @@ p  { text-wrap: pretty; }
 .btn--wa       { background: #1FAF54; color: #fff; box-shadow: var(--sh-1); }
 .btn--wa:hover { background: #1a9a49; box-shadow: var(--sh-2); }
 
+/* Instagram — the official brand gradient, so the button reads as Instagram
+   at a glance the same way the green one reads as WhatsApp. */
+.btn--ig       { background: linear-gradient(45deg,#F9CE34 0%,#EE2A7B 52%,#6228D7 100%); color: #fff; box-shadow: var(--sh-1); }
+.btn--ig:hover { filter: brightness(1.07); box-shadow: var(--sh-2); }
+
 .btn--outline  { background: transparent; border-color: var(--line); color: var(--navy-900); }
 .btn--outline:hover { border-color: var(--navy-800); background: var(--surface-2); }
 
@@ -263,6 +268,17 @@ p  { text-wrap: pretty; }
 }
 
 .brand { display: flex; align-items: center; gap: 11px; flex: none; }
+
+/* Logo lock-up. The text version stays in the markup as a fallback and is
+   only hidden once we know a logo file is configured — if the image 404s,
+   ui.js strips .brand--logo and the text reappears. */
+.brand-logo { height: 46px; width: auto; max-width: 210px; object-fit: contain; display: block; }
+.brand--logo .brand-fallback { display: none; }
+.brand-fallback { display: contents; }
+@media (max-width: 480px) {
+  .brand-logo { height: 38px; max-width: 150px; }
+}
+
 .brand-mark {
   width: 42px; height: 42px;
   border-radius: 11px;
@@ -320,8 +336,19 @@ p  { text-wrap: pretty; }
 @media (max-width: 940px) {
   .nav, .header-cta .btn span.hide-sm { display: none; }
   .nav-toggle { display: flex; }
-  .header-cta { margin-left: 0; }
+  /* With the nav hidden, the actions and the menu button group together on
+     the right — otherwise both claim the spare space and end up mid-header. */
+  .header-cta { margin-left: auto; }
+  .nav-toggle { margin-left: 0; }
   .header-cta .btn--outline { display: none; }
+}
+/* Logo + WhatsApp + Instagram + menu is a lot for a narrow phone, so the
+   header tightens up rather than wrapping. */
+@media (max-width: 520px) {
+  .header-inner { gap: var(--sp-3); }
+  .header-cta { gap: 6px; }
+  .header-cta .btn--sm { padding: 9px 11px; }
+  .nav-toggle { width: 40px; }
 }
 
 /* Mobile drawer */
@@ -738,6 +765,15 @@ p  { text-wrap: pretty; }
 
 .footer-brand .brand-mark { width: 46px; height: 46px; font-size: 16px; }
 .footer-brand .brand-name { color: #fff; }
+.footer-brand .brand-logo { height: 52px; max-width: 230px; }
+/* Navy artwork on a navy footer would vanish, so it sits on a white chip
+   unless a light version of the logo is set as logoDark in config.js. */
+.brand-logo--onDark {
+  background: #fff;
+  padding: 10px 16px;
+  border-radius: var(--r-md);
+  box-sizing: content-box;
+}
 .footer-blurb { margin-top: var(--sp-4); line-height: 1.65; max-width: 34ch; }
 
 .social-row { display: flex; gap: var(--sp-2); margin-top: var(--sp-4); }
@@ -778,6 +814,10 @@ p  { text-wrap: pretty; }
   box-shadow: 0 -4px 20px rgba(13,22,38,.07);
 }
 .mobile-bar .btn { flex: 1; }
+/* Instagram rides along as a square icon button so WhatsApp and Call us keep
+   almost all the width — three equal buttons would squash the labels. */
+.mobile-bar-ig { flex: none !important; width: 54px; padding-inline: 0; }
+.mobile-bar-ig svg { width: 22px; height: 22px; }
 @media (max-width: 780px) {
   .mobile-bar { display: flex; }
   body { padding-bottom: 74px; }

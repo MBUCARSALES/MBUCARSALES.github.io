@@ -61,7 +61,7 @@
         <span class="eyebrow">Newcastle upon Tyne</span>
         <h1>Used cars worth<br>your <em>trust</em>.</h1>
         <p class="hero-sub">
-          We hand-pick every car from auction, prepare it properly in our own workshop,
+          We hand-pick every car ourselves, prepare it properly in our own workshop,
           and price it fairly. Father and son — you always deal with the people who
           know the car inside out.
         </p>
@@ -111,6 +111,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.9" fill="none"/><line x1="16.2" y1="16.2" x2="21" y2="21" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
           Search
         </button>
+        <button class="btn btn--ghost btn--block qs-reset" type="button" id="qsReset" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 1 2.6 5.9" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linecap="round"/><polyline points="4 6.5 4 12 9.5 12" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Reset
+        </button>
       </div>
     </form>
   </div>
@@ -122,7 +126,7 @@
         <div class="section-head" style="margin-bottom:0">
           <span class="eyebrow">Available now</span>
           <h2>Latest into stock</h2>
-          <p>Fresh in from auction, checked over and ready to view. Everything here is on site in Newcastle.</p>
+          <p>Freshly in, checked over and ready to view. Everything here is on site in Newcastle.</p>
         </div>
         <a class="btn btn--outline" href="stock.html">See all stock</a>
       </div>
@@ -192,9 +196,9 @@
       <div class="section-head section-head--center">
         <span class="eyebrow" style="justify-content:center">Can’t see what you want?</span>
         <h2>Tell us what you’re after and we’ll find it</h2>
-        <p>We’re at auction most weeks. Give us the make, model and budget and we’ll
-           keep an eye out — no obligation, no deposit, and we’ll send you photos
-           before we bid on anything.</p>
+        <p>We’re out looking at cars most weeks. Give us the make, model and budget
+           and we’ll keep an eye out — no obligation, no deposit, and we’ll send you
+           photos before we commit to anything.</p>
       </div>
 
       <div class="steps" style="max-width:900px;margin:0 auto 40px">
@@ -204,11 +208,11 @@
         </div>
         <div class="step">
           <h3>We go looking</h3>
-          <p>We're at auction most weeks and see hundreds of cars you never will.</p>
+          <p>We're out looking most weeks and see plenty of cars that never get advertised.</p>
         </div>
         <div class="step">
           <h3>You decide</h3>
-          <p>We send photos and a price before we bid. No pressure, no commitment.</p>
+          <p>We send photos and a price before we commit. No pressure, no obligation.</p>
         </div>
       </div>
 
@@ -306,6 +310,8 @@
   MBU.getAvailable().then(cars => {
     const mk = document.getElementById('qsMake');
     const md = document.getElementById('qsModel');
+    const mx = document.getElementById('qsMax');
+    const reset = document.getElementById('qsReset');
 
     [...new Set(cars.map(c => c.make).filter(Boolean))].sort()
       .forEach(m => mk.add(new Option(m, m)));
@@ -320,8 +326,26 @@
       md.disabled = models.length === 0;
     }
 
-    mk.addEventListener('change', fillModels);
+    /* Reset only appears once something is actually chosen — an always-on
+       Reset next to Search just adds noise to an empty form. */
+    function syncReset() {
+      reset.hidden = !(mk.value || md.value || mx.value);
+    }
+
+    mk.addEventListener('change', () => { fillModels(); syncReset(); });
+    md.addEventListener('change', syncReset);
+    mx.addEventListener('change', syncReset);
+
+    reset.addEventListener('click', () => {
+      mk.value = '';
+      mx.value = '';
+      fillModels();          // rebuild the full model list and clear the choice
+      syncReset();
+      mk.focus();
+    });
+
     fillModels();
+    syncReset();
   });
 })();
 </script>

@@ -33,7 +33,7 @@
       <h1>Cars in stock</h1>
       <p>Everything priced below is here in Newcastle, ready to view — and the price is what you pay, no admin fees.
          Cars marked <strong>SOLD</strong> went in the last few weeks; if one of those is what you're after,
-         tell us and we'll look out for another at auction.</p>
+         tell us and we'll look out for another.</p>
     </div>
   </section>
 
@@ -296,7 +296,7 @@
       grid.innerHTML = MBU.emptyState(
         ALL.length ? 'No cars match those filters' : 'No cars listed right now',
         ALL.length
-          ? 'Try widening your search — or tell us what you are after and we will look out for one at auction.'
+          ? 'Try widening your search — or tell us what you are after and we will look out for one for you.'
           : 'New stock lands most weeks. Message us and we will let you know what is on its way.',
         `<div class="cluster" style="justify-content:center">
            ${ALL.length ? '<button class="btn btn--outline" id="emptyReset" type="button">Clear filters</button>' : ''}

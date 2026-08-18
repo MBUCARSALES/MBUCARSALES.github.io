@@ -23,18 +23,53 @@
   const page = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
   const isActive = href => href === page || (page === '' && href === 'index.html');
 
+  /* -------------------------------------------------------------- BRANDING */
+  /**
+   * The brand lock-up used in the header and the footer.
+   *
+   * If a logo file is set in config it is used, and the old "MBU" tile plus
+   * the name is kept in the markup as a fallback — if the image ever fails to
+   * load, `onerror` swaps the text version back in rather than leaving a gap.
+   * With no logo configured at all you just get the text version, exactly as
+   * the site looked before.
+   *
+   * @param {'header'|'footer'} where
+   */
+  function brand(where) {
+    const src = where === 'footer' ? (B.logoDark || B.logo) : B.logo;
+    const textMark = `
+      <span class="brand-mark">MBU</span>
+      <span class="brand-text">
+        <span class="brand-name">${esc(B.name)}</span>
+        <span class="brand-sub">${esc(B.town)}</span>
+      </span>`;
+
+    if (!src) return textMark;
+
+    // The footer is dark navy and the logo is navy artwork, so unless a light
+    // version has been supplied it sits on a white chip to stay readable.
+    const onDark = where === 'footer' && !B.logoDark ? ' brand-logo--onDark' : '';
+
+    return `
+      <img class="brand-logo${onDark}" src="${esc(MBU.link(src))}" alt="${esc(B.name)}"
+           onerror="this.onerror=null;this.remove();
+                    this.closest('.brand').classList.remove('brand--logo')">
+      <span class="brand-fallback">${textMark}</span>`;
+  }
+
+  const brandClass = B.logo ? 'brand brand--logo' : 'brand';
+
+  /* Instagram, shown only when a link is configured */
+  const igLink = (B.instagram || '').trim();
+
   /* ------------------------------------------------------------------ HEADER */
   function header() {
     return `
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header" id="siteHeader">
       <div class="container header-inner">
-        <a class="brand" href="${MBU.link('index.html')}" aria-label="${esc(B.name)} home">
-          <span class="brand-mark">MBU</span>
-          <span class="brand-text">
-            <span class="brand-name">${esc(B.name)}</span>
-            <span class="brand-sub">${esc(B.town)}</span>
-          </span>
+        <a class="${brandClass}" href="${MBU.link('index.html')}" aria-label="${esc(B.name)} home">
+          ${brand('header')}
         </a>
 
         <nav class="nav" aria-label="Main">
@@ -49,6 +84,10 @@
              target="_blank" rel="noopener">
             ${icon('whatsapp')}<span class="hide-sm">WhatsApp</span>
           </a>
+          ${igLink ? `<a class="btn btn--ig btn--sm" href="${esc(igLink)}"
+             target="_blank" rel="noopener" aria-label="MBU Car Sales on Instagram">
+            ${icon('instagram')}<span class="hide-sm">Instagram</span>
+          </a>` : ''}
         </div>
 
         <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false">
@@ -72,6 +111,10 @@
           <a class="btn btn--outline btn--block" href="${MBU.telLink()}">
             ${icon('phone')} ${esc(B.phone)}
           </a>
+          ${igLink ? `<a class="btn btn--ig btn--block" href="${esc(igLink)}"
+             target="_blank" rel="noopener">
+            ${icon('instagram')} Follow us on Instagram
+          </a>` : ''}
         </div>
       </div>
     </div>`;
@@ -92,12 +135,8 @@
       <div class="container">
         <div class="footer-grid">
           <div class="footer-brand">
-            <a class="brand" href="${MBU.link('index.html')}">
-              <span class="brand-mark">MBU</span>
-              <span class="brand-text">
-                <span class="brand-name">${esc(B.name)}</span>
-                <span class="brand-sub">${esc(B.town)}</span>
-              </span>
+            <a class="${brandClass}" href="${MBU.link('index.html')}">
+              ${brand('footer')}
             </a>
             <p class="footer-blurb">${esc(B.strapline)}</p>
             ${socials.length ? `<div class="social-row">
@@ -141,11 +180,15 @@
       </div>
     </footer>
 
-    <div class="mobile-bar">
+    <div class="mobile-bar${igLink ? ' mobile-bar--3' : ''}">
       <a class="btn btn--wa" href="${MBU.waLink('Hi MBU Car Sales,')}" target="_blank" rel="noopener">
         ${icon('whatsapp')} WhatsApp
       </a>
       <a class="btn btn--primary" href="${MBU.telLink()}">${icon('phone')} Call us</a>
+      ${igLink ? `<a class="btn btn--ig mobile-bar-ig" href="${esc(igLink)}"
+         target="_blank" rel="noopener" aria-label="MBU Car Sales on Instagram">
+        ${icon('instagram')}
+      </a>` : ''}
     </div>`;
   }
 

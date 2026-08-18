@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Car Finder — Tell Us What You’re Looking For | MBU Car Sales</title>
-<meta name="description" content="Can't see what you want? Tell MBU Car Sales in Newcastle what you're after and we'll look out for one at auction. No obligation, no deposit.">
+<meta name="description" content="Can't see what you want? Tell MBU Car Sales in Newcastle what you're after and we'll look out for one for you. No obligation, no deposit.">
 <link rel="canonical" href="https://mbucarsales.github.io/wanted.html">
 <meta property="og:title" content="Car Finder — MBU Car Sales">
-<meta property="og:description" content="Tell us what you're looking for and we'll find it at auction. No obligation, no deposit.">
+<meta property="og:description" content="Tell us what you're looking for and we'll find it for you. No obligation, no deposit.">
 <meta name="theme-color" content="#0D1626">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,9 +31,9 @@
       </nav>
       <h1 id="pageTitle">Tell us what you’re looking for</h1>
       <p id="pageIntro">
-        We’re at auction most weeks and see hundreds of cars that never make it onto
+        We’re out looking at cars most weeks and see plenty that never make it onto
         our website. Tell us the brief and we’ll keep an eye out — we’ll send you
-        photos and a price before we bid on anything, and you’re under no obligation.
+        photos and a price before we commit to anything, and you’re under no obligation.
       </p>
     </div>
   </section>
@@ -243,7 +243,7 @@
   const carId = MBU.param('car');       // set when arriving from a sold car
 
   document.getElementById('whyList').innerHTML = [
-    'We see hundreds of cars at auction you’ll never get access to',
+    'We see cars most weeks that never get advertised publicly',
     'You get photos and a price before we commit to anything',
     'No deposit and no obligation at any point',
     'If it turns out to be a bad car, we just don’t buy it'
@@ -295,7 +295,7 @@
       document.getElementById('pageIntro').textContent =
         'That one has gone, but we buy cars like it most weeks. Tell us what you ' +
         'need and we’ll look out for another — we’ll send you photos and a price ' +
-        'before we bid on anything.';
+        'before we commit to anything.';
 
       const about = document.getElementById('aboutCar');
       about.hidden = false;

@@ -115,9 +115,16 @@
 }
 .quick-search .field label { font-size: var(--fs-xs); letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); }
 .quick-search .btn { height: 48px; }
+/* Search stays the obvious action; Reset sits beside it, quieter, and only
+   appears once there is something to clear (wired up in index.html). */
+.qs-submit { display: flex; gap: 10px; align-items: end; }
+.qs-submit .btn--primary { min-width: 130px; }
+.qs-reset { width: auto; flex: none; color: var(--ink-3); }
+.qs-reset[hidden] { display: none; }
 @media (max-width: 860px) {
   .quick-search { grid-template-columns: 1fr 1fr; }
   .quick-search .qs-submit { grid-column: 1 / -1; }
+  .qs-submit .btn--primary { flex: 1; min-width: 0; }
 }
 @media (max-width: 520px) {
   .quick-search-wrap { margin-top: -40px; }

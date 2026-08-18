@@ -18,6 +18,14 @@ window.MBU_CONFIG = {
     tagline:     'Quality used cars, honestly priced',
     strapline:   'A local business in Newcastle upon Tyne. Hand-picked stock, straight answers, no pressure.',
 
+    // Logo image, relative to the site root. Drop the file in assets/img/ and
+    // put its filename here. Leave it as an empty string and the site falls
+    // back to the plain "MBU" tile — so a missing file never breaks anything.
+    //   logoDark  — optional lighter version for the dark navy footer. If you
+    //               leave it blank the footer just reuses the main logo.
+    logo:         'assets/img/logo.png',
+    logoDark:     '',
+
     phone:        '+44 7438 510044',   // shown on the site
     phoneDial:    '+447438510044',     // used for tel: links (no spaces)
     whatsapp:     '447438510044',      // international format, NO plus sign
@@ -36,7 +44,7 @@ window.MBU_CONFIG = {
     searchPostcode: 'NE1 1AA',
 
     // Optional — leave as empty string to hide the link entirely
-    instagram:    'https://www.instagram.com/mbucarsalesltd',
+    instagram:    'https://www.instagram.com/mbusalesltd/',
     facebook:     '',
     autotrader:   '',
 
@@ -58,7 +66,7 @@ window.MBU_CONFIG = {
     promises: [
       { icon: 'shield',  title: 'HPI checked',        text: 'Every car is HPI checked before it goes on sale, and we tell you up front if it has been repaired.' },
       { icon: 'spanner', title: 'Prepared properly',  text: 'Serviced, MOT’d and road-tested by us before it is handed over. We fix things before you see them, not after.' },
-      { icon: 'tag',     title: 'Priced to be fair',  text: 'We buy at auction and pass the saving on. What you see is what you pay — no admin fees, no surprises.' },
+      { icon: 'tag',     title: 'Priced to be fair',  text: 'We buy well and pass the saving on. What you see is what you pay — no admin fees, no surprises.' },
       { icon: 'people',  title: 'You deal with us',   text: 'Father and son, no sales team, no commission chasing. The person you speak to is the person who prepared the car.' }
     ],
 

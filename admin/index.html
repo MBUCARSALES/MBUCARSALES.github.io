@@ -25,7 +25,12 @@
 
 <!-- ======================================================== LOGIN -->
 <div class="login" id="loginView">
-  <div class="login-mark">MBU</div>
+  <!-- The logo if it's there, the plain MBU tile if it isn't. `onerror`
+       swaps one for the other so a missing file never leaves a gap. -->
+  <img class="login-logo" src="../assets/img/logo.png" alt="MBU Car Sales"
+       onerror="this.onerror=null;this.remove();
+                document.getElementById('loginMark').hidden=false">
+  <div class="login-mark" id="loginMark" hidden>MBU</div>
   <h1>MBU Admin</h1>
   <p>Sign in to add cars, mark them sold and check your enquiries.</p>
 
@@ -221,11 +226,12 @@
         </select>
       </div>
       <div class="f" id="condWrap" style="margin-top:16px;margin-bottom:0" hidden>
-        <label for="fCondition">Explain the damage and repair</label>
+        <label for="fCondition">Explain the damage and repair <span class="opt">(optional)</span></label>
         <textarea class="ta" id="fCondition"
           placeholder="What was damaged, what you did to fix it, and why it's safe. Customers respect honesty here — it sells cars."></textarea>
-        <p class="hint">Optional, but worth doing. Shows in a highlighted box on the car’s
-           page — being upfront saves the awkward conversation on the forecourt.</p>
+        <p class="hint">You can leave this blank and publish the car anyway — come back
+           and add it whenever you like. If you do fill it in it shows in a highlighted
+           box on the car’s page, which saves the awkward conversation on the forecourt.</p>
       </div>
     </div>
 

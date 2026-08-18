@@ -233,6 +233,9 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
 }
 .f .hint { font-size: 13px; color: var(--ink-3); margin-top: 6px; line-height: 1.45; }
 .f .req { color: var(--red-600); }
+/* The mirror of .req — says plainly that a field can be left blank, so nobody
+   gets stuck hunting for something to type. */
+.f .opt { color: var(--ink-3); font-weight: 500; }
 
 .in, .sel, .ta {
   width: 100%;
@@ -382,6 +385,18 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
   display: grid; place-items: center;
   font-size: 24px; font-weight: 800; color: var(--brass-400);
   letter-spacing: -.02em;
+}
+/* Navy artwork on the navy sign-in screen would disappear, so the logo sits
+   on a white card the same way it does in the website footer. */
+.login-logo {
+  display: block;
+  width: auto; max-width: 230px; height: 74px;
+  object-fit: contain;
+  margin: 0 auto 26px;
+  background: #fff;
+  padding: 12px 18px;
+  border-radius: 18px;
+  box-sizing: content-box;
 }
 .login h1 { font-size: 28px; margin-bottom: 8px; }
 .login p { color: #A8B6CC; font-size: 15.5px; line-height: 1.6; margin-bottom: 30px; }
