@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MBU Car Sales — Quality Used Cars in Newcastle upon Tyne</title>
+<title>MBU Car Sales | Quality Used Cars in Newcastle upon Tyne</title>
 <meta name="description" content="Hand-picked used cars, honestly priced and properly prepared. A father-and-son business in Newcastle upon Tyne. Browse our current stock or message us on WhatsApp.">
 <link rel="canonical" href="https://mbucarsales.github.io/">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="MBU Car Sales">
-<meta property="og:title" content="MBU Car Sales — Quality Used Cars in Newcastle upon Tyne">
+<meta property="og:title" content="MBU Car Sales | Quality Used Cars in Newcastle upon Tyne">
 <meta property="og:description" content="Hand-picked used cars, honestly priced and properly prepared. Browse our current stock.">
 <meta property="og:image" content="https://mbucarsales.github.io/assets/img/og-default.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#0D1626">
+<meta name="theme-color" content="#0A1830">
 
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/img/icon-180.png">
@@ -35,10 +35,16 @@
   "url": "https://mbucarsales.github.io/",
   "address": {
     "@type": "PostalAddress",
+    "streetAddress": "587 Westgate Road",
     "addressLocality": "Newcastle upon Tyne",
     "addressRegion": "Tyne and Wear",
+    "postalCode": "NE4 9PQ",
     "addressCountry": "GB"
   },
+  "sameAs": [
+    "https://www.instagram.com/mbusalesltd/",
+    "https://www.autotrader.co.uk/dealers/northumberland/newcastle-upon-tyne/mbu-sales-limited-10050768"
+  ],
   "openingHoursSpecification": [
     { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday"], "opens": "09:00", "closes": "22:00" },
     { "@type": "OpeningHoursSpecification", "dayOfWeek": "Saturday", "opens": "09:00", "closes": "18:00" },
@@ -62,11 +68,11 @@
         <h1>Used cars worth<br>your <em>trust</em>.</h1>
         <p class="hero-sub">
           We hand-pick every car ourselves, prepare it properly in our own workshop,
-          and price it fairly. Father and son — you always deal with the people who
+          and price it fairly. Father and son, so you always deal with the people who
           know the car inside out.
         </p>
         <div class="cluster hero-cta">
-          <a class="btn btn--brass btn--lg" href="stock.html">
+          <a class="btn btn--accent btn--lg" href="stock.html">
             View our stock
             <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><polyline points="13 6 19 12 13 18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
           </a>
@@ -79,7 +85,7 @@
       </div>
     </div>
     <div class="hero-stat" id="heroStat" aria-hidden="true">
-      <b>—</b><span>Cars in stock</span>
+      <b>&hellip;</b><span>Cars in stock</span>
     </div>
   </section>
 
@@ -93,6 +99,14 @@
       <div class="field">
         <label for="qsModel">Model</label>
         <select class="select" id="qsModel" name="model"><option value="">Any model</option></select>
+      </div>
+      <div class="field">
+        <label for="qsTrans">Gearbox</label>
+        <select class="select" id="qsTrans" name="transmission">
+          <option value="">Either</option>
+          <option value="manual">Manual</option>
+          <option value="automatic">Automatic</option>
+        </select>
       </div>
       <div class="field">
         <label for="qsMax">Max price</label>
@@ -119,19 +133,31 @@
     </form>
   </div>
 
-  <!-- ================================================== LATEST STOCK -->
+  <!-- ================================================== FEATURED STOCK -->
   <section class="section">
     <div class="container">
       <div class="stock-toolbar" style="align-items:flex-end;margin-bottom:32px">
         <div class="section-head" style="margin-bottom:0">
           <span class="eyebrow">Available now</span>
-          <h2>Latest into stock</h2>
-          <p>Freshly in, checked over and ready to view. Everything here is on site in Newcastle.</p>
+          <h2>Featured stock</h2>
+          <p>The ones we would point you at first. Swipe through, they are all on site in Newcastle.</p>
         </div>
-        <a class="btn btn--outline" href="stock.html">See all stock</a>
+        <div class="rail-nav">
+          <div class="rail-arrows" id="railArrows" hidden>
+          <button class="rail-btn" id="railPrev" type="button" aria-label="Previous cars">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 5 8 12 15 19" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="rail-btn" id="railNext" type="button" aria-label="More cars">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 5 16 12 9 19" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          </div>
+          <a class="btn btn--outline" href="stock.html">See all stock</a>
+        </div>
       </div>
 
-      <div class="grid grid--cars" id="featuredGrid"></div>
+      <!-- Swipe rail. The card width is set so the next one always peeks in
+           from the right, which is what tells people it scrolls. -->
+      <div class="car-rail" id="featuredGrid" tabindex="0" role="region" aria-label="Featured stock, scrollable"></div>
 
       <div class="center" style="margin-top:40px">
         <a class="btn btn--primary btn--lg" href="stock.html">
@@ -148,7 +174,7 @@
       <div class="section-head section-head--center">
         <span class="eyebrow" style="justify-content:center">Why buy from us</span>
         <h2>A small business that has to get it right</h2>
-        <p>We are not a forecourt with a sales team on commission. Our name is on every car that leaves here, and word of mouth in Newcastle is the only advertising that has ever worked for us.</p>
+        <p>There is no sales team here and nobody works on commission. Our name is on every car that leaves the yard, and word of mouth round Newcastle is what keeps us going.</p>
       </div>
       <div class="grid grid--4" id="promiseGrid"></div>
     </div>
@@ -162,21 +188,21 @@
           <span class="eyebrow">How it works</span>
           <h2 style="margin-bottom:16px">Straightforward from start to finish</h2>
           <p class="lead" style="margin-bottom:36px">
-            No pressure, no haggling games, no admin fees bolted on at the end.
-            Here is exactly what happens when you find something you like.
+            No pressure and no admin fees bolted on at the end. Here’s what
+            happens when you find something you like.
           </p>
           <div class="steps" style="grid-template-columns:1fr;gap:28px">
             <div class="step">
               <h3>Get in touch</h3>
-              <p>Message us on WhatsApp or give us a ring. Tell us which car and when suits you — evenings and weekends are fine.</p>
+              <p>Message us on WhatsApp or give us a ring. Tell us which car and when suits you. Evenings and weekends are fine.</p>
             </div>
             <div class="step">
               <h3>Come and see it</h3>
-              <p>We will have the car out, warmed up and ready. Take your time, bring someone who knows cars, take it for a drive. Ask us anything.</p>
+              <p>We’ll have the car out, warmed up and ready. Take your time and bring someone who knows cars if you want. Take it for a drive and ask us anything.</p>
             </div>
             <div class="step">
               <h3>Drive it away</h3>
-              <p>Serviced, MOT'd and valeted before you collect. We handle the V5 transfer and you leave with the keys and the paperwork in order.</p>
+              <p>Serviced, MOT'd and valeted before you collect. We sort the V5 transfer and you leave with the keys and the paperwork in order.</p>
             </div>
           </div>
         </div>
@@ -197,14 +223,14 @@
         <span class="eyebrow" style="justify-content:center">Can’t see what you want?</span>
         <h2>Tell us what you’re after and we’ll find it</h2>
         <p>We’re out looking at cars most weeks. Give us the make, model and budget
-           and we’ll keep an eye out — no obligation, no deposit, and we’ll send you
+           and we’ll keep an eye out. No obligation, no deposit, and we’ll send you
            photos before we commit to anything.</p>
       </div>
 
       <div class="steps" style="max-width:900px;margin:0 auto 40px">
         <div class="step">
           <h3>Tell us the brief</h3>
-          <p>Make, model, budget, mileage — as loose or as specific as you like.</p>
+          <p>Make, model, budget, mileage. As loose or as specific as you like.</p>
         </div>
         <div class="step">
           <h3>We go looking</h3>
@@ -217,7 +243,7 @@
       </div>
 
       <div class="center">
-        <a class="btn btn--brass btn--lg" href="wanted.html">Tell us what you’re looking for</a>
+        <a class="btn btn--accent btn--lg" href="wanted.html">Tell us what you’re looking for</a>
       </div>
     </div>
   </section>
@@ -228,10 +254,10 @@
       <div class="cta-band">
         <div>
           <h2>Got a car to sell?</h2>
-          <p>We buy outright — clean cars, damaged cars, non-runners, anything. Tell us what you have and we will come back with a no-obligation offer, usually the same day.</p>
+          <p>We buy outright. Clean cars, damaged cars, non-runners, anything. Tell us what you’ve got and we’ll come back with a no-obligation offer, usually the same day.</p>
         </div>
         <div class="cta-band-actions">
-          <a class="btn btn--brass btn--lg" href="sell.html">Get a free valuation</a>
+          <a class="btn btn--accent btn--lg" href="sell.html">Get a free valuation</a>
           <a class="btn btn--onDark btn--lg" id="ctaWa" href="#" target="_blank" rel="noopener">WhatsApp us</a>
         </div>
       </div>
@@ -277,23 +303,60 @@
   grid.innerHTML = MBU.skeletonCards(6);
 
   MBU.getFeatured().then(cars => {
+    /* Both fallbacks drop out of rail mode so the message fills the width
+       instead of sitting in a one-card-wide column. */
     if (!cars.length && MBU.loadFailed) {
-      grid.style.gridTemplateColumns = '1fr';
+      grid.classList.add('car-rail--flat');
       grid.innerHTML = MBU.loadErrorState();
       return;
     }
     if (!cars.length) {
+      grid.classList.add('car-rail--flat');
       grid.innerHTML = MBU.emptyState(
         'Nothing listed at the moment',
-        'We are between deliveries. New stock lands most weeks — message us and we will tell you what is on its way.',
+        'We are between deliveries. New stock lands most weeks, so message us and we’ll tell you what’s on its way.',
         `<a class="btn btn--wa" href="${wa}" target="_blank" rel="noopener">Ask what is coming in</a>`
       );
-      grid.style.gridTemplateColumns = '1fr';
       return;
     }
-    grid.innerHTML = cars.map(c => `<div class="reveal">${MBU.carCard(c)}</div>`).join('');
-    MBU.reveal(grid);
+    grid.innerHTML = cars.map(c => `<div class="rail-item">${MBU.carCard(c)}</div>`).join('');
+    wireRail(grid, cars.length);
   });
+
+  /* ------------------------------------------------------------- SWIPE RAIL
+     On a phone this is just native horizontal scrolling with snap points, so
+     it behaves exactly the way people expect. The arrows are for mouse users,
+     and they hide themselves when everything already fits on screen. */
+  function wireRail(rail, count) {
+    const nav  = document.getElementById('railArrows');
+    const prev = document.getElementById('railPrev');
+    const next = document.getElementById('railNext');
+    if (!nav) return;
+
+    const step = () => {
+      const first = rail.firstElementChild;
+      if (!first) return rail.clientWidth;
+      const gap = parseFloat(getComputedStyle(rail).columnGap) || 0;
+      return first.getBoundingClientRect().width + gap;
+    };
+
+    const overflows = () => rail.scrollWidth - rail.clientWidth > 4;
+
+    function syncArrows() {
+      nav.hidden = !overflows();
+      const max = rail.scrollWidth - rail.clientWidth;
+      prev.disabled = rail.scrollLeft <= 2;
+      next.disabled = rail.scrollLeft >= max - 2;
+    }
+
+    prev.addEventListener('click', () => rail.scrollBy({ left: -step(), behavior: 'smooth' }));
+    next.addEventListener('click', () => rail.scrollBy({ left:  step(), behavior: 'smooth' }));
+    rail.addEventListener('scroll', syncArrows, { passive: true });
+    window.addEventListener('resize', syncArrows);
+
+    // Let the browser lay the cards out before measuring anything.
+    requestAnimationFrame(syncArrows);
+  }
 
   /* Stock count in the hero */
   MBU.getAvailable().then(cars => {
@@ -311,6 +374,7 @@
     const mk = document.getElementById('qsMake');
     const md = document.getElementById('qsModel');
     const mx = document.getElementById('qsMax');
+    const tx = document.getElementById('qsTrans');
     const reset = document.getElementById('qsReset');
 
     [...new Set(cars.map(c => c.make).filter(Boolean))].sort()
@@ -326,19 +390,19 @@
       md.disabled = models.length === 0;
     }
 
-    /* Reset only appears once something is actually chosen — an always-on
+    /* Reset only appears once something is actually chosen. An always-on
        Reset next to Search just adds noise to an empty form. */
     function syncReset() {
-      reset.hidden = !(mk.value || md.value || mx.value);
+      reset.hidden = !(mk.value || md.value || mx.value || tx.value);
     }
 
     mk.addEventListener('change', () => { fillModels(); syncReset(); });
-    md.addEventListener('change', syncReset);
-    mx.addEventListener('change', syncReset);
+    [md, mx, tx].forEach(el => el.addEventListener('change', syncReset));
 
     reset.addEventListener('click', () => {
       mk.value = '';
       mx.value = '';
+      tx.value = '';
       fillModels();          // rebuild the full model list and clear the choice
       syncReset();
       mk.focus();

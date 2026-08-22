@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Car Finder — Tell Us What You’re Looking For | MBU Car Sales</title>
+<title>Car Finder: Tell Us What You’re Looking For | MBU Car Sales</title>
 <meta name="description" content="Can't see what you want? Tell MBU Car Sales in Newcastle what you're after and we'll look out for one for you. No obligation, no deposit.">
 <link rel="canonical" href="https://mbucarsales.github.io/wanted.html">
-<meta property="og:title" content="Car Finder — MBU Car Sales">
+<meta property="og:title" content="Car Finder | MBU Car Sales">
 <meta property="og:description" content="Tell us what you're looking for and we'll find it for you. No obligation, no deposit.">
-<meta name="theme-color" content="#0D1626">
+<meta name="theme-color" content="#0A1830">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -32,7 +32,7 @@
       <h1 id="pageTitle">Tell us what you’re looking for</h1>
       <p id="pageIntro">
         We’re out looking at cars most weeks and see plenty that never make it onto
-        our website. Tell us the brief and we’ll keep an eye out — we’ll send you
+        our website. Tell us the brief and we’ll keep an eye out. We’ll send you
         photos and a price before we commit to anything, and you’re under no obligation.
       </p>
     </div>
@@ -49,7 +49,7 @@
 
             <h2 style="font-size:var(--fs-xl);margin-bottom:6px">What are you after?</h2>
             <p class="muted small" style="margin-bottom:26px">
-              Fill in as much or as little as you like — even just “a diesel estate
+              Fill in as much or as little as you like. Even just “a diesel estate
               under £6,000” is enough for us to work with.
             </p>
 
@@ -58,12 +58,12 @@
 
                 <div class="field">
                   <label for="wMake">Make</label>
-                  <input class="input" id="wMake" list="makeList" placeholder="e.g. Ford — or leave blank" autocapitalize="words">
+                  <input class="input" id="wMake" list="makeList" placeholder="e.g. Ford, or leave blank" autocapitalize="words">
                   <datalist id="makeList"></datalist>
                 </div>
                 <div class="field">
                   <label for="wModel">Model</label>
-                  <input class="input" id="wModel" placeholder="e.g. Focus — or leave blank" autocapitalize="words">
+                  <input class="input" id="wModel" placeholder="e.g. Focus, or leave blank" autocapitalize="words">
                 </div>
 
                 <div class="field span-2">
@@ -73,7 +73,7 @@
                     <span>to</span>
                     <input class="input" id="wBudgetMax" type="number" inputmode="numeric" placeholder="£ up to" min="0" step="250">
                   </div>
-                  <span class="hint">Being straight about your budget saves us both time — we won’t push you past it.</span>
+                  <span class="hint">Being straight about your budget saves us both time. We won’t push you past it.</span>
                 </div>
 
                 <div class="field">
@@ -219,7 +219,7 @@
           <div class="panel">
             <h3 style="font-size:var(--fs-md);margin-bottom:10px">Available right now</h3>
             <p class="small muted" style="margin-bottom:16px">
-              Worth a look before you wait — we might already have something.
+              Worth a look before you wait. We might already have something.
             </p>
             <a class="btn btn--outline btn--block" href="stock.html">See our current stock</a>
           </div>
@@ -283,7 +283,7 @@
   });
 
   /* ------------------------------------------------------------------
-     Arriving from a sold car — pre-fill the brief with that car's details
+     Arriving from a sold car, so pre-fill the brief with that car's details
      so the customer barely has to type anything.
      ------------------------------------------------------------------ */
   if (carId) {
@@ -294,7 +294,7 @@
       document.getElementById('pageTitle').textContent = 'Want one like this?';
       document.getElementById('pageIntro').textContent =
         'That one has gone, but we buy cars like it most weeks. Tell us what you ' +
-        'need and we’ll look out for another — we’ll send you photos and a price ' +
+        'need and we’ll look out for another. We’ll send you photos and a price ' +
         'before we commit to anything.';
 
       const about = document.getElementById('aboutCar');
@@ -306,7 +306,7 @@
           <div>
             <strong>Based on the ${esc(title)}</strong>
             Sold ${esc(MBU.fmt.ago(car.sold_at))}. We’ve filled in the details below
-            from that car — change anything that doesn’t suit.
+            from that car. Change anything that doesn’t suit.
           </div>
         </div>`;
 
@@ -372,10 +372,10 @@
       form.innerHTML = `
         <div style="text-align:center;padding:34px 12px">
           <div class="info-card-icon" style="margin:0 auto 18px;background:var(--green-100);color:var(--green-600)">${MBU.icon('checkCirc')}</div>
-          <h3 style="margin-bottom:10px">Thanks ${esc(v('wName').split(' ')[0])} — we’re on it</h3>
+          <h3 style="margin-bottom:10px">Thanks ${esc(v('wName').split(' ')[0])}, we’re on it</h3>
           <p class="muted" style="max-width:46ch;margin:0 auto 22px;line-height:1.7">
             We’ll keep an eye out and get in touch the moment something suitable
-            comes up. That might be this week or it might take a few — we’d rather
+            comes up. That might be this week or it might take a few. We’d rather
             wait for the right one than push you a bad car.
           </p>
           <a class="btn btn--outline" href="stock.html">Have a look at what we’ve got now</a>

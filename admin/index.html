@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="MBU Admin">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#0D1626">
+<meta name="theme-color" content="#0A1830">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
@@ -32,7 +32,7 @@
                 document.getElementById('loginMark').hidden=false">
   <div class="login-mark" id="loginMark" hidden>MBU</div>
   <h1>MBU Admin</h1>
-  <p>Sign in to add cars, mark them sold and check your enquiries.</p>
+  <p>Sign in to add cars and see who’s been in touch.</p>
 
   <div class="msg" id="loginMsg" role="status"></div>
 
@@ -47,12 +47,12 @@
       <input class="in" id="loginPassword" type="password"
              autocomplete="current-password" placeholder="Password" required>
     </div>
-    <button class="btn btn--brass btn--block" type="submit" id="loginBtn">Sign in</button>
+    <button class="btn btn--accent btn--block" type="submit" id="loginBtn">Sign in</button>
   </form>
 
   <p class="login-note" id="loginNote">
-    Tap “Save Password” when your iPhone offers —<br>
-    then you’ll never have to type it again.
+    Tap “Save Password” when your iPhone offers.<br>
+    Then you’ll never have to type it again.
   </p>
 </div>
 
@@ -65,7 +65,7 @@
     </button>
     <span class="topbar-spacer" id="topbarSpacer"></span>
     <h1 id="topTitle">Your stock</h1>
-    <button class="topbar-btn topbar-btn--brass" id="topAction" hidden></button>
+    <button class="topbar-btn topbar-btn--accent" id="topAction" hidden></button>
     <span class="topbar-spacer" id="topbarSpacer2"></span>
   </header>
 
@@ -80,6 +80,77 @@
     <div id="stockList"></div>
   </section>
 
+  <!-- ---------------------------------------------- QUICK ADD
+       The auction screen. Plate, what it cost, what it will cost to put
+       right. Saves as a draft in about twenty seconds so somebody can write
+       the listing up properly later. -->
+  <section class="view is-hidden" id="quickView">
+    <div class="msg" id="quickMsg" role="status"></div>
+
+    <div class="section-card">
+      <h2>What is it?</h2>
+      <div class="plate-wrap">
+        <span class="plate-holder">
+          <input class="plate-input" id="qReg" placeholder="AB12 CDE"
+                 autocomplete="off" autocapitalize="characters" spellcheck="false">
+        </span>
+        <button class="btn btn--primary" id="qLookup" type="button" style="min-width:104px">Look up</button>
+      </div>
+      <p class="hint" id="qHint">Type the plate and tap Look up, or just fill the two boxes below.</p>
+
+      <div class="row-2" style="margin-top:16px">
+        <div class="f">
+          <label for="qMake">Make</label>
+          <select class="sel" id="qMake"></select>
+          <input class="in pick-other" id="qMakeOther" placeholder="Type the make" autocapitalize="words" hidden>
+        </div>
+        <div class="f">
+          <label for="qModel">Model</label>
+          <select class="sel" id="qModel"></select>
+          <input class="in pick-other" id="qModelOther" placeholder="Type the model" autocapitalize="words" hidden>
+        </div>
+      </div>
+      <div class="f" style="margin-bottom:0">
+        <label for="qYear">Year</label>
+        <input class="in" id="qYear" type="number" inputmode="numeric" placeholder="2017">
+      </div>
+    </div>
+
+    <div class="section-card money-card">
+      <h2>What it costs us</h2>
+      <p class="hint" style="margin:-6px 0 18px">
+        None of this ever reaches the website. It is here so you can see at a
+        glance whether there is money in the car.
+      </p>
+
+      <div class="f">
+        <label for="qPaid">What you paid</label>
+        <div class="money"><input class="in in--big" id="qPaid" type="number" inputmode="numeric" placeholder="0"></div>
+      </div>
+      <div class="f">
+        <label for="qPrep">Repairs, prep and everything else</label>
+        <div class="money"><input class="in in--big" id="qPrep" type="number" inputmode="numeric" placeholder="0"></div>
+        <p class="hint">One total. Add to it whenever you spend more on it.</p>
+      </div>
+      <div class="f">
+        <label for="qTarget">What you reckon it sells for</label>
+        <div class="money"><input class="in in--big" id="qTarget" type="number" inputmode="numeric" placeholder="0"></div>
+      </div>
+
+      <div class="moneyline" id="quickSummary"></div>
+    </div>
+
+    <div class="section-card">
+      <div class="f" style="margin-bottom:0">
+        <label for="qNotes">Notes</label>
+        <textarea class="ta" id="qNotes" style="min-height:90px"
+          placeholder="Where it came from, what it needs doing, who has the V5. Whatever the next person needs to know."></textarea>
+      </div>
+    </div>
+
+    <div style="height:12px"></div>
+  </section>
+
   <!-- ---------------------------------------------- CAR FORM -->
   <section class="view is-hidden" id="formView">
     <div class="msg" id="formMsg" role="status"></div>
@@ -90,8 +161,8 @@
       <div id="photoArea"></div>
       <input type="file" id="photoInput" accept="image/*" multiple hidden>
       <p class="hint" style="margin-top:12px">
-        The first photo is the one customers see first. Tap a photo to make it the main one,
-        move it, or delete it.
+        First photo is the one people see on the website. Tap a photo to move it,
+        make it the main one or bin it.
       </p>
     </div>
 
@@ -117,7 +188,7 @@
         <button class="btn btn--primary" id="lookupBtn" type="button" style="min-width:104px">Look up</button>
       </div>
       <p class="hint" id="lookupHint">
-        Type the plate and tap Look up — we’ll fill in as much as we can for you.
+        Type the plate and tap Look up. We’ll fill in what we can.
       </p>
     </div>
 
@@ -127,11 +198,15 @@
       <div class="row-2">
         <div class="f">
           <label for="fMake">Make <span class="req">*</span></label>
-          <input class="in" id="fMake" placeholder="Ford" autocapitalize="words">
+          <select class="sel" id="fMake"></select>
+          <input class="in pick-other" id="fMakeOther" placeholder="Type the make"
+                 autocapitalize="words" hidden>
         </div>
         <div class="f">
           <label for="fModel">Model <span class="req">*</span></label>
-          <input class="in" id="fModel" placeholder="Focus" autocapitalize="words">
+          <select class="sel" id="fModel"></select>
+          <input class="in pick-other" id="fModelOther" placeholder="Type the model"
+                 autocapitalize="words" hidden>
         </div>
       </div>
       <div class="f" style="margin-top:16px">
@@ -145,7 +220,9 @@
         </div>
         <div class="f">
           <label for="fColour">Colour</label>
-          <input class="in" id="fColour" placeholder="Blue" autocapitalize="words">
+          <select class="sel" id="fColour"></select>
+          <input class="in pick-other" id="fColourOther" placeholder="Type the colour"
+                 autocapitalize="words" hidden>
         </div>
       </div>
     </div>
@@ -157,9 +234,41 @@
         <label for="fPrice">Price <span class="req">*</span></label>
         <div class="money"><input class="in" id="fPrice" type="number" inputmode="numeric" placeholder="0"></div>
       </div>
-      <div class="f" style="margin-bottom:0">
+      <div class="f">
         <label for="fMileage">Mileage <span class="req">*</span></label>
         <input class="in" id="fMileage" type="number" inputmode="numeric" placeholder="e.g. 68000">
+      </div>
+      <label class="tickrow" for="fFeatured" style="margin-bottom:0">
+        <input type="checkbox" id="fFeatured">
+        <span>
+          <strong>Featured car</strong>
+          <small>Puts it in the swipe row at the top of the website. Use it for
+          the ones you most want people to see.</small>
+        </span>
+      </label>
+    </div>
+
+    <div class="section-card" style="border:2px dashed var(--line)">
+      <h2 style="color:var(--navy-900)">🔒 Just for you. Never on the website</h2>
+      <p class="hint" style="margin:-6px 0 16px">
+        Never leaves this app. Fill them in and you can see at a glance what
+        is in the car and what is left in it.
+      </p>
+      <div class="row-2">
+        <div class="f">
+          <label for="fPurchase">What you paid</label>
+          <div class="money"><input class="in" id="fPurchase" type="number" inputmode="numeric" placeholder="0"></div>
+        </div>
+        <div class="f">
+          <label for="fPrep">Prep costs</label>
+          <div class="money"><input class="in" id="fPrep" type="number" inputmode="numeric" placeholder="0"></div>
+        </div>
+      </div>
+      <div class="moneyline" id="costSummary" hidden></div>
+      <div class="f" style="margin-top:16px;margin-bottom:0">
+        <label for="fPrivateNotes">Private notes</label>
+        <textarea class="ta" id="fPrivateNotes" style="min-height:80px"
+          placeholder="Where you bought it, what needed doing, who to chase for the V5. Anything you want to remember."></textarea>
       </div>
     </div>
 
@@ -186,7 +295,7 @@
         <div class="f">
           <label for="fDoors">Doors</label>
           <select class="sel" id="fDoors">
-            <option value="">—</option><option>2</option><option>3</option>
+            <option value="">Not sure</option><option>2</option><option>3</option>
             <option>4</option><option>5</option>
           </select>
         </div>
@@ -209,7 +318,7 @@
       <div class="f" style="margin-top:16px">
         <label for="fService">Service history</label>
         <select class="sel" id="fService">
-          <option value="">—</option>
+          <option value="">Not sure</option>
           <option value="full">Full service history</option>
           <option value="part">Part service history</option>
           <option value="none">No service history</option>
@@ -228,10 +337,10 @@
       <div class="f" id="condWrap" style="margin-top:16px;margin-bottom:0" hidden>
         <label for="fCondition">Explain the damage and repair <span class="opt">(optional)</span></label>
         <textarea class="ta" id="fCondition"
-          placeholder="What was damaged, what you did to fix it, and why it's safe. Customers respect honesty here — it sells cars."></textarea>
-        <p class="hint">You can leave this blank and publish the car anyway — come back
-           and add it whenever you like. If you do fill it in it shows in a highlighted
-           box on the car’s page, which saves the awkward conversation on the forecourt.</p>
+          placeholder="What was damaged, what you did to put it right, and why it's safe now. Being straight about it sells cars."></textarea>
+        <p class="hint">Leave it blank and publish the car anyway if you want. You can
+           add it later. Fill it in and it shows in a highlighted box on the car’s page,
+           so you’re not having that conversation on the forecourt.</p>
       </div>
     </div>
 
@@ -240,7 +349,7 @@
       <h2>Description</h2>
       <div class="f" style="margin-bottom:12px">
         <textarea class="ta" id="fDescription" style="min-height:150px"
-          placeholder="Talk about it like you would to a customer stood next to it. What's good, what's honest, why it's worth the money."></textarea>
+          placeholder="Talk about it like you would to a customer stood next to it. What's good about it and why it's worth the money."></textarea>
       </div>
       <button class="btn btn--outline btn--sm btn--block" id="draftDescBtn" type="button">
         Write one for me from the details above
@@ -248,29 +357,6 @@
     </div>
 
     <!-- Private figures -->
-    <div class="section-card" style="border:2px dashed var(--line)">
-      <h2 style="color:var(--amber-600)">🔒 Just for you — never on the website</h2>
-      <p class="hint" style="margin:-6px 0 16px">
-        Optional. Fill these in and the Insights tab can show you what you
-        actually made on each car. Customers can never see them.
-      </p>
-      <div class="row-2">
-        <div class="f">
-          <label for="fPurchase">What you paid</label>
-          <div class="money"><input class="in" id="fPurchase" type="number" inputmode="numeric" placeholder="0"></div>
-        </div>
-        <div class="f">
-          <label for="fPrep">Prep costs</label>
-          <div class="money"><input class="in" id="fPrep" type="number" inputmode="numeric" placeholder="0"></div>
-        </div>
-      </div>
-      <div class="f" style="margin-top:16px;margin-bottom:0">
-        <label for="fPrivateNotes">Private notes</label>
-        <textarea class="ta" id="fPrivateNotes" style="min-height:80px"
-          placeholder="Where you bought it, what needed doing, who to chase for the V5 — anything you want to remember."></textarea>
-      </div>
-    </div>
-
     <!-- Features -->
     <div class="section-card">
       <h2>Equipment</h2>
@@ -297,8 +383,8 @@
         <button class="btn btn--primary" id="vLookup" type="button" style="min-width:96px">Check</button>
       </div>
       <p class="hint" id="vHint" style="margin-top:10px">
-        Pulls the DVLA record and the full MOT history — mileage every year,
-        every advisory, and anything that should worry you.
+        Pulls the DVLA record and the full MOT history, so you get the mileage
+        at every MOT and every advisory it has ever had.
       </p>
     </div>
 
@@ -331,7 +417,7 @@
   <section class="view is-hidden" id="moreView">
     <div class="section-card">
       <h2>Signed in as</h2>
-      <p style="font-size:17px;font-weight:700" id="whoami">—</p>
+      <p style="font-size:17px;font-weight:700" id="whoami"></p>
       <button class="btn btn--outline btn--block" id="signOutBtn" style="margin-top:16px">Sign out</button>
     </div>
 
@@ -348,15 +434,15 @@
         <div class="sheet-action" style="align-items:flex-start;padding-block:14px">
           <div>
             <strong style="display:block;margin-bottom:4px">Marking a car sold</strong>
-            <small>Tap the car in your list, then “Mark as sold”. It moves off the stock page
-            straight away and appears under Recently Sold — without the price.</small>
+            <small>Tap the car in your list, then “Mark as sold”. It comes off the stock page
+            straight away and shows under Recently Sold with no price.</small>
           </div>
         </div>
         <div class="sheet-action" style="align-items:flex-start;padding-block:14px">
           <div>
             <strong style="display:block;margin-bottom:4px">Photos not uploading?</strong>
-            <small>Usually a weak signal. They’ll upload fine on wi-fi. Nothing is lost —
-            save it as a draft and add the photos later.</small>
+            <small>Usually a weak signal. They’ll go up fine on wi-fi. Nothing is lost,
+            so save it as a draft and add the photos later.</small>
           </div>
         </div>
       </div>
@@ -370,9 +456,8 @@
     <div class="section-card">
       <h2>Back up your data</h2>
       <p class="hint" style="margin:-6px 0 14px">
-        Downloads everything as spreadsheets — cars, enquiries, car requests,
-        your price book and price history. Worth doing before year end, and
-        worth having if you ever lose access to anything.
+        Downloads the lot as spreadsheets: cars, enquiries, car requests, your
+        price book and price history. Worth doing before year end.
       </p>
       <button class="btn btn--outline btn--block" id="exportAll">Export everything</button>
       <div id="exportStatus" class="hint" style="margin-top:10px"></div>
@@ -416,7 +501,13 @@
   <!-- Sticky save bar (shown on the form) -->
   <div class="savebar" id="saveBar" hidden>
     <button class="btn btn--outline" id="saveDraftBtn">Save draft</button>
-    <button class="btn btn--brass" id="publishBtn">Publish</button>
+    <button class="btn btn--accent" id="publishBtn">Publish</button>
+  </div>
+
+  <!-- Sticky save bar for the quick add screen -->
+  <div class="savebar" id="quickBar" hidden>
+    <button class="btn btn--outline" id="quickFullBtn">Add the rest</button>
+    <button class="btn btn--accent" id="quickSaveBtn">Save draft</button>
   </div>
 </div>
 

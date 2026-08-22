@@ -1,5 +1,5 @@
 /* ============================================================================
-   MBU CAR SALES — CORE LIBRARY
+   MBU CAR SALES / CORE LIBRARY
    Icons, formatting, image handling and the data layer.
    Works with demo data until Supabase is connected in config.js.
    ========================================================================== */
@@ -10,7 +10,7 @@
   const MBU = window.MBU = {};
 
   /* ==========================================================================
-     ICONS  —  usage: MBU.icon('phone')  /  MBU.icon('phone', 'my-class')
+     ICONS. Usage: MBU.icon('phone')  or  MBU.icon('phone', 'my-class')
      ========================================================================== */
   const P = 'stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"';
   const PATHS = {
@@ -68,11 +68,11 @@
       return '£' + Number(n).toLocaleString('en-GB', { maximumFractionDigits: 0 });
     },
     miles(n) {
-      if (n == null || n === '') return '—';
+      if (n == null || n === '') return 'n/a';
       return Number(n).toLocaleString('en-GB') + ' miles';
     },
     milesShort(n) {
-      if (n == null || n === '') return '—';
+      if (n == null || n === '') return 'n/a';
       return Number(n).toLocaleString('en-GB');
     },
     engine(l) {
@@ -80,7 +80,7 @@
       return Number(l).toFixed(1) + 'L';
     },
     date(d) {
-      if (!d) return '—';
+      if (!d) return 'n/a';
       return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     },
     monthYear(d) {
@@ -168,7 +168,7 @@
     const id = typeof image === 'string' ? image : (image.public_id || image.url || '');
     if (!id) return PLACEHOLDER;
 
-    // Already a full URL that isn't Cloudinary — use as-is
+    // Already a full URL that isn't Cloudinary, so use it as-is
     if (/^(https?:|data:)/.test(id) && !id.includes('res.cloudinary.com')) return id;
 
     const cloud = CFG.cloudinary && CFG.cloudinary.cloudName;
@@ -205,7 +205,7 @@
     const id = video && video.public_id;
     if (!cloud || !id) return '';
     return what === 'poster'
-      // A frame one second in — the very first frame is often a blur of tarmac
+      // A frame one second in. The very first frame is often a blur of tarmac
       ? `https://res.cloudinary.com/${cloud}/video/upload/so_1,w_1200,c_limit,q_auto,f_jpg/${id}.jpg`
       : `https://res.cloudinary.com/${cloud}/video/upload/q_auto,f_auto,w_1280,c_limit/${id}.mp4`;
   };
@@ -225,8 +225,8 @@
    * The public API key.
    *
    * Supabase replaced the old `anon` JWT with a "publishable key"
-   * (sb_publishable_...). Both work identically for our purposes — the
-   * gateway swaps an sb_ key for the right internal token — so accept
+   * (sb_publishable_...). Both work identically for our purposes, because the
+   * gateway swaps an sb_ key for the right internal token, so accept
    * whichever is filled in, preferring the current one.
    */
   const SB_KEY = (CFG.supabase && (CFG.supabase.publishableKey || CFG.supabase.anonKey)) || '';
@@ -285,7 +285,7 @@
     if (cachePromise) return cachePromise;
 
     cachePromise = (async () => {
-      // No backend configured yet — show the demo cars so the site is viewable.
+      // No backend configured yet, so show the demo cars to keep the site viewable.
       if (!hasBackend) {
         cache = (window.MBU_DEMO_CARS || []).map(normalise);
         return cache;
@@ -298,7 +298,7 @@
         cache = (await res.json()).map(normalise);
         return cache;
       } catch (err) {
-        // IMPORTANT: never fall back to demo cars once we are live — showing
+        // IMPORTANT: never fall back to demo cars once we are live. Showing
         // customers vehicles that don't exist is far worse than showing none.
         console.error('[MBU] Could not load stock from the database.', err);
         MBU.loadFailed = true;
@@ -327,7 +327,7 @@
 
   /**
    * Everything shown on the stock page: available, reserved and recently sold,
-   * mixed together in one list. Sold cars are still clearly marked as sold —
+   * mixed together in one list. Sold cars are still clearly marked as sold,
    * they're here for social proof and to capture "have you got another one?",
    * not to pad the stock count.
    */
@@ -336,12 +336,23 @@
     return live.concat(sold);
   };
 
+  /**
+   * Cars for the homepage rail.
+   *
+   * Anything ticked as Featured in the admin app comes first and they all
+   * show, up to the cap. If fewer than `featuredMin` are ticked the rest of
+   * the row is topped up with the newest stock, so the homepage never looks
+   * broken just because nobody has ticked anything yet.
+   */
   MBU.getFeatured = async () => {
+    const opt = CFG.options || {};
+    const cap = opt.featuredCount || 9;
+    const min = opt.featuredMin || 4;
     const avail = await MBU.getAvailable();
-    const n = (CFG.options && CFG.options.featuredCount) || 6;
     const starred = avail.filter(c => c.featured);
+    if (starred.length >= min) return starred.slice(0, cap);
     const rest = avail.filter(c => !c.featured);
-    return starred.concat(rest).slice(0, n);
+    return starred.concat(rest).slice(0, Math.max(min, starred.length));
   };
 
   MBU.getCar = async (id) => {
@@ -391,7 +402,7 @@
       try {
         const flat = {
           access_key: CFG.web3formsKey,
-          subject: `${payload.kind === 'sell' ? 'Sell your car' : payload.kind === 'car' ? 'Car enquiry' : 'Website enquiry'} — ${payload.name || 'No name'}`,
+          subject: `${payload.kind === 'sell' ? 'Sell your car' : payload.kind === 'car' ? 'Car enquiry' : 'Website enquiry'}: ${payload.name || 'No name'}`,
           from_name: 'MBU Car Sales website',
           name: payload.name, email: payload.email, phone: payload.phone,
           message: payload.message || '',
@@ -417,7 +428,7 @@
   };
 
   /* ==========================================================================
-     CAR REQUESTS  —  "register interest" and the Car Finder page
+     CAR REQUESTS. "Register interest" and the Car Finder page
      ========================================================================== */
   MBU.submitWanted = async function (payload) {
     let savedToDb = false;
@@ -450,8 +461,8 @@
           body: JSON.stringify({
             access_key: CFG.web3formsKey,
             subject: payload.kind === 'sold_interest'
-              ? `Interest in a sold car — ${payload.name || 'No name'}`
-              : `Car wanted — ${payload.name || 'No name'}`,
+              ? `Interest in a sold car: ${payload.name || 'No name'}`
+              : `Car wanted: ${payload.name || 'No name'}`,
             from_name: 'MBU Car Sales website',
             name: payload.name, email: payload.email, phone: payload.phone,
             looking_for: wants,
@@ -471,7 +482,7 @@
   };
 
   /* ==========================================================================
-     INTEREST TRACKING  —  anonymous, cookieless, no consent banner needed
+     INTEREST TRACKING. Anonymous, cookieless, no consent banner needed
      --------------------------------------------------------------------------
      What this does NOT do, deliberately:
        · no cookies
@@ -482,7 +493,7 @@
 
      `sessionKey` is a random string held in memory for this tab only. Its sole
      job is to stop one person's page refreshes being counted ten times. It
-     cannot be tied to a person, a device, or a previous visit — which is why
+     cannot be tied to a person, a device, or a previous visit, which is why
      this sits outside PECR's cookie rules and needs no banner.
      ========================================================================== */
   const sessionKey = (() => {
@@ -584,7 +595,7 @@
   /**
    * The link to share for a car.
    *
-   * Prefers /c/<id>/ — those pages are pre-rendered with the car's photo and
+   * Prefers /c/<id>/, because those pages are pre-rendered with the car's photo and
    * price baked into the preview tags, so forwarding one on WhatsApp shows the
    * actual car instead of our logo. Falls back to the query-string URL if the
    * share pages haven't been generated yet.

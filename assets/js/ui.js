@@ -1,5 +1,5 @@
 /* ============================================================================
-   MBU CAR SALES — SHARED UI
+   MBU CAR SALES / SHARED UI
    Header, footer, mobile nav, car cards, scroll reveal.
    Every page includes this so the navigation only ever needs editing once.
    ========================================================================== */
@@ -28,7 +28,7 @@
    * The brand lock-up used in the header and the footer.
    *
    * If a logo file is set in config it is used, and the old "MBU" tile plus
-   * the name is kept in the markup as a fallback — if the image ever fails to
+   * the name is kept in the markup as a fallback. If the image ever fails to
    * load, `onerror` swaps the text version back in rather than leaving a gap.
    * With no logo configured at all you just get the text version, exactly as
    * the site looked before.
@@ -59,8 +59,10 @@
 
   const brandClass = B.logo ? 'brand brand--logo' : 'brand';
 
-  /* Instagram, shown only when a link is configured */
+  /* Social and marketplace links. Each one only appears if it is filled in
+     in config.js, so leaving one blank hides its button everywhere. */
   const igLink = (B.instagram || '').trim();
+  const atLink = (B.autotrader || '').trim();
 
   /* ------------------------------------------------------------------ HEADER */
   function header() {
@@ -80,6 +82,10 @@
           <a class="btn btn--outline btn--sm" href="${MBU.telLink()}">
             ${icon('phone')}<span>${esc(B.phone)}</span>
           </a>
+          ${atLink ? `<a class="btn btn--at btn--sm" href="${esc(atLink)}"
+             target="_blank" rel="noopener" aria-label="Our cars on Auto Trader">
+            ${icon('car')}<span class="hide-sm">Auto Trader</span>
+          </a>` : ''}
           <a class="btn btn--wa btn--sm" href="${MBU.waLink('Hi MBU Car Sales, I have a question about a car.')}"
              target="_blank" rel="noopener">
             ${icon('whatsapp')}<span class="hide-sm">WhatsApp</span>
@@ -111,6 +117,10 @@
           <a class="btn btn--outline btn--block" href="${MBU.telLink()}">
             ${icon('phone')} ${esc(B.phone)}
           </a>
+          ${atLink ? `<a class="btn btn--at btn--block" href="${esc(atLink)}"
+             target="_blank" rel="noopener">
+            ${icon('car')} See our cars on Auto Trader
+          </a>` : ''}
           ${igLink ? `<a class="btn btn--ig btn--block" href="${esc(igLink)}"
              target="_blank" rel="noopener">
             ${icon('instagram')} Follow us on Instagram
@@ -124,7 +134,8 @@
   function footer() {
     const socials = [
       B.instagram && { href: B.instagram, icon: 'instagram', label: 'Instagram' },
-      B.facebook && { href: B.facebook, icon: 'facebook', label: 'Facebook' }
+      B.facebook && { href: B.facebook, icon: 'facebook', label: 'Facebook' },
+      B.autotrader && { href: B.autotrader, icon: 'car', label: 'Our cars on Auto Trader' }
     ].filter(Boolean);
 
     const location_ = [B.addressLine, B.town, B.postcode, B.region]
@@ -212,7 +223,7 @@
     if (sold) flags.push('<span class="badge badge--solid">SOLD</span>');
     else if (reserved) flags.push('<span class="badge badge--amber badge--dot">Reserved</span>');
     if (reduced) flags.push('<span class="badge badge--red">Reduced</span>');
-    if (car.featured && !sold && !reduced) flags.push('<span class="badge badge--brass">Pick of the stock</span>');
+    if (car.featured && !sold && !reduced) flags.push('<span class="badge badge--accent">Pick of the stock</span>');
     if (car.hpi_status && car.hpi_status !== 'clear' && !sold) {
       flags.push(`<span class="badge badge--blue">${esc(MBU.label('hpi', car.hpi_status).split(' (')[0])}</span>`);
     }
@@ -225,7 +236,7 @@
     ].filter(Boolean);
 
     // Sold cars sit in the same grid as available stock, so the sold state has
-    // to be unmissable — greyed photo, a SOLD flash across the image, and
+    // to be unmissable: greyed photo, a SOLD flash across the image, and
     // "Register interest" exactly where the price would otherwise be. Nobody
     // should be able to mistake one for something they can buy.
     const priceBlock = sold
@@ -299,14 +310,14 @@
 
   /**
    * Shown when the database can't be reached. Never pretends there is no
-   * stock — it tells the customer the website is at fault and gives them
+   * stock. It tells the customer the website is at fault and gives them
    * a way to reach us anyway, which is the only thing that matters here.
    */
   MBU.loadErrorState = function () {
     return `<div class="empty-state">
       ${icon('phone')}
       <h3>We can’t load our stock list right now</h3>
-      <p>Something on our end isn’t responding — sorry about that. We do have cars
+      <p>Something on our end isn’t responding, sorry about that. We do have cars
          available, so please give us a ring or send a message and we’ll tell you
          exactly what’s on the forecourt today.</p>
       <div class="cluster" style="justify-content:center">
@@ -380,8 +391,8 @@
 
     // Friendly warning in the console while the backend isn't wired up yet
     if (!MBU.hasBackend) {
-      console.info('%c[MBU] Demo mode — showing example cars. Add your Supabase details in assets/js/config.js to go live.',
-        'background:#12203A;color:#D9AD5C;padding:4px 8px;border-radius:4px');
+      console.info('%c[MBU] Demo mode. Showing example cars. Add your Supabase details in assets/js/config.js to go live.',
+        'background:#12203A;color:#8FB4EA;padding:4px 8px;border-radius:4px');
     }
   }
 

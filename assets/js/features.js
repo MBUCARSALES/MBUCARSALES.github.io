@@ -126,7 +126,7 @@
     return out;
   }
 
-  /** Every known feature, flat — used to build the tap-to-add list in the app. */
+  /** Every known feature, flat. Used to build the tap-to-add list in the app. */
   function all() {
     return CATEGORIES.reduce((a, c) => a.concat(c.items), []);
   }

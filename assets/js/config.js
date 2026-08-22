@@ -1,5 +1,5 @@
 /* ============================================================================
-   MBU CAR SALES — SITE CONFIGURATION
+   MBU CAR SALES / SITE CONFIGURATION
    ----------------------------------------------------------------------------
    This is the ONLY file you need to edit to change business details or to
    connect the website to its backend. Everything else reads from here.
@@ -16,12 +16,12 @@ window.MBU_CONFIG = {
   business: {
     name:        'MBU Car Sales',
     tagline:     'Quality used cars, honestly priced',
-    strapline:   'A local business in Newcastle upon Tyne. Hand-picked stock, straight answers, no pressure.',
+    strapline:   'A local business in Newcastle upon Tyne. Straight answers and no pressure.',
 
     // Logo image, relative to the site root. Drop the file in assets/img/ and
     // put its filename here. Leave it as an empty string and the site falls
-    // back to the plain "MBU" tile — so a missing file never breaks anything.
-    //   logoDark  — optional lighter version for the dark navy footer. If you
+    // back to the plain "MBU" tile, so a missing file never breaks anything.
+    //   logoDark: optional lighter version for the dark navy footer. If you
     //               leave it blank the footer just reuses the main logo.
     logo:         'assets/img/logo.png',
     logoDark:     '',
@@ -36,17 +36,17 @@ window.MBU_CONFIG = {
     country:      'United Kingdom',
     // Leave addressLine blank if you would rather not publish the exact lot
     // address. The site will just show the town.
-    addressLine:  '',
-    postcode:     '',
+    addressLine:  '587 Westgate Road',
+    postcode:     'NE4 9PQ',
 
     // Used as the centre point when the bidding tool searches Auto Trader for
     // comparable cars. Doesn't need to be your exact address.
-    searchPostcode: 'NE1 1AA',
+    searchPostcode: 'NE4 9PQ',
 
-    // Optional — leave as empty string to hide the link entirely
+    // Optional. Leave any of these as an empty string to hide that link.
     instagram:    'https://www.instagram.com/mbusalesltd/',
     facebook:     '',
-    autotrader:   '',
+    autotrader:   'https://www.autotrader.co.uk/dealers/northumberland/newcastle-upon-tyne/mbu-sales-limited-10050768',
 
     // Shown on the contact page and in the footer
     openingHours: [
@@ -59,14 +59,14 @@ window.MBU_CONFIG = {
       { day: 'Sunday',    hours: '9:00am – 12:00pm' }
     ],
     // Note shown under the opening hours
-    hoursNote: 'Viewings by appointment — please call or message ahead so we can have the car ready for you.',
+    hoursNote: 'Viewings by appointment. Give us a ring or a message first so we can have the car ready for you.',
 
     // Trust points shown on the homepage. Edit the wording freely.
     // Only claim things that are true.
     promises: [
       { icon: 'shield',  title: 'HPI checked',        text: 'Every car is HPI checked before it goes on sale, and we tell you up front if it has been repaired.' },
       { icon: 'spanner', title: 'Prepared properly',  text: 'Serviced, MOT’d and road-tested by us before it is handed over. We fix things before you see them, not after.' },
-      { icon: 'tag',     title: 'Priced to be fair',  text: 'We buy well and pass the saving on. What you see is what you pay — no admin fees, no surprises.' },
+      { icon: 'tag',     title: 'Priced to be fair',  text: 'We buy well and pass the saving on. What you see is what you pay. No admin fees and no surprises.' },
       { icon: 'people',  title: 'You deal with us',   text: 'Father and son, no sales team, no commission chasing. The person you speak to is the person who prepared the car.' }
     ],
 
@@ -79,7 +79,7 @@ window.MBU_CONFIG = {
      From Supabase → Settings → General (for the Project ID) and
      Settings → API Keys (for the publishable key).
 
-     The publishable key is SAFE to publish — Supabase's own dashboard says
+     The publishable key is SAFE to publish. Supabase's own dashboard says
      so. The database rules control what it can do: read published cars and
      accept enquiries. Nothing else.
 
@@ -93,7 +93,7 @@ window.MBU_CONFIG = {
 
     // Project Settings → API Keys → "Publishable key"
     // Starts with  sb_publishable_...
-    // This one is MEANT to be public — the database rules control what it can do.
+    // This one is MEANT to be public. The database rules control what it can do.
     publishableKey: 'sb_publishable_gPsg7GxMb-CxayQpqAIg1g_OZFTBWdT',
 
     // Only if your project is old enough to still use the legacy key
@@ -114,14 +114,14 @@ window.MBU_CONFIG = {
 
   /* ---------------------------------------------------------------------
      4. ENQUIRY EMAIL NOTIFICATIONS (optional but recommended)
-     Get a free access key from https://web3forms.com — just enter your
+     Get a free access key from https://web3forms.com by entering your
      email address, no account needed. Enquiries are saved in the admin app
      either way; this simply also pings your inbox.
      ------------------------------------------------------------------- */
   web3formsKey: '852cee44-007a-4df6-be6a-0a997bab0de6',
 
   /* ---------------------------------------------------------------------
-     4a. WARRANTY  —  OFF until you tell me what you actually offer
+     4a. WARRANTY  ::  OFF until you tell me what you actually offer
      ---------------------------------------------------------------------
      Deliberately switched off. Publishing a guarantee you haven't actually
      agreed to is a promise you'd be legally held to, so this is left blank
@@ -141,7 +141,7 @@ window.MBU_CONFIG = {
   },
 
   /* ---------------------------------------------------------------------
-     4b. FINANCE  —  OFF, and read this before switching it on
+     4b. FINANCE  ::  OFF, and read this before switching it on
      ---------------------------------------------------------------------
      ⚠️  Arranging, brokering or introducing customers to vehicle finance is
      a REGULATED ACTIVITY in the UK. Doing it without FCA authorisation (or
@@ -178,22 +178,26 @@ window.MBU_CONFIG = {
   options: {
     // Sold cars stay visible in the stock list for this many days, mixed in
     // with available stock but clearly marked as sold. The database also
-    // enforces a 45-day cut-off, so raising this above 45 has no effect —
+    // enforces a 45-day cut-off, so raising this above 45 has no effect.
     // change the `cars_public` view in supabase/schema-v4-pricing-video.sql too.
     soldVisibleDays: 45,
 
-    // Sold prices are hidden by the DATABASE, not by this setting — the
+    // Sold prices are hidden by the DATABASE, not by this setting. The
     // `cars_public` view returns null for them, so the figure never reaches
     // the browser at all. Left here as a reminder of the intent.
     hideSoldPrices: true,
-    // Cars shown on the homepage
-    featuredCount: 6,
+    // The homepage rail. Cars you tick as Featured in the admin app show
+    // first and they all appear, up to featuredCount. If fewer than
+    // featuredMin are ticked, the newest stock fills the rest of the row so
+    // the homepage never looks empty.
+    featuredCount: 9,
+    featuredMin: 4,
     // Show a "Reserved" badge instead of hiding reserved cars
     showReserved: true,
     // Canonical site address, used for sharing links. Update if you buy a domain.
     siteUrl: 'https://mbucarsales.github.io',
 
-    // Share car links as /c/<id>/ — pre-rendered pages that show the actual
+    // Share car links as /c/<id>/, pre-rendered pages that show the actual
     // car when forwarded on WhatsApp or Facebook. Requires the
     // "Build shareable car pages" GitHub Action to be running.
     // Set to false to fall back to car.html?id=... links.

@@ -26,7 +26,7 @@ window.MBU_DEMO_CARS = [
     previous_owners: 2, mot_expiry: '2027-03-14',
     service_history: 'full', hpi_status: 'clear',
     condition_notes: '',
-    description: 'A really tidy GT with the 2.0 TDI and DSG box — the pick of the range if you do a lot of miles. Two owners from new, full main-dealer service history and a fresh MOT with no advisories. Drives faultlessly, gearbox is smooth and the interior is unmarked. Adaptive cruise, heated seats and the digital dash make it feel far newer than it is.',
+    description: 'A really tidy GT with the 2.0 TDI and DSG box, the pick of the range if you do a lot of miles. Two owners from new, full main-dealer service history and a fresh MOT with no advisories. Drives faultlessly, gearbox is smooth and the interior is unmarked. Adaptive cruise, heated seats and the digital dash make it feel far newer than it is.',
     features: ['Adaptive cruise control', 'Heated front seats', 'Digital cockpit', 'Apple CarPlay', 'Parking sensors front & rear', 'DAB radio', 'Bluetooth', 'Alloy wheels'],
     images: [U('1471479917193-f00955256257'), U('1503376780353-7e6692767b70'), U('1605559424843-9e4c228bf1c2'), U('1552519507-da3b142c6e3d')],
     created_at: daysAgo(4)
@@ -42,7 +42,7 @@ window.MBU_DEMO_CARS = [
     previous_owners: 3, mot_expiry: '2027-01-22',
     service_history: 'part', hpi_status: 'clear',
     condition_notes: '',
-    description: 'Ideal first car or second family car. The 1.0 EcoBoost is genuinely good — plenty quick enough and cheap to tax and insure. A few small stone chips on the bonnet which we have not tried to hide, otherwise very clean inside and out. Timing belt and water pump done at 68,000 miles with receipts.',
+    description: 'Ideal first car or second family car. The 1.0 EcoBoost is genuinely good. Plenty quick enough and cheap to tax and insure. A few small stone chips on the bonnet which we have not tried to hide, otherwise very clean inside and out. Timing belt and water pump done at 68,000 miles with receipts.',
     features: ['Air conditioning', 'Bluetooth', 'DAB radio', 'Alloy wheels', 'Electric windows', 'Isofix'],
     images: [U('1494976388531-d1058494cdd8'), U('1550355291-bbee04a92027')],
     created_at: daysAgo(9)
@@ -57,8 +57,8 @@ window.MBU_DEMO_CARS = [
     doors: 5, engine_size: 1.5, colour: 'Gun Metallic',
     previous_owners: 2, mot_expiry: '2027-05-09',
     service_history: 'full', hpi_status: 'cat_n',
-    condition_notes: 'Category N — recorded for a rear-quarter panel and bumper following a low-speed car park knock. Repaired properly by our own bodyshop, panel gaps and paint match are spot on. Structurally untouched, and priced accordingly. Happy to show you the before-and-after photos.',
-    description: 'The family SUV that makes sense. Panoramic roof, 360 camera and the frugal 1.5 diesel. This one is a Category N — read the condition notes above, we are completely open about it, and it is reflected in the price. Mechanically excellent with a full service history.',
+    condition_notes: 'Category N, recorded for a rear-quarter panel and bumper following a low-speed car park knock. Repaired properly by our own bodyshop, panel gaps and paint match are spot on. Structurally untouched, and priced accordingly. Happy to show you the before-and-after photos.',
+    description: 'The family SUV that makes sense. Panoramic roof, 360 camera and the frugal 1.5 diesel. This one is a Category N. Read the condition notes above. We are completely open about it and it is reflected in the price. Mechanically excellent with a full service history.',
     features: ['Panoramic glass roof', '360° camera', 'Sat nav', 'Cruise control', 'Climate control', 'Parking sensors', 'Bluetooth'],
     images: [U('1568605117036-5fe5e7bab0b7'), U('1544636331-e26879cd4d9b'), U('1533473359331-0135ef1b58bf')],
     created_at: daysAgo(12)
@@ -74,7 +74,7 @@ window.MBU_DEMO_CARS = [
     previous_owners: 1, mot_expiry: '2027-06-30',
     service_history: 'full', hpi_status: 'clear',
     condition_notes: '',
-    description: 'One owner from new with full Audi history. Virtual cockpit, half leather and the smooth S Tronic gearbox. Presents almost as new — genuinely one of the nicest A3s we have had through.',
+    description: 'One owner from new with full Audi history. Virtual cockpit, half leather and the smooth S Tronic gearbox. Presents almost as new and genuinely one of the nicest A3s we have had through.',
     features: ['Virtual cockpit', 'Half leather', 'Sat nav', 'Cruise control', 'Rear parking sensors', 'Apple CarPlay', 'LED headlights'],
     images: [U('1519641471654-76ce0107ad1b'), U('1541899481282-d53bffe3c35d')],
     created_at: daysAgo(6)
@@ -106,7 +106,7 @@ window.MBU_DEMO_CARS = [
     previous_owners: 2, mot_expiry: '2027-02-11',
     service_history: 'full', hpi_status: 'clear',
     condition_notes: '',
-    description: 'M Sport with the good spec — professional navigation, heated leather and 18" alloys. Full BMW service history and a recent major service including oil, filters and brake fluid. The eight-speed auto is superb and it will still return well over 50mpg on a run.',
+    description: 'M Sport with the good spec: professional navigation, heated leather and 18" alloys. Full BMW service history and a recent major service including oil, filters and brake fluid. The eight-speed auto is superb and it will still return well over 50mpg on a run.',
     features: ['Heated leather seats', 'Professional navigation', 'Cruise control', 'Front & rear sensors', 'Bluetooth', '18" alloy wheels', 'DAB radio'],
     images: [U('1580273916550-e323be2ae537'), U('1555215695-3004980ad54e'), U('1503376780353-7e6692767b70')],
     created_at: daysAgo(2)
@@ -138,7 +138,7 @@ window.MBU_DEMO_CARS = [
     previous_owners: 3, mot_expiry: '2027-01-05',
     service_history: 'full', hpi_status: 'clear',
     condition_notes: '',
-    description: 'A proper workhorse estate with a big boot and £30 road tax. Higher mileage but a full stamped history and it drives beautifully — motorway miles, not town miles. New clutch at 96,000 with the receipt in the folder.',
+    description: 'A proper workhorse estate with a big boot and £30 road tax. Higher mileage but a full stamped history and it drives beautifully. Motorway miles, not town miles. New clutch at 96,000 with the receipt in the folder.',
     features: ['Sat nav', 'Heated windscreen', 'Cruise control', 'Parking sensors', 'Bluetooth', 'Air conditioning'],
     images: [U('1533473359331-0135ef1b58bf'), U('1547744152-14d985cb937f')],
     created_at: daysAgo(24)

@@ -1,32 +1,48 @@
 /* ==========================================================================
-   MBU CAR SALES — DESIGN SYSTEM
-   Deep navy + warm brass. Confident, clean, trustworthy. Not shouty.
+   MBU CAR SALES / DESIGN SYSTEM
+
+   Every colour below is taken from the MBU Car Sales logo. The navies are
+   sampled from the letters, the silvers from the swoosh under them, and the
+   accent blue from the lightest point of the gradient across the top of the
+   MBU itself. Nothing else has been invented.
+
+   Change a value here and it changes everywhere on the site.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
    1. TOKENS
    -------------------------------------------------------------------------- */
 :root {
-  /* Brand */
-  --navy-900: #0D1626;
-  --navy-800: #12203A;
-  --navy-700: #1B2E4F;
-  --navy-600: #274070;
-  --brass-600: #A87A2C;
-  --brass-500: #C4933C;
-  --brass-400: #D9AD5C;
-  --brass-100: #F7EEDC;
+  /* Navy, from the MBU letters */
+  --navy-900: #0A1830;
+  --navy-800: #0F2246;
+  --navy-700: #17305E;
+  --navy-600: #213768;
 
-  /* Neutrals */
-  --ink:      #131820;
-  --ink-2:    #3A4453;
-  --ink-3:    #6B7686;
-  --ink-4:    #99A2AF;
-  --line:     #E4E8EE;
-  --line-2:   #EFF2F6;
+  /* Accent, the light top of the letter gradient. Buttons and links.
+     -300 is the version that goes on top of navy; the others go on white. */
+  --accent-600: #1E4C8F;
+  --accent-500: #2A62B4;
+  --accent-300: #8FB4EA;
+  --accent-100: #E8EFFA;
+
+  /* Silver, from the swoosh */
+  --silver-600: #6E7688;
+  --silver-500: #9AA1B0;
+  --silver-400: #B7BDC9;
+  --silver-200: #DADEE6;
+  --silver-100: #EEF0F5;
+
+  /* Neutrals, pulled slightly cool so they sit with the navy */
+  --ink:      #101724;
+  --ink-2:    #38414F;
+  --ink-3:    #6E7688;
+  --ink-4:    #9AA1B0;
+  --line:     #E1E5EC;
+  --line-2:   #EDF0F5;
   --surface:  #FFFFFF;
-  --surface-2:#F7F9FC;
-  --surface-3:#EEF2F7;
+  --surface-2:#F6F8FC;
+  --surface-3:#EDF0F6;
 
   /* Status */
   --green-600:#12734A;
@@ -81,7 +97,7 @@ html {
   scroll-behavior: smooth;
   scroll-padding-top: calc(var(--header-h) + 16px);
   /* Belt and braces against sideways scroll on phones. Setting it on <body>
-     alone doesn't stop it — the viewport still scrolls, which drags the
+     alone doesn't stop it, because the viewport still scrolls, which drags the
      sticky header off to the left with it. */
   overflow-x: hidden;
   max-width: 100%;
@@ -123,7 +139,7 @@ h4 { font-size: var(--fs-lg); font-weight: 700; }
 p  { text-wrap: pretty; }
 
 :focus-visible {
-  outline: 3px solid var(--brass-500);
+  outline: 3px solid var(--accent-500);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -171,24 +187,27 @@ p  { text-wrap: pretty; }
   font-weight: 700;
   letter-spacing: .09em;
   text-transform: uppercase;
-  color: var(--brass-600);
+  color: var(--accent-600);
   margin-bottom: var(--sp-3);
 }
 .eyebrow::before {
   content: '';
   width: 20px; height: 2px;
-  background: var(--brass-500);
+  background: var(--accent-500);
   border-radius: 2px;
 }
-.section--dark .eyebrow { color: var(--brass-400); }
+.section--dark .eyebrow { color: var(--accent-300); }
 
 .grid { display: grid; gap: var(--sp-5); }
-.grid--cars { grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); }
+/* Stock grid: three across on a laptop, two on a tablet or phone. Fixed
+   counts rather than auto-fill, so the number of cars per row is predictable
+   instead of jumping about as the window changes. */
+.grid--cars { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .grid--3    { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .grid--4    { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
-@media (max-width: 600px) {
-  .grid--cars { grid-template-columns: 1fr; }
-}
+@media (max-width: 1100px) { .grid--cars { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px)  { .grid--cars { gap: var(--sp-4); } }
+@media (max-width: 380px)  { .grid--cars { grid-template-columns: 1fr; } }
 
 .stack   { display: flex; flex-direction: column; gap: var(--sp-4); }
 .cluster { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; }
@@ -220,16 +239,23 @@ p  { text-wrap: pretty; }
 .btn--primary  { background: var(--navy-800); color: #fff; box-shadow: var(--sh-1); }
 .btn--primary:hover  { background: var(--navy-700); box-shadow: var(--sh-2); }
 
-.btn--brass    { background: var(--brass-500); color: var(--navy-900); box-shadow: var(--sh-1); }
-.btn--brass:hover { background: var(--brass-400); box-shadow: var(--sh-2); }
+/* The main call to action. White on the accent blue, and it darkens rather
+   than lightens on hover so it still reads as a button on a pale page. */
+.btn--accent    { background: var(--accent-500); color: #fff; box-shadow: var(--sh-1); }
+.btn--accent:hover { background: var(--accent-600); box-shadow: var(--sh-2); }
 
 .btn--wa       { background: #1FAF54; color: #fff; box-shadow: var(--sh-1); }
 .btn--wa:hover { background: #1a9a49; box-shadow: var(--sh-2); }
 
-/* Instagram — the official brand gradient, so the button reads as Instagram
-   at a glance the same way the green one reads as WhatsApp. */
+/* Instagram, in its own brand gradient so the button reads as Instagram at a
+   glance the same way the green one reads as WhatsApp. */
 .btn--ig       { background: linear-gradient(45deg,#F9CE34 0%,#EE2A7B 52%,#6228D7 100%); color: #fff; box-shadow: var(--sh-1); }
 .btn--ig:hover { filter: brightness(1.07); box-shadow: var(--sh-2); }
+
+/* Auto Trader. Deliberately not their logo or their colours, since that is
+   their trademark. A car icon and their name is clear enough. */
+.btn--at       { background: var(--navy-700); color: #fff; box-shadow: var(--sh-1); }
+.btn--at:hover { background: var(--navy-600); box-shadow: var(--sh-2); }
 
 .btn--outline  { background: transparent; border-color: var(--line); color: var(--navy-900); }
 .btn--outline:hover { border-color: var(--navy-800); background: var(--surface-2); }
@@ -270,7 +296,7 @@ p  { text-wrap: pretty; }
 .brand { display: flex; align-items: center; gap: 11px; flex: none; }
 
 /* Logo lock-up. The text version stays in the markup as a fallback and is
-   only hidden once we know a logo file is configured — if the image 404s,
+   only hidden once we know a logo file is configured. If the image 404s,
    ui.js strips .brand--logo and the text reappears. */
 .brand-logo { height: 46px; width: auto; max-width: 210px; object-fit: contain; display: block; }
 .brand--logo .brand-fallback { display: none; }
@@ -283,7 +309,7 @@ p  { text-wrap: pretty; }
   width: 42px; height: 42px;
   border-radius: 11px;
   background: linear-gradient(150deg, var(--navy-700), var(--navy-900) 65%);
-  color: var(--brass-400);
+  color: var(--accent-300);
   display: grid;
   place-items: center;
   font-weight: 800;
@@ -309,6 +335,7 @@ p  { text-wrap: pretty; }
 
 .nav { display: flex; align-items: center; gap: 2px; margin-left: auto; }
 .nav a {
+  white-space: nowrap;
   padding: 9px 14px;
   border-radius: var(--r-sm);
   font-size: var(--fs-sm);
@@ -333,11 +360,24 @@ p  { text-wrap: pretty; }
 .nav-toggle:hover { background: var(--surface-3); }
 .nav-toggle svg { width: 24px; height: 24px; }
 
+/* Logo, five nav links and three action buttons is a lot of header. Rather
+   than let the nav wrap onto two lines, things drop out in order of how
+   little they are missed: the phone number first (it is in the footer, the
+   menu and the sticky bar), then the button labels. */
+@media (max-width: 1240px) {
+  .header-inner { gap: var(--sp-4); }
+  .header-cta .btn--outline { display: none; }
+  .nav a { padding: 9px 11px; }
+}
+@media (max-width: 1080px) {
+  .header-cta .btn--at span.hide-sm,
+  .header-cta .btn--ig span.hide-sm { display: none; }
+}
 @media (max-width: 940px) {
   .nav, .header-cta .btn span.hide-sm { display: none; }
   .nav-toggle { display: flex; }
   /* With the nav hidden, the actions and the menu button group together on
-     the right — otherwise both claim the spare space and end up mid-header. */
+     the right, otherwise both claim the spare space and end up mid-header. */
   .header-cta { margin-left: auto; }
   .nav-toggle { margin-left: 0; }
   .header-cta .btn--outline { display: none; }
@@ -411,7 +451,7 @@ p  { text-wrap: pretty; }
 .badge--amber  { background: var(--amber-100); color: var(--amber-600); }
 .badge--red    { background: var(--red-100);   color: var(--red-600); }
 .badge--blue   { background: var(--blue-100);  color: var(--navy-600); }
-.badge--brass  { background: var(--brass-100); color: var(--brass-600); }
+.badge--accent  { background: var(--accent-100); color: var(--accent-600); }
 .badge--grey   { background: var(--surface-3); color: var(--ink-2); }
 .badge--solid  { background: var(--navy-900); color: #fff; }
 .badge--dot::before {
@@ -491,7 +531,7 @@ p  { text-wrap: pretty; }
   bottom: var(--sp-3); left: var(--sp-3);
   padding: 4px 10px;
   border-radius: var(--r-full);
-  background: var(--brass-500);
+  background: var(--accent-500);
   color: var(--navy-900);
   font-size: var(--fs-xs);
   font-weight: 800;
@@ -556,6 +596,22 @@ p  { text-wrap: pretty; }
 .car-card-cta svg { width: 15px; height: 15px; transition: transform .2s var(--ease); }
 .car-card:hover .car-card-cta svg { transform: translateX(3px); }
 
+/* Two cards side by side on a phone leaves roughly 165px each, so below this
+   width the card sheds anything that isn't the photo, the car and the price. */
+@media (max-width: 620px) {
+  .car-card-body   { padding: var(--sp-3); gap: 7px; }
+  .car-card-title  { font-size: var(--fs-md); }
+  .car-card-variant{ font-size: var(--fs-xs); }
+  .car-card-specs  { font-size: var(--fs-xs); gap: 4px 9px; }
+  .car-card-specs li:nth-child(n+3) { display: none; }
+  .car-card-specs svg { width: 12px; height: 12px; }
+  .car-card-foot   { flex-direction: column; align-items: flex-start; gap: 4px; padding-top: 10px; }
+  .car-price       { font-size: 1.2rem; }
+  .car-card-cta    { font-size: var(--fs-xs); }
+  .car-card-flags  { gap: 4px; }
+  .car-card-flags .badge { font-size: 10px; padding: 3px 7px; }
+}
+
 /* --------------------------------------------------------------------------
    SOLD TREATMENT
    Sold cars sit in the same grid as available stock, so this has to be
@@ -608,7 +664,7 @@ p  { text-wrap: pretty; }
   color: var(--ink-4);
   letter-spacing: 0;
 }
-.car-card-cta--interest { color: var(--brass-600); }
+.car-card-cta--interest { color: var(--accent-600); }
 
 /* --------------------------------------------------------------------------
    8. FORMS
@@ -688,7 +744,7 @@ p  { text-wrap: pretty; }
 .form-status--ok  { background: var(--green-100); color: var(--green-600); }
 .form-status--err { background: var(--red-100);   color: var(--red-600); }
 
-/* Honeypot — hidden from humans, catches bots */
+/* Honeypot. Hidden from humans, catches bots */
 .hp-field {
   position: absolute !important;
   left: -9999px !important;
@@ -722,8 +778,8 @@ p  { text-wrap: pretty; }
   width: 46px; height: 46px;
   border-radius: var(--r-md);
   display: grid; place-items: center;
-  background: var(--brass-100);
-  color: var(--brass-600);
+  background: var(--accent-100);
+  color: var(--accent-600);
   margin-bottom: 2px;
 }
 .info-card-icon svg { width: 23px; height: 23px; }
@@ -757,7 +813,7 @@ p  { text-wrap: pretty; }
   margin-bottom: var(--sp-4);
 }
 .site-footer a { color: #A8B6CC; transition: color .16s var(--ease); }
-.site-footer a:hover { color: var(--brass-400); }
+.site-footer a:hover { color: var(--accent-300); }
 .footer-links { display: flex; flex-direction: column; gap: 11px; }
 .footer-hours { display: flex; flex-direction: column; gap: 7px; }
 .footer-hours li { display: flex; justify-content: space-between; gap: var(--sp-4); }
@@ -815,7 +871,7 @@ p  { text-wrap: pretty; }
 }
 .mobile-bar .btn { flex: 1; }
 /* Instagram rides along as a square icon button so WhatsApp and Call us keep
-   almost all the width — three equal buttons would squash the labels. */
+   almost all the width. Three equal buttons would squash the labels. */
 .mobile-bar-ig { flex: none !important; width: 54px; padding-inline: 0; }
 .mobile-bar-ig svg { width: 22px; height: 22px; }
 @media (max-width: 780px) {

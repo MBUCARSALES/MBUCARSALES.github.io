@@ -1,7 +1,7 @@
 /* ============================================================================
-   MBU ADMIN — service worker
+   MBU ADMIN / service worker
    Deliberately minimal. It makes the app installable to the home screen and
-   keeps it working offline, but it NEVER caches car data — stock and enquiries
+   keeps it working offline, but it NEVER caches car data. Stock and enquiries
    always come fresh from the network.
 
    NETWORK FIRST, on purpose. The old version served the cached copy and only
@@ -14,7 +14,7 @@
    makes phones throw the old files away.
    ========================================================================== */
 
-const CACHE = 'mbu-admin-v3';
+const CACHE = 'mbu-admin-v4';
 const SHELL = [
   './',
   './index.html',
@@ -47,7 +47,7 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(req.url);
 
-  // Never touch anything from Supabase or Cloudinary — always live.
+  // Never touch anything from Supabase or Cloudinary. Always live.
   if (url.hostname.includes('supabase') || url.hostname.includes('cloudinary')) return;
 
   // Only manage our own files. Fonts and anything else on another host go
@@ -63,7 +63,7 @@ self.addEventListener('fetch', event => {
         }
         return res;
       })
-      // No signal — fall back to whatever was saved last time.
+      // No signal, so fall back to whatever was saved last time.
       .catch(() => caches.match(req).then(cached => cached || caches.match('./index.html')))
   );
 });

@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Car details — MBU Car Sales</title>
+<title>Car details | MBU Car Sales</title>
 <meta name="description" content="Full details, photos and specification for this used car at MBU Car Sales, Newcastle upon Tyne.">
-<meta property="og:title" content="MBU Car Sales — Newcastle upon Tyne">
+<meta property="og:title" content="MBU Car Sales | Newcastle upon Tyne">
 <meta property="og:description" content="Quality used cars, honestly priced and properly prepared.">
 <meta property="og:image" content="https://mbucarsales.github.io/assets/img/og-default.jpg">
-<meta name="theme-color" content="#0D1626">
+<meta name="theme-color" content="#0A1830">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -60,7 +60,7 @@
   const root = document.getElementById('carRoot');
 
   // Normally the car comes from ?id=. The pre-rendered share pages under
-  // /c/<id>/ have no query string, so they set this instead — that's what
+  // /c/<id>/ have no query string, so they set this instead. That's what
   // lets a link forwarded on WhatsApp show the actual car in the preview.
   const id = window.MBU_FORCED_CAR_ID || MBU.param('id');
   const icon = MBU.icon, esc = MBU.esc, fmt = MBU.fmt;
@@ -71,7 +71,7 @@
 
   /* ------------------------------------------------------------ 404 */
   function notFound() {
-    // Tell the truth about which problem this is — "car not found" when the
+    // Tell the truth about which problem this is. "Car not found" when the
     // database is actually down sends people away for no reason.
     if (MBU.loadFailed) {
       root.innerHTML = `<section class="section"><div class="container"
@@ -103,10 +103,10 @@
     const images = car.images && car.images.length ? car.images : [null];
 
     /* --- page metadata --- */
-    // Never print a price for a sold car — not even in the browser tab.
-    document.title = `${title}${sub ? ' ' + sub : ''} — ${sold ? 'Sold' : fmt.price(car.price)} — MBU Car Sales`;
+    // Never print a price for a sold car, not even in the browser tab.
+    document.title = `${title}${sub ? ' ' + sub : ''} | ${sold ? 'Sold' : fmt.price(car.price)} | MBU Car Sales`;
     setMeta('description', (car.description || `${title} for sale at MBU Car Sales, Newcastle upon Tyne.`).slice(0, 158));
-    setMeta('og:title', `${title} — ${sold ? 'Sold' : fmt.price(car.price)}`, true);
+    setMeta('og:title', `${title} | ${sold ? 'Sold' : fmt.price(car.price)}`, true);
     setMeta('og:description', (car.description || 'Quality used cars from MBU Car Sales, Newcastle.').slice(0, 158), true);
     if (car.images && car.images[0]) setMeta('og:image', MBU.img(car.images[0], 'hero'), true);
 
@@ -175,7 +175,7 @@
                   ${icon('camera')}
                   <div>
                     <strong>Walkaround video</strong>
-                    <span>Us showing you round the actual car — sound on.</span>
+                    <span>Us showing you round the actual car. Sound on.</span>
                   </div>
                 </div>
                 <video controls playsinline preload="none"
@@ -211,7 +211,7 @@
             ${car.condition_notes ? `
               <div class="notice notice--amber" style="margin-top:22px">
                 ${icon('shield')}
-                <div><strong>About this car’s history — please read</strong>${esc(car.condition_notes)}</div>
+                <div><strong>About this car’s history, please read</strong>${esc(car.condition_notes)}</div>
               </div>` : ''}
 
             ${(!sold && MBU_CONFIG.warranty && MBU_CONFIG.warranty.enabled
@@ -272,7 +272,7 @@
               <p class="muted" style="margin-bottom:22px">
                 We’re out looking at cars most weeks and see plenty that never make
                 it onto the website. Tell us what you need and we’ll look out for
-                another ${esc([car.make, car.model].filter(Boolean).join(' ') || 'one')} —
+                another ${esc([car.make, car.model].filter(Boolean).join(' ') || 'one')},
                 or something close to it.
               </p>
               <div class="panel panel--flat" style="text-align:center;padding:36px 24px">
@@ -282,7 +282,7 @@
                   Takes a minute. No deposit, no obligation, and we’ll send you photos
                   and a price before we commit to anything.
                 </p>
-                <a class="btn btn--brass btn--lg" href="${MBU.link('wanted.html?car=' + encodeURIComponent(car.id))}">
+                <a class="btn btn--accent btn--lg" href="${MBU.link('wanted.html?car=' + encodeURIComponent(car.id))}">
                   Tell us what you’re after
                 </a>
               </div>
@@ -323,7 +323,7 @@
                     <label for="cfPartExDetails">What have you got?</label>
                     <input class="input" id="cfPartExDetails"
                            placeholder="e.g. 2014 Astra, 90,000 miles, reg AB14 CDE">
-                    <span class="hint">Rough details are fine — we’ll give you a straight price when you come.</span>
+                    <span class="hint">Rough details are fine. We’ll give you a straight price when you come.</span>
                   </div>
 
                   ${MBU_CONFIG.finance && MBU_CONFIG.finance.enabled ? `
@@ -373,10 +373,10 @@
               <div class="buy-panel-body">
                 ${sold ? `
                   <p class="small muted" style="margin-bottom:6px">
-                    This one has gone — but we buy cars like it most weeks. Register your
+                    This one has gone, but we buy cars like it most weeks. Register your
                     interest and we’ll look out for another for you.
                   </p>
-                  <a class="btn btn--brass btn--lg" href="${MBU.link('wanted.html?car=' + encodeURIComponent(car.id))}">
+                  <a class="btn btn--accent btn--lg" href="${MBU.link('wanted.html?car=' + encodeURIComponent(car.id))}">
                     ${icon('heart')} Want one like this?
                   </a>
                   <a class="btn btn--wa" href="${MBU.waLink('Hi MBU Car Sales, I saw the ' + title + ' has sold. Could you look out for another one like it?')}" target="_blank" rel="noopener">
@@ -399,7 +399,7 @@
                   </a>
                   <p class="buy-note">
                     Viewings by appointment, seven days a week.<br>
-                    Message any time — we usually reply within the hour.
+                    Message any time. We usually reply within the hour.
                   </p>
                 `}
                 <hr class="divider" style="margin:8px 0">
@@ -462,7 +462,7 @@
     function show(n) {
       i = (n + images.length) % images.length;
       img.src = MBU.img(images[i], 'hero');
-      img.alt = `${title} — photo ${i + 1}`;
+      img.alt = `${title}, photo ${i + 1}`;
       if (count) count.textContent = `${i + 1} / ${images.length}`;
       thumbs.forEach((t, k) => t.classList.toggle('is-on', k === i));
       const active = thumbs[i];
@@ -494,7 +494,7 @@
     function lbShow(n) {
       j = (n + images.length) % images.length;
       lbImg.src = MBU.img(images[j], 'full');
-      lbImg.alt = `${title} — photo ${j + 1}`;
+      lbImg.alt = `${title}, photo ${j + 1}`;
       lbCount.textContent = `${j + 1} / ${images.length}`;
     }
     function lbOpen() {
@@ -536,10 +536,10 @@
     const btn = document.getElementById('shareBtn');
     btn.addEventListener('click', async () => {
       MBU.track('share', car.id);
-      // Always share the pre-rendered URL — that's the one with a proper
+      // Always share the pre-rendered URL. That's the one with a proper
       // preview, even if you're currently on the ?id= version.
       const url = MBU.carUrl(car);
-      const data = { title: `${title} — MBU Car Sales`, text: `Have a look at this ${title} at MBU Car Sales`, url };
+      const data = { title: `${title} | MBU Car Sales`, text: `Have a look at this ${title} at MBU Car Sales`, url };
       if (navigator.share) { try { await navigator.share(data); return; } catch { /* cancelled */ } }
       try {
         await navigator.clipboard.writeText(url);
@@ -556,7 +556,7 @@
     const status = document.getElementById('cfStatus');
     const btn = document.getElementById('cfSubmit');
 
-    // Count someone starting the form, once — tells us how many begin
+    // Count someone starting the form, once. Tells us how many begin
     // but don't finish, which is the interesting number.
     let started = false;
     form.addEventListener('input', () => {
@@ -575,7 +575,7 @@
 
       if (document.getElementById('cfCompany').value) return;   // bot
 
-      // NB: use getElementById, not form.name — HTMLFormElement.name is the
+      // NB: use getElementById, not form.name. HTMLFormElement.name is the
       // form's own name attribute and shadows any input called "name".
       const v = id => document.getElementById(id).value.trim();
       const name = v('cfName');
@@ -605,7 +605,7 @@
         form.innerHTML = `
           <div style="text-align:center;padding:28px 12px">
             <div class="info-card-icon" style="margin:0 auto 16px;background:var(--green-100);color:var(--green-600)">${MBU.icon('checkCirc')}</div>
-            <h3 style="margin-bottom:8px">Thanks ${esc(name.split(' ')[0])} — message received</h3>
+            <h3 style="margin-bottom:8px">Thanks ${esc(name.split(' ')[0])}, message received</h3>
             <p class="muted" style="max-width:44ch;margin:0 auto 20px">
               We will be in touch shortly. If you would rather not wait, message us on WhatsApp and
               you will usually get a reply within the hour.

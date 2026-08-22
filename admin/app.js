@@ -1,5 +1,5 @@
 /* ============================================================================
-   MBU ADMIN — application logic
+   MBU ADMIN: application logic
    Auth, stock management, photo upload, DVLA lookup, enquiries.
    ========================================================================== */
 (function () {
@@ -64,6 +64,72 @@
   const TRANS = [['manual','Manual'],['automatic','Automatic']];
   const BODIES = [['hatchback','Hatchback'],['saloon','Saloon'],['estate','Estate'],['suv','SUV'],
                   ['coupe','Coupe'],['convertible','Convertible'],['mpv','MPV'],['van','Van'],['pickup','Pickup']];
+  /* --------------------------------------------------------------------------
+     MAKES AND MODELS
+
+     Just a starting list so the dropdowns are useful on day one. Anything you
+     type yourself, and anything the plate lookup returns, gets added to the
+     list automatically, and every make and model already in your own stock is
+     merged in on top. So it learns what you actually sell.
+
+     Add to it freely. Order does not matter, it is sorted before it is shown.
+     -------------------------------------------------------------------------- */
+  const MODELS = {
+    'Abarth':        ['500','595','695','124 Spider'],
+    'Alfa Romeo':    ['Giulia','Giulietta','Mito','Stelvio','Tonale'],
+    'Audi':          ['A1','A3','A4','A5','A6','A7','A8','Q2','Q3','Q5','Q7','Q8','TT','R8','e-tron','S3','RS3'],
+    'BMW':           ['1 Series','2 Series','3 Series','4 Series','5 Series','6 Series','7 Series','8 Series',
+                      'X1','X2','X3','X4','X5','X6','X7','Z4','i3','i4','iX','M2','M3','M4'],
+    'Citroën':       ['C1','C3','C3 Aircross','C4','C4 Cactus','C5 Aircross','Berlingo','DS3'],
+    'Cupra':         ['Ateca','Born','Formentor','Leon'],
+    'Dacia':         ['Sandero','Duster','Jogger','Logan'],
+    'Fiat':          ['500','500L','500X','Panda','Punto','Tipo','Doblo'],
+    'Ford':          ['Fiesta','Focus','Puma','Kuga','EcoSport','Mondeo','C-Max','S-Max','Galaxy','Ka',
+                      'B-Max','Mustang','Ranger','Transit','Transit Custom','Transit Connect','Tourneo'],
+    'Honda':         ['Jazz','Civic','CR-V','HR-V','Accord','e'],
+    'Hyundai':       ['i10','i20','i30','i40','Tucson','Santa Fe','Kona','Ioniq','Ioniq 5','Bayon'],
+    'Jaguar':        ['XE','XF','XJ','E-Pace','F-Pace','I-Pace','F-Type'],
+    'Jeep':          ['Renegade','Compass','Cherokee','Wrangler','Avenger'],
+    'Kia':           ['Picanto','Rio','Ceed','Proceed','Stonic','Sportage','Sorento','Niro','EV6','Soul','XCeed'],
+    'Land Rover':    ['Defender','Discovery','Discovery Sport','Freelander','Range Rover',
+                      'Range Rover Sport','Range Rover Evoque','Range Rover Velar'],
+    'Lexus':         ['CT','IS','ES','NX','RX','UX'],
+    'Mazda':         ['2','3','6','CX-3','CX-30','CX-5','MX-5'],
+    'Mercedes-Benz': ['A Class','B Class','C Class','E Class','S Class','CLA','CLS','GLA','GLB','GLC','GLE',
+                      'V Class','Vito','Sprinter','SLK'],
+    'MG':            ['MG3','MG4','MG5','ZS','HS','MG ZS EV'],
+    'Mini':          ['Hatch','Clubman','Countryman','Convertible','Paceman'],
+    'Mitsubishi':    ['Mirage','ASX','Outlander','Shogun','L200','Eclipse Cross'],
+    'Nissan':        ['Micra','Note','Juke','Qashqai','X-Trail','Leaf','Ariya','Navara','Pulsar'],
+    'Peugeot':       ['108','208','2008','308','3008','5008','508','Partner','Rifter','Expert','Boxer'],
+    'Porsche':       ['Macan','Cayenne','Panamera','911','Boxster','Cayman','Taycan'],
+    'Renault':       ['Clio','Captur','Megane','Kadjar','Scenic','Zoe','Arkana','Trafic','Master','Kangoo'],
+    'Seat':          ['Ibiza','Leon','Arona','Ateca','Tarraco','Alhambra','Mii'],
+    'Škoda':         ['Citigo','Fabia','Scala','Octavia','Superb','Kamiq','Karoq','Kodiaq','Enyaq','Yeti','Rapid'],
+    'Smart':         ['ForTwo','ForFour'],
+    'Subaru':        ['Impreza','Forester','Outback','XV'],
+    'Suzuki':        ['Swift','Vitara','S-Cross','Ignis','Jimny','Celerio'],
+    'Tesla':         ['Model 3','Model Y','Model S','Model X'],
+    'Toyota':        ['Aygo','Yaris','Corolla','Auris','C-HR','RAV4','Prius','Hilux','Proace','Land Cruiser'],
+    'Vauxhall':      ['Corsa','Astra','Insignia','Adam','Viva','Crossland','Grandland','Mokka','Zafira',
+                      'Meriva','Antara','Vivaro','Combo','Movano'],
+    'Volkswagen':    ['up!','Polo','Golf','Golf SV','Passat','Arteon','T-Cross','T-Roc','Tiguan','Touareg',
+                      'Touran','Sharan','Scirocco','Beetle','Caddy','Transporter','ID.3','ID.4'],
+    'Volvo':         ['V40','V60','V90','S60','S90','XC40','XC60','XC90','C40'],
+    'Chevrolet':     ['Aveo','Cruze','Spark'],
+    'Chrysler':      ['Ypsilon','300C'],
+    'DS':            ['DS 3','DS 4','DS 7'],
+    'Isuzu':         ['D-Max'],
+    'SsangYong':     ['Tivoli','Korando','Musso','Rexton'],
+    'Polestar':      ['2','3'],
+    'Genesis':       ['G70','GV70','GV80'],
+    'Infiniti':      ['Q30','Q50','QX30'],
+    'BYD':           ['Atto 3','Dolphin','Seal']
+  };
+
+  const COLOURS = ['Black','White','Silver','Grey','Blue','Red','Green','Blue (metallic)',
+                   'Grey (metallic)','Bronze','Beige','Brown','Gold','Orange','Purple','Yellow'];
+
   const COMMON_FEATURES = [
     'Air conditioning','Climate control','Sat nav','Apple CarPlay','Android Auto','Bluetooth',
     'DAB radio','Cruise control','Adaptive cruise control','Parking sensors','Reversing camera',
@@ -96,7 +162,7 @@
   };
 
   /* =========================================================== HELPERS */
-  const money = n => n == null || n === '' ? '—' : '£' + Number(n).toLocaleString('en-GB');
+  const money = n => n == null || n === '' ? 'No price' : '£' + Number(n).toLocaleString('en-GB');
   const num = v => { const n = parseFloat(String(v).replace(/[^0-9.]/g, '')); return isNaN(n) ? null : n; };
   const int = v => { const n = parseInt(String(v).replace(/[^0-9]/g, ''), 10); return isNaN(n) ? null : n; };
 
@@ -164,12 +230,12 @@
 
      1. Supabase only lets you edit the sign-in email template if you've set
         up your own SMTP server. Without that, the emailed template contains a
-        link and no code — so a 6-digit code flow simply isn't available.
+        link and no code, so a 6-digit code flow simply isn't available.
 
      2. A magic link is worse than it looks on iOS. An app added to the home
         screen has its own storage, separate from Safari. Tapping a link in
         Mail signs you into *Safari*, while the home-screen app still shows a
-        login screen — baffling, and impossible for a non-technical user to
+        login screen. Baffling, and impossible for a non-technical user to
         diagnose.
 
      A password sidesteps both. It works identically wherever it's typed, the
@@ -197,7 +263,7 @@
       const m = error.message || '';
       msg('#loginMsg',
         /invalid login credentials/i.test(m)
-          ? 'That email address and password don’t match. Check for typos — the password is case sensitive.'
+          ? 'That email address and password don’t match. Check for typos. The password is case sensitive.'
         : /email not confirmed/i.test(m)
           ? 'This account hasn’t been confirmed yet. Whoever set it up needs to tick “Auto Confirm User” in Supabase.'
         : /too many requests|rate/i.test(m)
@@ -271,8 +337,8 @@
    * Confirm all four SQL files have been run.
    *
    * Without this, skipping one shows up later as a raw Postgres error at the
-   * worst possible moment — usually "column cars.video does not exist" the
-   * first time someone tries to save a car. This says which file is missing,
+   * worst possible moment. Usually it is "column cars.video does not exist"
+   * the first time someone tries to save a car. This says which file is missing,
    * in words, before that happens.
    */
   async function checkSchema() {
@@ -312,21 +378,105 @@
     }
   });
 
+  /* ================================================== MAKE/MODEL PICKERS
+     A native dropdown is the fastest thing on a phone, but a fixed list would
+     eventually block a car nobody thought of. So every picker carries a
+     "Something else" option that reveals a text box, and anything typed there
+     (or returned by the plate lookup) is added to the list from then on.
+     ==================================================================== */
+  const OTHER = '__other';
+
+  /** Everything we know about, ours and the built-in list, sorted. */
+  function knownMakes() {
+    const set = new Set(Object.keys(MODELS));
+    state.cars.forEach(c => { if (c.make) set.add(c.make); });
+    return [...set].sort((a, b) => a.localeCompare(b, 'en-GB'));
+  }
+
+  function knownModels(make) {
+    const set = new Set(MODELS[make] || []);
+    state.cars.forEach(c => { if (c.model && (!make || c.make === make)) set.add(c.model); });
+    return [...set].sort((a, b) => a.localeCompare(b, 'en-GB', { numeric: true }));
+  }
+
+  /**
+   * Fill a picker, keeping the current value selected if it still exists.
+   * @param {string} sel     the <select>
+   * @param {string} other   the text input revealed by "Something else"
+   * @param {string[]} values
+   * @param {string} blank   label for the empty first option
+   */
+  function fillPicker(sel, other, values, blank) {
+    const el = $(sel);
+    const keep = el.value;
+    el.innerHTML = `<option value="">${blank}</option>` +
+      values.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('') +
+      `<option value="${OTHER}">Something else…</option>`;
+    if (keep && [...el.options].some(o => o.value === keep)) el.value = keep;
+    syncOther(sel, other);
+  }
+
+  function syncOther(sel, other) {
+    const show = $(sel).value === OTHER;
+    $(other).hidden = !show;
+    if (!show) $(other).value = '';
+  }
+
+  /** What the picker is actually set to, typed value included. */
+  function pickerValue(sel, other) {
+    const v = $(sel).value;
+    return v === OTHER ? $(other).value.trim() : v;
+  }
+
+  /**
+   * Set a picker to a value, adding it to the list first if it is new. This
+   * is what lets the plate lookup drop in a make nobody has sold before.
+   */
+  function setPicker(sel, other, value) {
+    const el = $(sel);
+    if (!value) { el.value = ''; syncOther(sel, other); return; }
+    if (![...el.options].some(o => o.value === value)) {
+      el.insertBefore(new Option(value, value), el.options[el.options.length - 1]);
+    }
+    el.value = value;
+    syncOther(sel, other);
+  }
+
+  /** Make changed, so the model list has to follow it. */
+  function wirePickerPair(makeSel, makeOther, modelSel, modelOther) {
+    const refreshModels = () => {
+      const make = pickerValue(makeSel, makeOther);
+      fillPicker(modelSel, modelOther, knownModels(make), 'Choose…');
+    };
+    $(makeSel).addEventListener('change', () => {
+      syncOther(makeSel, makeOther);
+      $(modelSel).value = '';
+      refreshModels();
+    });
+    $(makeOther).addEventListener('input', refreshModels);
+    $(modelSel).addEventListener('change', () => syncOther(modelSel, modelOther));
+    return refreshModels;
+  }
+
   /* ============================================================= NAV */
   function go(view) {
     state.view = view;
-    ['stock','form','value','enq','data','more'].forEach(v =>
+    ['stock','quick','form','value','enq','data','more'].forEach(v =>
       $('#' + v + 'View').classList.toggle('is-hidden', v !== view));
 
-    const isForm = view === 'form';
-    $('#tabbar').style.display = isForm ? 'none' : '';
+    const isForm  = view === 'form';
+    const isQuick = view === 'quick';
+    const isEdit  = isForm || isQuick;
+    $('#tabbar').style.display = isEdit ? 'none' : '';
     $('#addFab').style.display = view === 'stock' ? '' : 'none';
-    $('#saveBar').hidden = !isForm;
-    $('#backBtn').hidden = !isForm;
-    $('#topbarSpacer').style.display = isForm ? 'none' : '';
+    $('#saveBar').hidden  = !isForm;
+    $('#quickBar').hidden = !isQuick;
+    $('#backBtn').hidden = !isEdit;
+    $('#topbarSpacer').style.display = isEdit ? 'none' : '';
 
     $('#topTitle').textContent =
       isForm ? (state.editing ? 'Edit car' : 'Add a car')
+      : isQuick ? 'Quick add'
       : view === 'enq' ? 'Enquiries'
       : view === 'value' ? 'Before you bid'
       : view === 'data' ? 'Insights'
@@ -385,7 +535,8 @@
 
     list.innerHTML = cars.map(c => {
       const imgs = Array.isArray(c.images) ? c.images : [];
-      const title = [c.year, c.make, c.model].filter(Boolean).join(' ') || 'Untitled car';
+      const title = [c.year, c.make, c.model].filter(Boolean).join(' ')
+                    || (c.registration ? fmtReg(c.registration) : 'Untitled car');
       const meta = [
         c.mileage != null ? Number(c.mileage).toLocaleString('en-GB') + ' mi' : null,
         c.fuel && LABEL.fuel[c.fuel],
@@ -401,7 +552,7 @@
         c.featured ? '<span class="pill pill--blue">Featured</span>' : '';
 
       const atPill = (c.at_published && c.status !== 'sold')
-        ? '<span class="pill pill--brass" style="background:var(--brass-100);color:var(--brass-600)">AT</span>' : '';
+        ? '<span class="pill pill--accent" style="background:var(--accent-100);color:var(--accent-600)">AT</span>' : '';
 
       return `
       <div class="card"><div class="stock-row" data-id="${esc(c.id)}">
@@ -452,7 +603,7 @@
 
     if (car.status === 'available') {
       acts.push({ label: 'Mark as sold', icon: 'sold',
-        sub: 'Moves it to Recently Sold — price hidden',
+        sub: 'Moves it to Recently Sold with the price hidden',
         run: () => setStatus(car, 'sold') });
       acts.push({ label: 'Mark as reserved', icon: 'pause',
         sub: 'Stays visible with a Reserved badge',
@@ -473,7 +624,7 @@
         run: () => window.open(`../car.html?id=${encodeURIComponent(car.id)}`, '_blank') });
     }
     acts.push({ label: 'Delete this car', icon: 'trash', danger: true,
-      sub: 'Permanent — cannot be undone',
+      sub: 'Permanent. No undo.',
       run: () => confirmSheet('Delete this car?',
         `${title} will be removed from the website and your list for good.`,
         'Yes, delete it', () => removeCar(car), true) });
@@ -486,11 +637,11 @@
 
     if (status === 'sold') {
       patch.sold_at = new Date().toISOString();
-      // Optional — but it's the one number that makes the margin figures real,
+      // Optional, but it's the one number that makes the margin figures real,
       // and now is the only moment you'll reliably remember it.
       const asked = prompt(
         'What did it actually sell for?\n\n' +
-        'Just for your own figures — never shown on the website.\n' +
+        'Just for your own figures. Never shown on the website.\n' +
         'Leave blank to skip.',
         car.price != null ? String(car.price) : '');
       if (asked !== null) {
@@ -501,7 +652,7 @@
     if (status === 'available' && car.status === 'sold') patch.sold_at = null;
 
     const { error } = await sb.from('cars').update(patch).eq('id', car.id);
-    if (error) return toast('Couldn’t update — ' + error.message);
+    if (error) return toast('Couldn’t update: ' + error.message);
     Object.assign(car, patch);
     renderStock();
     toast(status === 'sold' ? 'Marked as sold' : status === 'reserved' ? 'Marked as reserved'
@@ -511,7 +662,7 @@
   /* ---- Auto Trader advert slots ------------------------------------------
      The package allows a fixed number of live adverts (8 on the current plan).
      This tracks which cars you've chosen for those slots. Once API access is
-     switched on, the same flag drives the actual sync — see ROADMAP.md §4. */
+     switched on, the same flag drives the actual sync (see ROADMAP.md §4). */
   function advertAllowance() {
     const limit = (CFG.autotrader && CFG.autotrader.maxAdverts) || 8;
     const used = state.cars.filter(c => c.at_published && c.status !== 'sold').length;
@@ -536,7 +687,7 @@
     const { error } = await sb.from('cars')
       .update({ at_published: next, at_lifecycle_state: next ? 'FORECOURT' : null })
       .eq('id', car.id);
-    if (error) return toast('Couldn’t update — ' + error.message);
+    if (error) return toast('Couldn’t update: ' + error.message);
 
     car.at_published = next;
     renderStock();
@@ -566,7 +717,7 @@
 
   async function removeCar(car) {
     const { error } = await sb.from('cars').delete().eq('id', car.id);
-    if (error) return toast('Couldn’t delete — ' + error.message);
+    if (error) return toast('Couldn’t delete: ' + error.message);
     state.cars = state.cars.filter(c => c.id !== car.id);
     renderStock();
     toast('Car deleted', 'ok');
@@ -586,6 +737,13 @@
       el.addEventListener('input', () => { state.dirty = true; });
     });
 
+    refreshFormModels = wirePickerPair('#fMake', '#fMakeOther', '#fModel', '#fModelOther');
+    $('#fColour').addEventListener('change', () => syncOther('#fColour', '#fColourOther'));
+
+    // Running total under the private figures, updated as you type
+    ['#fPurchase', '#fPrep', '#fPrice'].forEach(sel =>
+      $(sel).addEventListener('input', renderCostSummary));
+
     const reg = $('#fReg');
     reg.addEventListener('input', () => { reg.value = reg.value.toUpperCase().replace(/[^A-Z0-9 ]/g, ''); });
     $('#lookupBtn').onclick = dvlaLookup;
@@ -593,9 +751,196 @@
     $('#addFeatureBtn').onclick = addCustomFeature;
     $('#photoInput').onchange = e => handleFiles(Array.from(e.target.files));
     $('#videoInput').onchange = e => handleVideo(e.target.files[0]);
-    $('#addFab').onclick = () => openForm(null);
+    $('#addFab').onclick = () => openQuick();
     $('#saveDraftBtn').onclick = () => save('draft');
     $('#publishBtn').onclick = () => save('available');
+
+    buildQuickControls();
+  }
+
+  /** Set by buildFormControls so other code can rebuild the model list. */
+  let refreshFormModels = () => {};
+
+  /**
+   * The bit that matters: what the car has cost so far, and what is left in
+   * it at the asking price. Shown live under the private figures.
+   */
+  function renderCostSummary() {
+    const box  = $('#costSummary');
+    const paid = int($('#fPurchase').value) || 0;
+    const prep = int($('#fPrep').value) || 0;
+    const ask  = int($('#fPrice').value) || 0;
+    const inCar = paid + prep;
+
+    if (!inCar) { box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false;
+
+    const margin = ask ? ask - inCar : null;
+    box.innerHTML =
+      `<div class="ml ml--total"><span>Total in the car</span><b>${money(inCar)}</b></div>` +
+      (margin === null
+        ? '<div class="ml-note">Put an asking price in and this will show what is left in it.</div>'
+        : `<div class="ml ${margin >= 0 ? 'ml--good' : 'ml--bad'}">
+             <span>${margin >= 0 ? 'Margin at asking price' : 'Short by'}</span>
+             <b>${money(Math.abs(margin))}</b>
+           </div>`);
+  }
+
+  /* ========================================================== QUICK ADD
+     The auction screen. Everything here is about money: what the car cost,
+     what putting it right will cost, and whether there is anything left in
+     it. It saves as a draft, so whoever writes the listing up later picks it
+     out of the Drafts tab and fills in the rest.
+     ==================================================================== */
+  let refreshQuickModels = () => {};
+
+  function buildQuickControls() {
+    refreshQuickModels = wirePickerPair('#qMake', '#qMakeOther', '#qModel', '#qModelOther');
+
+    const reg = $('#qReg');
+    reg.addEventListener('input', () => { reg.value = reg.value.toUpperCase().replace(/[^A-Z0-9 ]/g, ''); });
+
+    ['#qPaid', '#qPrep', '#qTarget'].forEach(sel =>
+      $(sel).addEventListener('input', renderQuickSummary));
+    $$('#quickView input, #quickView textarea, #quickView select').forEach(el =>
+      el.addEventListener('input', () => { state.dirty = true; }));
+
+    $('#qLookup').onclick = quickLookup;
+    $('#quickSaveBtn').onclick = () => saveQuick(false);
+    $('#quickFullBtn').onclick = () => saveQuick(true);
+  }
+
+  function openQuick() {
+    state.editing = null;
+    state.dirty = false;
+    ['#qReg', '#qYear', '#qPaid', '#qPrep', '#qTarget', '#qNotes'].forEach(sel => { $(sel).value = ''; });
+    fillPicker('#qMake', '#qMakeOther', knownMakes(), 'Choose…');
+    fillPicker('#qModel', '#qModelOther', knownModels(''), 'Choose…');
+    $('#qHint').textContent = 'Type the plate and tap Look up, or just fill the two boxes below.';
+    msg('#quickMsg', '');
+    renderQuickSummary();
+    go('quick');
+    $('#qReg').focus();
+  }
+
+  function renderQuickSummary() {
+    const paid   = int($('#qPaid').value) || 0;
+    const prep   = int($('#qPrep').value) || 0;
+    const target = int($('#qTarget').value) || 0;
+    const inCar  = paid + prep;
+    const box    = $('#quickSummary');
+
+    if (!inCar && !target) {
+      box.innerHTML = '<div class="ml-note">Put the figures in and the total works itself out.</div>';
+      return;
+    }
+
+    const rows = [`<div class="ml ml--total"><span>Total in the car</span><b>${money(inCar)}</b></div>`];
+
+    if (target) {
+      const margin = target - inCar;
+      const pct = inCar ? Math.round((margin / inCar) * 100) : 0;
+      rows.push(`<div class="ml ${margin >= 0 ? 'ml--good' : 'ml--bad'}">
+          <span>${margin >= 0 ? 'Profit if it makes that' : 'You would lose'}</span>
+          <b>${money(Math.abs(margin))}</b>
+        </div>`);
+      if (inCar) {
+        rows.push(`<div class="ml-note">${margin >= 0
+          ? `That is ${pct}% on what you have got in it.`
+          : 'There is nothing in this one at that price.'}</div>`);
+      }
+    } else if (inCar) {
+      rows.push('<div class="ml-note">Add what you reckon it sells for to see the profit.</div>');
+    }
+
+    box.innerHTML = rows.join('');
+  }
+
+  /** Same lookup as the full form, pointed at the quick add fields. */
+  async function quickLookup() {
+    const plate = $('#qReg').value.replace(/\s+/g, '').toUpperCase();
+    const hint = $('#qHint');
+    if (plate.length < 2) return void (hint.textContent = 'Type the number plate first.');
+
+    const btn = $('#qLookup');
+    const label = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Looking…';
+    hint.textContent = 'Checking the DVLA…';
+
+    try {
+      const d = await vehicleLookup(plate);
+      const make = d.make;
+      const year = d.year ?? d.yearOfManufacture;
+      if (make) { setPicker('#qMake', '#qMakeOther', titleCase(make)); refreshQuickModels(); }
+      if (d.model) setPicker('#qModel', '#qModelOther', titleCase(d.model));
+      if (year) $('#qYear').value = year;
+      state.dirty = true;
+      hint.innerHTML = make
+        ? '<strong style="color:var(--green-600)">Found it.</strong> Check it looks right, then put the money in.'
+        : 'Nothing came back for that plate. Fill the boxes in yourself.';
+    } catch (err) {
+      hint.textContent = 'Couldn’t look that up. Fill the boxes in yourself, it all still works.';
+    } finally {
+      btn.disabled = false; btn.textContent = label;
+    }
+  }
+
+  /**
+   * Save the quick add as a draft.
+   * @param {boolean} thenEdit  open the full form on it straight afterwards
+   */
+  async function saveQuick(thenEdit) {
+    const make  = pickerValue('#qMake', '#qMakeOther');
+    const model = pickerValue('#qModel', '#qModelOther');
+    const plate = $('#qReg').value.replace(/\s+/g, '');
+
+    if (!plate && !make) {
+      return msg('#quickMsg', 'Give it a number plate or a make, so you can find it again.', 'warn');
+    }
+
+    const target = int($('#qTarget').value);
+    const record = {
+      status: 'draft',
+      registration: plate || null,
+      make: make || null,
+      model: model || null,
+      year: int($('#qYear').value),
+      purchase_price: int($('#qPaid').value),
+      prep_cost: int($('#qPrep').value),
+      // What you reckon it sells for becomes the starting asking price. It is
+      // a draft, so nobody sees it until somebody publishes it.
+      price: target,
+      private_notes: $('#qNotes').value.trim() || null,
+      updated_at: new Date().toISOString()
+    };
+
+    const btns = [$('#quickSaveBtn'), $('#quickFullBtn')];
+    const labels = btns.map(b => b.textContent);
+    btns.forEach(b => { b.disabled = true; });
+    $('#quickSaveBtn').textContent = 'Saving…';
+    msg('#quickMsg', '');
+
+    try {
+      const { data, error } = await sb.from('cars').insert(record).select().single();
+      if (error) throw error;
+      state.cars.unshift(data);
+      state.dirty = false;
+      renderStock();
+      if (thenEdit) {
+        openForm(data);
+        toast('Saved. Now add the photos and the words', 'ok');
+      } else {
+        go('stock');
+        toast('Saved as a draft. It is in the Drafts tab', 'ok');
+      }
+    } catch (err) {
+      console.error(err);
+      msg('#quickMsg', 'Couldn’t save: ' + esc(err.message || 'unknown error') +
+        '<br>Nothing has been lost. Try again in a moment.', 'err');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } finally {
+      btns.forEach((b, i) => { b.disabled = false; b.textContent = labels[i]; });
+    }
   }
 
   function chipGroup(sel, options, key) {
@@ -623,7 +968,7 @@
 
   /**
    * Equipment chips, grouped the same way they appear on the website.
-   * A well-specced car has 20+ items — as one flat wall of chips that's
+   * A well-specced car has 20+ items. As one flat wall of chips that's
    * unusable on a phone, so it's split into the same categories the car
    * page uses.
    */
@@ -635,7 +980,7 @@
     const known = F ? F.all() : COMMON_FEATURES;
     const all = [...new Set(known.concat([...state.features]))];
 
-    if (!F) {                       // features.js missing — fall back to flat
+    if (!F) {                       // features.js missing, so fall back to flat
       box.innerHTML = all.map(f =>
         `<button class="chip ${state.features.has(f) ? 'is-on' : ''}" type="button"
                  data-f="${esc(f)}">${esc(f)}</button>`).join('');
@@ -681,9 +1026,17 @@
 
     const v = (sel, val) => { $(sel).value = val == null ? '' : val; };
     v('#fReg', car ? fmtReg(car.registration) : '');
-    v('#fMake', car && car.make); v('#fModel', car && car.model);
+
+    // Rebuild the dropdowns first, so this car's make and model are in them
+    fillPicker('#fMake', '#fMakeOther', knownMakes(), 'Choose…');
+    setPicker('#fMake', '#fMakeOther', (car && car.make) || '');
+    fillPicker('#fModel', '#fModelOther', knownModels(car && car.make), 'Choose…');
+    setPicker('#fModel', '#fModelOther', (car && car.model) || '');
+    fillPicker('#fColour', '#fColourOther', COLOURS, 'Choose…');
+    setPicker('#fColour', '#fColourOther', (car && car.colour) || '');
+
     v('#fVariant', car && car.variant); v('#fYear', car && car.year);
-    v('#fColour', car && car.colour); v('#fPrice', car && car.price);
+    v('#fPrice', car && car.price);
     v('#fMileage', car && car.mileage); v('#fEngine', car && car.engine_size);
     v('#fDoors', car && car.doors); v('#fOwners', car && car.previous_owners);
     v('#fMot', car && car.mot_expiry); v('#fService', (car && car.service_history) || '');
@@ -693,6 +1046,8 @@
     v('#fPurchase', car && car.purchase_price);
     v('#fPrep', car && car.prep_cost);
     v('#fPrivateNotes', car && car.private_notes);
+    $('#fFeatured').checked = !!(car && car.featured);
+    renderCostSummary();
 
     setChip('#fFuel', car && car.fuel);
     setChip('#fTrans', car && car.transmission);
@@ -703,7 +1058,7 @@
     renderPhotos();
     renderVideo();
     msg('#formMsg', '');
-    $('#lookupHint').textContent = 'Type the plate and tap Look up — we’ll fill in as much as we can for you.';
+    $('#lookupHint').textContent = 'Type the plate and tap Look up. We’ll fill in what we can.';
     $('#publishBtn').textContent = car && car.status !== 'draft' ? 'Save changes' : 'Publish';
     $('#saveDraftBtn').style.display = car && car.status !== 'draft' ? 'none' : '';
 
@@ -718,8 +1073,8 @@
         <div class="photo-drop">
           ${icon('camera')}
           <h3>Add your photos</h3>
-          <p>Pick them straight from your camera roll.<br>10–15 is plenty. They’re shrunk automatically.</p>
-          <button class="btn btn--brass btn--block" type="button" id="pickBtn">Choose photos</button>
+          <p>Pick them straight from your camera roll.<br>10 to 15 is plenty. They’re shrunk automatically.</p>
+          <button class="btn btn--accent btn--block" type="button" id="pickBtn">Choose photos</button>
         </div>`;
     } else {
       area.innerHTML = `
@@ -777,7 +1132,7 @@
       area.innerHTML = `
         <div class="photo-drop">
           <div style="font-size:30px;font-weight:800;color:var(--navy-800)">${v.progress || 0}%</div>
-          <p style="margin-top:8px">Uploading — keep the app open.<br>
+          <p style="margin-top:8px">Uploading. Keep the app open.<br>
              Video takes a while, especially on mobile data.</p>
         </div>`;
       return;
@@ -825,7 +1180,7 @@
 
     if (file.size > MAX_VIDEO_BYTES) {
       msg('#formMsg',
-        `That video is ${(file.size / 1048576).toFixed(0)}MB — too big to upload reliably.<br><br>
+        `That video is ${(file.size / 1048576).toFixed(0)}MB. Too big to upload reliably.<br><br>
          Either record a shorter clip, or turn the quality down:
          <strong>iPhone Settings → Camera → Record Video → 1080p at 30fps</strong>.
          That alone usually cuts it by two thirds.`, 'warn');
@@ -857,7 +1212,7 @@
       console.error(err);
       state.video = null;
       msg('#formMsg', 'Video didn’t upload: ' + esc(err.message || 'unknown error') +
-        '<br>Try again on wi-fi — everything else you’ve typed is safe.', 'err');
+        '<br>Try again on wi-fi. Everything else you’ve typed is safe.', 'err');
     }
     renderVideo();
   }
@@ -877,7 +1232,7 @@
         canvas.width = w; canvas.height = h;
         const ctx = canvas.getContext('2d');
         ctx.imageSmoothingQuality = 'high';
-        // JPEG has no transparency — without this, a PNG with a clear
+        // JPEG has no transparency, so without this a PNG with a clear
         // background comes out with black patches.
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, w, h);
@@ -921,7 +1276,7 @@
           }
         } catch { reject(new Error('Upload failed')); }
       };
-      xhr.onerror = () => reject(new Error('No connection — try again on wi-fi'));
+      xhr.onerror = () => reject(new Error('No connection. Try again on wi-fi'));
       xhr.send(fd);
     });
   }
@@ -955,7 +1310,7 @@
         state.photos = state.photos.filter(x => x !== p);
         console.error(err);
         msg('#formMsg', esc(err.message || 'A photo failed to upload.') +
-          ' The rest are fine — you can try that one again.', 'err');
+          ' The rest are fine, so try that one again.', 'err');
       }
       renderPhotos();
     }
@@ -964,6 +1319,39 @@
   }
 
   /* ======================================================= DVLA LOOKUP */
+  /**
+   * Ask the lookup functions about a number plate and hand back whatever they
+   * know. Shared by the full form and the quick add screen, so there is only
+   * one copy of the fallback logic.
+   * @param {string} plate  no spaces, upper case
+   * @returns {Promise<object>}
+   */
+  async function vehicleLookup(plate) {
+    const { data: { session } } = await sb.auth.getSession();
+    const auth = 'Bearer ' + (session ? session.access_token : SB_KEY);
+    const call = fn => fetch(`${CFG.supabase.url}/functions/v1/${fn}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: auth },
+      body: JSON.stringify({ registrationNumber: plate })
+    });
+
+    // Try the combined DVLA + MOT lookup, and fall back to the DVLA-only one
+    // if that function hasn't been deployed. (See runValuation for why the
+    // 404 has to be inspected rather than trusted.)
+    let res = await call('vehicle-lookup');
+    let d = null;
+    try { d = await res.json(); } catch { /* not JSON */ }
+
+    if (res.status === 404 && !(d && d.error)) {
+      res = await call('dvla-lookup');
+      try { d = await res.json(); } catch { d = null; }
+    }
+
+    if (!res.ok) throw new Error((d && d.error) || 'Lookup unavailable');
+    if (!d) throw new Error('The lookup service returned something unexpected.');
+    return d;
+  }
+
   async function dvlaLookup() {
     const raw = $('#fReg').value.replace(/\s+/g, '').toUpperCase();
     const hint = $('#lookupHint');
@@ -974,28 +1362,7 @@
     hint.textContent = 'Checking with the DVLA…';
 
     try {
-      const { data: { session } } = await sb.auth.getSession();
-      const auth = 'Bearer ' + (session ? session.access_token : SB_KEY);
-      const call = fn => fetch(`${CFG.supabase.url}/functions/v1/${fn}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: auth },
-        body: JSON.stringify({ registrationNumber: raw })
-      });
-
-      // Try the combined DVLA + MOT lookup; fall back to the DVLA-only one
-      // if that function hasn't been deployed (see runValuation for why the
-      // 404 has to be inspected rather than trusted).
-      let res = await call('vehicle-lookup');
-      let d = null;
-      try { d = await res.json(); } catch { /* not JSON */ }
-
-      if (res.status === 404 && !(d && d.error)) {
-        res = await call('dvla-lookup');
-        try { d = await res.json(); } catch { d = null; }
-      }
-
-      if (!res.ok) throw new Error((d && d.error) || 'Lookup unavailable');
-      if (!d) throw new Error('The lookup service returned something unexpected.');
+      const d = await vehicleLookup(raw);
 
       const set = (sel, val) => { if (val != null && val !== '' && !$(sel).value) $(sel).value = val; };
       const force = (sel, val) => { if (val != null && val !== '') $(sel).value = val; };
@@ -1008,10 +1375,13 @@
       const litres = d.engineLitres ?? (d.engineCapacity ? d.engineCapacity / 1000 : null);
       const miles  = d.mot && d.mot.latestMileage != null ? d.mot.latestMileage : null;
 
-      if (make)   force('#fMake', titleCase(make));
-      if (model)  force('#fModel', titleCase(model));
+      if (make) {
+        setPicker('#fMake', '#fMakeOther', titleCase(make));
+        refreshFormModels();
+      }
+      if (model)  setPicker('#fModel', '#fModelOther', titleCase(model));
       if (year)   force('#fYear', year);
-      if (d.colour) force('#fColour', titleCase(d.colour));
+      if (d.colour) setPicker('#fColour', '#fColourOther', titleCase(d.colour));
       if (litres) force('#fEngine', Number(litres).toFixed(1));
       if (d.motExpiryDate) set('#fMot', String(d.motExpiryDate).slice(0, 10));
       if (miles != null) set('#fMileage', miles);
@@ -1027,14 +1397,14 @@
            engine filled in${miles != null ? ', plus the mileage from its last MOT' : ''}.
            Check the mileage against the clock and add the trim.`
         : `<strong style="color:var(--green-600)">Found it.</strong> Filled in what the DVLA knows.
-           You’ll still need the model, trim and mileage — they don’t hold those.`;
+           You’ll still need the model, trim and mileage. The DVLA don’t hold those.`;
       $(model ? '#fVariant' : '#fModel').focus();
       toast('Details filled in', 'ok');
 
     } catch (err) {
       console.error(err);
       hint.innerHTML = `<strong style="color:var(--amber-600)">Couldn’t look that up.</strong>
-        ${esc(err.message)} — just type the details in yourself, it all still works.`;
+        Just type the details in yourself, it all still works. (${esc(err.message)})`;
     } finally {
       btn.disabled = false; btn.textContent = 'Look up';
     }
@@ -1045,13 +1415,15 @@
   /* ================================================ DESCRIPTION HELPER */
   function draftDescription() {
     const g = sel => $(sel).value.trim();
-    const year = g('#fYear'), make = g('#fMake'), model = g('#fModel'), variant = g('#fVariant');
+    const year = g('#fYear'), variant = g('#fVariant');
+    const make  = pickerValue('#fMake', '#fMakeOther');
+    const model = pickerValue('#fModel', '#fModelOther');
     if (!make || !model) { toast('Add the make and model first'); return; }
 
     const miles = int(g('#fMileage'));
     const fuel = chipValue('#fFuel'), trans = chipValue('#fTrans');
     const service = g('#fService'), hpi = g('#fHpi'), owners = int(g('#fOwners'));
-    const mot = g('#fMot'), colour = g('#fColour');
+    const mot = g('#fMot'), colour = pickerValue('#fColour', '#fColourOther');
     const feats = [...state.features];
 
     const bits = [];
@@ -1066,7 +1438,7 @@
 
     if (trans === 'automatic') bits.push('Automatic gearbox.');
     if (fuel === 'diesel' && miles > 60000) bits.push('The diesel is well suited to longer runs and is economical with it.');
-    if (fuel === 'electric') bits.push('Fully electric — nothing to pay in road tax and very cheap to run.');
+    if (fuel === 'electric') bits.push('Fully electric, so nothing to pay in road tax and very cheap to run.');
 
     if (feats.length) {
       bits.push(`Equipment includes ${feats.slice(0, 6).map(f => f.toLowerCase()).join(', ')}${feats.length > 6 ? ' and more' : ''}.`);
@@ -1076,37 +1448,39 @@
       if (!isNaN(d)) bits.push(`MOT runs to ${d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}.`);
     }
     if (hpi && hpi !== 'clear') {
-      bits.push(`This car is a ${LABEL.hpi[hpi]} — see the note above about the damage and how it was repaired. It is priced to reflect that.`);
+      bits.push(`This car is a ${LABEL.hpi[hpi]}. See the note above about the damage and how it was repaired. It is priced to reflect that.`);
     } else {
       bits.push('HPI clear.');
     }
-    bits.push('Serviced, MOT’d and checked over by us before it goes out. Viewings welcome seven days a week — give us a ring and we’ll have it ready for you.');
+    bits.push('Serviced, MOT’d and checked over by us before it goes out. Viewings welcome seven days a week, so give us a ring and we’ll have it ready for you.');
 
     $('#fDescription').value = bits.join(' ');
     state.dirty = true;
-    toast('Description written — have a read and change anything', 'ok');
+    toast('Description written. Have a read and change anything', 'ok');
     $('#fDescription').focus();
   }
 
   /* ============================================================== SAVE */
   async function save(status) {
     const g = sel => $(sel).value.trim();
+    const make  = pickerValue('#fMake', '#fMakeOther');
+    const model = pickerValue('#fModel', '#fModelOther');
     const problems = [];
-    if (!g('#fMake')) problems.push('make');
-    if (!g('#fModel')) problems.push('model');
+    if (!make) problems.push('make');
+    if (!model) problems.push('model');
     if (status !== 'draft') {
       if (!g('#fYear')) problems.push('year');
       if (!g('#fPrice')) problems.push('price');
       if (!g('#fMileage')) problems.push('mileage');
       if (!state.photos.some(p => p.public_id)) problems.push('at least one photo');
-      // The damage explanation is encouraged but NOT required — you can
+      // The damage explanation is encouraged but NOT required. You can
       // publish a Cat S/N car without it and add the wording later.
     }
     if (state.photos.some(p => p.uploading)) {
-      return msg('#formMsg', 'Hang on — photos are still uploading.', 'warn');
+      return msg('#formMsg', 'Photos are still uploading. Give them a second.', 'warn');
     }
     if (state.video && state.video.uploading) {
-      return msg('#formMsg', 'Hang on — the video is still uploading.', 'warn');
+      return msg('#formMsg', 'The video is still uploading. Give it a second.', 'warn');
     }
     if (problems.length) {
       msg('#formMsg', 'Still needed: <strong>' + problems.join(', ') + '</strong>.', 'warn');
@@ -1117,13 +1491,14 @@
     const record = {
       status,
       registration: g('#fReg').replace(/\s+/g, '') || null,
-      make: g('#fMake') || null,
-      model: g('#fModel') || null,
+      make: make || null,
+      model: model || null,
       variant: g('#fVariant') || null,
       year: int(g('#fYear')),
       price: int(g('#fPrice')),
       mileage: int(g('#fMileage')),
-      colour: g('#fColour') || null,
+      colour: pickerValue('#fColour', '#fColourOther') || null,
+      featured: $('#fFeatured').checked,
       fuel: chipValue('#fFuel'),
       transmission: chipValue('#fTrans'),
       body_type: chipValue('#fBody'),
@@ -1135,13 +1510,13 @@
       hpi_status: g('#fHpi') || null,
       condition_notes: g('#fCondition') || null,
       description: g('#fDescription') || null,
-      // Private — excluded from the public view, so these never reach the website
+      // Private. Excluded from the public view, so these never reach the website
       purchase_price: int(g('#fPurchase')),
       prep_cost: int(g('#fPrep')),
       private_notes: g('#fPrivateNotes') || null,
       features: [...state.features],
-      // Only keep photos that actually finished uploading and have an id —
-      // a half-finished one would render as a broken image on the website.
+      // Only keep photos that actually finished uploading and have an id.
+      // A half-finished one would render as a broken image on the website.
       images: state.photos
         .filter(p => !p.uploading && p.public_id)
         .map(p => ({ public_id: p.public_id, width: p.width, height: p.height })),
@@ -1173,7 +1548,7 @@
     } catch (err) {
       console.error(err);
       msg('#formMsg', 'Couldn’t save: ' + esc(err.message || 'unknown error') +
-        '<br>Nothing has been lost — try again in a moment.', 'err');
+        '<br>Nothing has been lost. Try again in a moment.', 'err');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       btn.disabled = false; btn.textContent = label;
@@ -1312,8 +1687,7 @@
 
       if (!unread.length) {
         list.innerHTML = `<div class="empty">${icon('inbox')}<h3>Nothing new</h3>
-          <p>You’re all caught up. Anything that comes in from the website
-          lands here.</p></div>`;
+          <p>Anything that comes in from the website lands here.</p></div>`;
         return;
       }
       list.innerHTML = unread.map(x => x.t === 'r' ? requestRow(x.d) : enquiryRow(x.d)).join('');
@@ -1502,9 +1876,9 @@
     }
 
     const bands = [
-      ['critical', 'Over 90 days — losing you money', 'var(--red-600)'],
-      ['overdue',  '60 to 90 days — review the price', 'var(--amber-600)'],
-      ['watch',    '45 to 60 days — keep an eye on it', 'var(--ink-2)'],
+      ['critical', 'Over 90 days and losing you money', 'var(--red-600)'],
+      ['overdue',  '60 to 90 days, worth a price review', 'var(--amber-600)'],
+      ['watch',    '45 to 60 days, keep an eye on it', 'var(--ink-2)'],
       ['fine',     'Fresh stock', 'var(--green-600)']
     ];
 
@@ -1541,7 +1915,7 @@
             : `No history on this model to compare against.`}
           <br>
           ${nf(c.views)} views, ${nf(c.contacts)} got in touch.
-          ${c.views >= 25 && c.contacts === 0 ? '<strong style="color:var(--red-600)">Plenty of interest, nobody ringing — that\'s a price problem.</strong>' : ''}
+          ${c.views >= 25 && c.contacts === 0 ? '<strong style="color:var(--red-600)">Plenty of interest but nobody ringing. That\'s a price problem.</strong>' : ''}
           ${lastChange != null ? `<br>Price last changed ${lastChange} days ago.` : '<br>Price never changed.'}
         </div>
 
@@ -1563,7 +1937,7 @@
     return `
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
         ${statTile(counts[0], 'Over 90 days', counts[0] ? 'var(--red-600)' : null)}
-        ${statTile(counts[1], '60–90 days', counts[1] ? 'var(--amber-600)' : null)}
+        ${statTile(counts[1], '60 to 90 days', counts[1] ? 'var(--amber-600)' : null)}
         ${statTile(counts[3], 'Fresh', 'var(--green-600)')}
       </div>
 
@@ -1602,13 +1976,13 @@
     if (price === car.price) return;
 
     const { error } = await sb.from('cars').update({ price }).eq('id', car.id);
-    if (error) return toast('Couldn’t update — ' + error.message);
+    if (error) return toast('Couldn’t update: ' + error.message);
 
     const wentDown = car.price != null && price < car.price;
     car.price = price;
     renderStock();
     loadInsights();
-    toast(wentDown ? 'Reduced — badge is live on the website' : 'Price updated', 'ok');
+    toast(wentDown ? 'Reduced. Badge is live on the website' : 'Price updated', 'ok');
   }
 
   const nf = n => Number(n || 0).toLocaleString('en-GB');
@@ -1638,8 +2012,8 @@
 
     if (!totalViews && !stats.length) {
       return `<div class="empty">${icon('car')}<h3>Nothing to show yet</h3>
-        <p>Once the website has had some visitors, this is where you'll see which
-        cars people are actually looking at.</p></div>`;
+        <p>Once the website has had a few visitors you'll see which cars people
+        are actually looking at.</p></div>`;
     }
 
     /* Ranked list of live stock by interest */
@@ -1668,7 +2042,7 @@
           <div><b style="font-size:17px">${nf(c.views)}</b><br><span style="font-size:11px;color:var(--ink-3)">views</span></div>
           <div><b style="font-size:17px">${nf(c.gallery_opens)}</b><br><span style="font-size:11px;color:var(--ink-3)">photos</span></div>
           <div><b style="font-size:17px">${nf(contacts)}</b><br><span style="font-size:11px;color:var(--ink-3)">contacts</span></div>
-          <div><b style="font-size:17px">${c.contact_rate_pct != null ? c.contact_rate_pct + '%' : '—'}</b><br><span style="font-size:11px;color:var(--ink-3)">rate</span></div>
+          <div><b style="font-size:17px">${c.contact_rate_pct != null ? c.contact_rate_pct + '%' : 'n/a'}</b><br><span style="font-size:11px;color:var(--ink-3)">rate</span></div>
         </div>
       </div></div>`;
     }).join('');
@@ -1680,7 +2054,7 @@
 
     if (sitting.length) {
       advice.push(`<strong>${sitting.length} car${sitting.length === 1 ? ' has' : 's have'} been here over 60 days.</strong>
-        Worth a price review — the longer they sit the more they cost you.`);
+        Worth a price review. The longer they sit the more they cost you.`);
     }
     if (ignored.length) {
       advice.push(`<strong>${ignored.length} car${ignored.length === 1 ? ' is' : 's are'} getting looked at but nobody's making contact.</strong>
@@ -1691,8 +2065,8 @@
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">
         ${statTile(nf(totalViews), 'Car views')}
         ${statTile(nf(totalContacts), 'People made contact', 'var(--green-600)')}
-        ${statTile(avgDays != null ? avgDays + ' days' : '—', 'Avg time to sell')}
-        ${statTile(withMargin.length ? money(totalMargin) : '—', 'Total margin', 'var(--brass-600)')}
+        ${statTile(avgDays != null ? avgDays + ' days' : 'Not yet', 'Avg time to sell')}
+        ${statTile(withMargin.length ? money(totalMargin) : 'Not yet', 'Total margin', 'var(--accent-600)')}
       </div>
 
       ${withMargin.length === 0 ? `
@@ -1704,7 +2078,7 @@
       ${advice.map(a => `<div class="msg msg--warn is-shown" style="margin-bottom:10px">${a}</div>`).join('')}
 
       <div class="section-card">
-        <h2>In stock — most interest first</h2>
+        <h2>In stock, most interest first</h2>
         ${rows || '<p class="hint">No cars in stock at the moment.</p>'}
       </div>
 
@@ -1752,7 +2126,7 @@
       ${top && top.requests >= 2 ? `
         <div class="msg msg--info is-shown" style="margin-bottom:14px">
           <strong>${esc(top.make)}${top.model && top.model !== 'Any' ? ' ' + esc(top.model) : ''}
-          is your most requested car</strong> — ${top.requests} people asked${top.avg_budget ? `, averaging ${money(top.avg_budget)}` : ''}.
+          is your most requested car</strong>. ${top.requests} people asked${top.avg_budget ? `, averaging ${money(top.avg_budget)}` : ''}.
           Worth looking out for at the next auction.
         </div>` : ''}
 
@@ -1821,7 +2195,7 @@
   /** Turn an array of records into a CSV file and hand it to the browser. */
   function downloadCsv(name, rows, quiet) {
     if (!rows || !rows.length) { if (!quiet) toast('Nothing to export yet'); return; }
-    // Union of keys, not just the first row's — Supabase omits nulls sometimes
+    // Union of keys, not just the first row's, because Supabase omits nulls sometimes
     const cols = [...new Set(rows.flatMap(r => Object.keys(r)))];
     const cell = v => {
       if (v == null) return '';
@@ -1877,21 +2251,21 @@
 
     /* ---- Facebook Marketplace ---------------------------------------------
        Their vehicle listings have structured fields, so the description just
-       needs to add what the fields don't cover. Keep it plain — Marketplace
-       buyers scroll fast. */
+       needs to add what the fields don't cover. Keep it plain because
+       Marketplace buyers scroll fast. */
     const facebook =
-`${full}${car.price != null ? ' — £' + nf(car.price) : ''}
+`${full}${car.price != null ? ' | £' + nf(car.price) : ''}
 
 ${facts.join(' • ')}
 
 ${car.description || ''}${honesty}
 
-${feats.length ? 'Spec: ' + feats.join(', ') + '\n\n' : ''}Part exchange welcome. No admin fees — the price is the price.
+${feats.length ? 'Spec: ' + feats.join(', ') + '\n\n' : ''}Part exchange welcome and no admin fees. The price is the price.
 Viewings by appointment 7 days a week in ${B.town}.
 
 Message here or WhatsApp ${B.phone}.`;
 
-    /* ---- Gumtree — allows more detail, buyers read further ---------------- */
+    /* ---- Gumtree: allows more detail, buyers read further ---------------- */
     const gumtree =
 `${full}${car.price != null ? ' | £' + nf(car.price) : ''} | ${car.mileage != null ? nf(car.mileage) + ' miles' : ''}
 
@@ -1905,11 +2279,11 @@ WHY BUY FROM US
 - HPI checked before it goes on sale, and we tell you up front about any history
 - Serviced, MOT'd and road tested by us before you collect
 - Part exchange welcome, no admin fees
-- Family run business in ${B.town} — you deal with the people who prepared the car
+- Family run business in ${B.town}, so you deal with the people who prepared the car
 
 Call or WhatsApp ${B.phone} to arrange a viewing.`;
 
-    /* ---- Instagram — short, no links work in captions --------------------- */
+    /* ---- Instagram: short, no links work in captions --------------------- */
     const tags = ['#usedcars', '#carsforsale', '#newcastle', '#northeast',
       '#cardealer', '#carsofinstagram',
       car.make ? '#' + String(car.make).toLowerCase().replace(/[^a-z0-9]/g, '') : '',
@@ -1918,10 +2292,10 @@ Call or WhatsApp ${B.phone} to arrange a viewing.`;
     ].filter(Boolean);
 
     const instagram =
-`${full}${car.price != null ? ' — £' + nf(car.price) : ''}
+`${full}${car.price != null ? ' | £' + nf(car.price) : ''}
 
 ${facts.slice(0, 5).join(' • ')}
-${car.hpi_status && car.hpi_status !== 'clear' ? '\n' + (LABEL.hpi[car.hpi_status] || '') + ' — fully disclosed, priced accordingly\n' : ''}
+${car.hpi_status && car.hpi_status !== 'clear' ? '\n' + (LABEL.hpi[car.hpi_status] || '') + '. Fully disclosed and priced accordingly\n' : ''}
 ${(car.description || '').split(/[.!?]/).slice(0, 2).join('. ').trim()}${car.description ? '.' : ''}
 
 DM or WhatsApp ${B.phone} to arrange a viewing.
@@ -1929,11 +2303,11 @@ Newcastle upon Tyne.
 
 ${tags.join(' ')}`;
 
-    /* ---- Auto Trader — spec-led, buyers are comparing like for like ------- */
+    /* ---- Auto Trader: spec-led, buyers are comparing like for like ------- */
     const autotrader =
 `${car.description || ''}${honesty}
 
-${feats.length ? 'Equipment includes: ' + feats.join(', ') + '.\n\n' : ''}Every car we sell is HPI checked, serviced and MOT'd before collection, and we are upfront about any history. Part exchange welcome and there are no admin fees — the advertised price is what you pay.
+${feats.length ? 'Equipment includes: ' + feats.join(', ') + '.\n\n' : ''}Every car we sell is HPI checked, serviced and MOT'd before collection, and we are upfront about any history. Part exchange welcome and there are no admin fees. The advertised price is what you pay.
 
 Viewings by appointment seven days a week in ${B.town}. Call or message to arrange a time and we will have the car ready for you.`;
 
@@ -1967,8 +2341,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
           style="min-height:110px;font-size:14px;background:var(--bg)">${esc(text)}</textarea>
       </div>`).join('') +
       `<p class="hint" style="padding:4px 4px 0">
-         Tap Copy, open the app, and paste. Your photos are already in your
-         camera roll from when you took them.
+         Tap Copy, open the app and paste.
        </p>`;
 
     $$('#sheetActions [data-copy]').forEach(btn => {
@@ -1997,11 +2370,11 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
      --------------------------------------------------------------------------
      Type a plate, get a decision. Three things stacked together:
 
-       1. What the car IS      — DVLA + full MOT history, clocking checks,
+       1. What the car IS:       DVLA + full MOT history, clocking checks,
                                  advisories, anything that should worry you
-       2. What YOU know        — every one of these you've traded before:
+       2. What YOU know:         every one of these you've traded before:
                                  what you paid, what you got, how long it sat
-       3. What it's WORTH TO YOU — work backwards from a realistic sale price
+       3. What it's WORTH TO YOU: work backwards from a realistic sale price
                                  through fees, prep and margin to a max bid
 
      The number at the bottom is the only one that matters: walk away above it.
@@ -2068,7 +2441,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
             fuelType: d.fuelType, engineLitres: d.engineCapacity ? +(d.engineCapacity / 1000).toFixed(1) : null,
             motExpiryDate: d.motExpiryDate, taxStatus: d.taxStatus,
             mot: null,
-            flags: [{ level: 'warn', text: 'MOT history isn’t switched on — you’re only seeing the DVLA record. See SETUP.md to add it.' }]
+            flags: [{ level: 'warn', text: 'MOT history isn’t switched on, so you’re only seeing the DVLA record. See SETUP.md to add it.' }]
           };
           renderValuation();
           return;
@@ -2152,7 +2525,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
   function autoTraderSearchUrl(v, mileage) {
     const p = new URLSearchParams();
     p.set('postcode', (CFG.business.searchPostcode || 'NE1 1AA').replace(/\s+/g, ''));
-    p.set('radius', '1500');                       // national — we want the market, not the neighbours
+    p.set('radius', '1500');                       // national: we want the market, not the neighbours
     if (v.make)  p.set('make', v.make);
     if (v.model) p.set('model', v.model);
     if (v.year) {
@@ -2195,13 +2568,13 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         <div class="f" style="margin-top:16px;margin-bottom:0">
           <label for="pcTypical">What most were around <span class="req">*</span></label>
           <div class="money"><input class="in" id="pcTypical" type="number" inputmode="numeric" placeholder="0"></div>
-          <span class="hint">This is the one that matters — it becomes your sell price.</span>
+          <span class="hint">This is the one that matters. It becomes your sell price.</span>
         </div>
         <div class="f" style="margin-top:16px;margin-bottom:0">
           <label for="pcNotes">Anything worth remembering?</label>
           <input class="in" id="pcNotes" placeholder="e.g. all had higher miles, cheapest was a Cat N">
         </div>
-        <button class="btn btn--brass btn--block" id="pcSave" style="margin-top:16px">
+        <button class="btn btn--accent btn--block" id="pcSave" style="margin-top:16px">
           Save and use this price
         </button>
       </div>`;
@@ -2232,7 +2605,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         toast('Saved to your price book', 'ok');
       }
 
-      // Feed it straight into the calculator — that's the whole point
+      // Feed it straight into the calculator, which is the whole point
       const sale = $('#bSale');
       if (sale) { sale.value = typical; calcBid(); sale.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
       refreshPriceBlock(v, mileage);
@@ -2260,7 +2633,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
 
       ${history === null ? `
         <p class="hint" style="margin-top:12px">
-          Price book not set up yet — run <strong>schema-v3-price-book.sql</strong> in Supabase
+          Price book not set up yet. Run <strong>schema-v3-price-book.sql</strong> in Supabase
           and your checks will start being remembered.
         </p>`
       : seen.length ? `
@@ -2276,7 +2649,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
               </span>
               <span style="font-weight:700">${money(h.typical)}</span>
             </div>`).join('')}
-          <button class="btn btn--brass btn--block btn--sm" id="pcUse" style="margin-top:12px">
+          <button class="btn btn--accent btn--block btn--sm" id="pcUse" style="margin-top:12px">
             Use ${money(avgSeen)} as the sell price
           </button>
         </div>`
@@ -2334,7 +2707,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     return `
       <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;overflow:visible" role="img"
            aria-label="Mileage recorded at each MOT">
-        <polyline points="${pts.join(' ')}" fill="none" stroke="#C4933C" stroke-width="2.5"
+        <polyline points="${pts.join(' ')}" fill="none" stroke="#2A62B4" stroke-width="2.5"
                   stroke-linejoin="round" stroke-linecap="round"/>
         ${dots}
       </svg>
@@ -2372,7 +2745,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         <div style="font-size:14.5px;color:var(--ink-3)">${esc(spec || 'No details returned')}</div>
         ${!v.found?.mot ? `<p class="hint" style="margin-top:10px">
           MOT history unavailable${v.motUnavailableReason === 'no_key'
-            ? ' — add the free MOT API keys to see mileage history and advisories.' : '.'}
+            ? '. Add the free MOT API keys to see mileage history and advisories.' : '.'}
         </p>` : ''}
       </div>
 
@@ -2387,9 +2760,9 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         <h2>Mileage history</h2>
         ${mileageChart(mot.readings)}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;text-align:center">
-          <div><b style="font-size:19px">${mot.recentMilesPerYear != null ? nf(mot.recentMilesPerYear) : '—'}</b>
+          <div><b style="font-size:19px">${mot.recentMilesPerYear != null ? nf(mot.recentMilesPerYear) : 'n/a'}</b>
             <br><span style="font-size:11.5px;color:var(--ink-3)">MILES/YR RECENTLY</span></div>
-          <div><b style="font-size:19px">${mot.passRate != null ? mot.passRate + '%' : '—'}</b>
+          <div><b style="font-size:19px">${mot.passRate != null ? mot.passRate + '%' : 'n/a'}</b>
             <br><span style="font-size:11.5px;color:var(--ink-3)">MOT PASS RATE</span></div>
         </div>
       </div>` : ''}
@@ -2415,20 +2788,21 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
           </p>
           <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;text-align:center">
             <div class="card" style="padding:12px 6px;margin:0">
-              <b style="font-size:19px">${hist.avgBought != null ? money(hist.avgBought) : '—'}</b>
+              <b style="font-size:19px">${hist.avgBought != null ? money(hist.avgBought) : 'n/a'}</b>
               <br><span style="font-size:11.5px;color:var(--ink-3)">AVG PAID</span></div>
             <div class="card" style="padding:12px 6px;margin:0">
-              <b style="font-size:19px;color:var(--green-600)">${hist.avgSold != null ? money(hist.avgSold) : '—'}</b>
+              <b style="font-size:19px;color:var(--green-600)">${hist.avgSold != null ? money(hist.avgSold) : 'n/a'}</b>
               <br><span style="font-size:11.5px;color:var(--ink-3)">AVG SOLD</span></div>
             <div class="card" style="padding:12px 6px;margin:0">
-              <b style="font-size:19px">${hist.avgDays != null ? hist.avgDays + ' days' : '—'}</b>
+              <b style="font-size:19px">${hist.avgDays != null ? hist.avgDays + ' days' : 'n/a'}</b>
               <br><span style="font-size:11.5px;color:var(--ink-3)">AVG TO SELL</span></div>
             <div class="card" style="padding:12px 6px;margin:0">
-              <b style="font-size:19px;color:var(--brass-600)">${hist.avgMargin != null ? money(hist.avgMargin) : '—'}</b>
+              <b style="font-size:19px;color:var(--accent-600)">${hist.avgMargin != null ? money(hist.avgMargin) : 'n/a'}</b>
               <br><span style="font-size:11.5px;color:var(--ink-3)">AVG MARGIN</span></div>
           </div>`
-        : `<p class="hint">You haven't traded one of these before — nothing to compare against.
-             The figures build up as you record what you pay and what you sell for.</p>`}
+        : `<p class="hint">You haven't traded one of these before, so there's nothing to
+             compare against. The figures build up as you record what you pay and what you
+             sell for.</p>`}
       </div>
 
       ${reqs.length ? `
@@ -2462,8 +2836,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
           <div class="money"><input class="in" id="bSale" type="number" inputmode="numeric"
             value="${hist && hist.avgSold != null ? hist.avgSold : ''}" placeholder="0"></div>
           ${hist && hist.avgSold != null
-            ? `<span class="hint">Filled in from what you've actually achieved on these. Check Auto Trader above if you want to sanity-check it.</span>`
-            : `<span class="hint">Use the Auto Trader check above rather than guessing — the whole calculation rests on this number.</span>`}
+            ? `<span class="hint">Filled in from what you've actually achieved on these. Check Auto Trader above if you want to double-check it.</span>`
+            : `<span class="hint">Use the Auto Trader check above rather than guessing. The whole calculation rests on this number.</span>`}
         </div>
         <div class="row-2">
           <div class="f">
@@ -2493,8 +2867,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         </button>
       </div>
 
-      <button class="btn btn--brass btn--block" id="vAddCar" style="margin-bottom:10px">
-        I bought it — add to stock
+      <button class="btn btn--accent btn--block" id="vAddCar" style="margin-bottom:10px">
+        I bought it, add to stock
       </button>
       <button class="btn btn--outline btn--block" id="vClear">Check another car</button>
       <div style="height:10px"></div>`;
@@ -2520,7 +2894,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         marginPct: num($('#bMargin').value) ?? 22
       };
       try { localStorage.setItem(BID_DEFAULTS_KEY, JSON.stringify(bidDefaults)); } catch {}
-      toast('Saved — these will be filled in next time', 'ok');
+      toast('Saved. These will be filled in next time', 'ok');
     };
     calcBid();
   }
@@ -2542,8 +2916,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     const marginPct = num($('#bMargin').value) ?? 0;
 
     // Work backwards: sale price, less the margin you want, less prep and
-    // transport, gives the total you can afford to pay at the auction —
-    // and the hammer price plus fee has to fit inside that.
+    // transport, gives the total you can afford to pay at the auction.
+    // The hammer price plus fee has to fit inside that.
     const wantedMargin = Math.round(sale * (marginPct / 100));
     const affordableAllIn = sale - wantedMargin - prep - transport;
     const maxBid = Math.floor(affordableAllIn / (1 + feePct / 100));
@@ -2563,7 +2937,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       <div style="background:linear-gradient(150deg,var(--navy-800),var(--navy-900));
                   border-radius:var(--r-lg);padding:22px 18px;text-align:center;color:#fff">
         <div style="font-size:12px;font-weight:800;letter-spacing:.1em;color:#A8B6CC">MAXIMUM BID</div>
-        <div style="font-size:44px;font-weight:800;letter-spacing:-.04em;color:var(--brass-400);line-height:1.05;margin:4px 0">
+        <div style="font-size:44px;font-weight:800;letter-spacing:-.04em;color:var(--accent-300);line-height:1.05;margin:4px 0">
           ${money(maxBid)}
         </div>
         <div style="font-size:13.5px;color:#B6C4D8">Stop bidding above this</div>
@@ -2586,25 +2960,25 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       </div>`;
   }
 
-  /** Bought it — start a draft with everything already filled in. */
+  /** Bought it, so start a draft with everything already filled in. */
   function createFromLookup() {
     const v = vehicle;
     if (!v) return;
 
-    const bid = prompt('What did you pay for it?\n\nHammer price including fees — private, never shown on the website.', '');
+    const bid = prompt('What did you pay for it?\n\nHammer price including fees. Private, never shown on the website.', '');
     if (bid === null) return;
     const paidNum = parseInt(String(bid).replace(/[^0-9]/g, ''), 10);
 
     openForm(null);
     $('#fReg').value = fmtReg(v.registration);
-    if (v.make) $('#fMake').value = v.make;
-    if (v.model) $('#fModel').value = v.model;
+    if (v.make) { setPicker('#fMake', '#fMakeOther', v.make); refreshFormModels(); }
+    if (v.model) setPicker('#fModel', '#fModelOther', v.model);
     if (v.year) $('#fYear').value = v.year;
-    if (v.colour) $('#fColour').value = v.colour;
+    if (v.colour) setPicker('#fColour', '#fColourOther', v.colour);
     if (v.engineLitres) $('#fEngine').value = v.engineLitres;
     if (v.motExpiryDate) $('#fMot').value = String(v.motExpiryDate).slice(0, 10);
     if (v.mot && v.mot.latestMileage != null) $('#fMileage').value = v.mot.latestMileage;
-    if (!isNaN(paidNum)) $('#fPurchase').value = paidNum;
+    if (!isNaN(paidNum)) { $('#fPurchase').value = paidNum; renderCostSummary(); }
 
     const fuelMap = { PETROL:'petrol', DIESEL:'diesel', HYBRID:'hybrid',
                       'HYBRID ELECTRIC':'hybrid', ELECTRICITY:'electric', ELECTRIC:'electric' };
@@ -2617,7 +2991,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     }
 
     state.dirty = true;
-    toast('Started from the plate — add photos and a price', 'ok');
+    toast('Started from the plate. Add photos and a price', 'ok');
   }
 
   /* =============================================== LEAVE-PAGE WARNING */

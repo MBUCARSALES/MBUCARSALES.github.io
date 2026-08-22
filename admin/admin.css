@@ -1,23 +1,25 @@
 /* ==========================================================================
-   MBU ADMIN — phone-first styling
+   MBU ADMIN / phone-first styling
    Big tap targets, big type, nothing clever. Designed to be used one-handed
    in a car park with cold fingers.
    ========================================================================== */
 
 :root {
-  --navy-900: #0D1626;
-  --navy-800: #12203A;
-  --navy-700: #1B2E4F;
-  --brass-500: #C4933C;
-  --brass-400: #D9AD5C;
-  --brass-100: #F7EEDC;
+  /* Same colours as the website, taken from the logo. See style.css. */
+  --navy-900: #0A1830;
+  --navy-800: #0F2246;
+  --navy-700: #17305E;
+  --accent-600: #1E4C8F;
+  --accent-500: #2A62B4;
+  --accent-300: #8FB4EA;
+  --accent-100: #E8EFFA;
 
-  --ink: #131820;
-  --ink-2: #3A4453;
-  --ink-3: #6B7686;
-  --ink-4: #99A2AF;
-  --line: #E1E6ED;
-  --line-2: #EFF2F6;
+  --ink: #101724;
+  --ink-2: #38414F;
+  --ink-3: #6E7688;
+  --ink-4: #9AA1B0;
+  --line: #DFE4EB;
+  --line-2: #EDF0F5;
   --bg: #F4F6FA;
   --card: #FFFFFF;
 
@@ -59,7 +61,7 @@ a { color: inherit; text-decoration: none; }
 ul { list-style: none; padding: 0; }
 h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
 
-:focus-visible { outline: 3px solid var(--brass-500); outline-offset: 2px; border-radius: 6px; }
+:focus-visible { outline: 3px solid var(--accent-500); outline-offset: 2px; border-radius: 6px; }
 
 /* --------------------------------------------------------------- LAYOUT */
 .app { min-height: 100dvh; display: flex; flex-direction: column; }
@@ -83,7 +85,7 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
 }
 .topbar-btn:active { background: rgba(255,255,255,.15); }
 .topbar-btn svg { width: 24px; height: 24px; }
-.topbar-btn--brass { color: var(--brass-400); }
+.topbar-btn--accent { color: var(--accent-300); }
 .topbar-spacer { min-width: 44px; }
 
 .view { flex: 1; padding: 16px 14px calc(96px + env(safe-area-inset-bottom)); }
@@ -107,7 +109,7 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
   position: relative;
 }
 .tabbar button svg { width: 24px; height: 24px; }
-/* Five tabs on a narrow phone — tighten up so nothing wraps */
+/* Five tabs on a narrow phone, so tighten up until nothing wraps */
 @media (max-width: 400px) {
   .tabbar button { font-size: 10px; padding-inline: 2px; }
   .tabbar button svg { width: 22px; height: 22px; }
@@ -138,7 +140,7 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
 .btn svg { width: 21px; height: 21px; flex: none; }
 .btn--block { width: 100%; }
 .btn--primary { background: var(--navy-800); color: #fff; }
-.btn--brass   { background: var(--brass-500); color: var(--navy-900); }
+.btn--accent   { background: var(--accent-500); color: #fff; }
 .btn--green   { background: var(--green-600); color: #fff; }
 .btn--red     { background: var(--red-100); color: var(--red-600); }
 .btn--outline { border-color: var(--line); background: #fff; color: var(--navy-900); }
@@ -152,7 +154,7 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
   z-index: 44;
   height: 58px; padding: 0 24px;
   border-radius: var(--r-full);
-  background: var(--brass-500); color: var(--navy-900);
+  background: var(--accent-500); color: #fff;
   font-size: 17px; font-weight: 800;
   display: inline-flex; align-items: center; gap: 9px;
   box-shadow: var(--sh-3);
@@ -233,9 +235,51 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
 }
 .f .hint { font-size: 13px; color: var(--ink-3); margin-top: 6px; line-height: 1.45; }
 .f .req { color: var(--red-600); }
-/* The mirror of .req — says plainly that a field can be left blank, so nobody
+/* The mirror of .req. Says plainly that a field can be left blank, so nobody
    gets stuck hunting for something to type. */
 .f .opt { color: var(--ink-3); font-weight: 500; }
+
+/* A make/model/colour picker that still lets you type something the list has
+   never heard of. Choosing "Something else" reveals the text box under it. */
+.pick-other { margin-top: 8px; }
+.pick-other[hidden] { display: none; }
+
+/* Tick row: a big target with the explanation attached, rather than a bare
+   checkbox with a label the size of a full stop. */
+.tickrow {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: border-color .15s var(--ease), background .15s var(--ease);
+}
+.tickrow:has(input:checked) { border-color: var(--accent-500); background: var(--accent-100); }
+.tickrow input { width: 24px; height: 24px; flex: none; margin-top: 1px; accent-color: var(--accent-500); }
+.tickrow strong { display: block; font-size: 15.5px; }
+.tickrow small { display: block; margin-top: 3px; font-size: 13px; color: var(--ink-3); line-height: 1.45; }
+
+/* The money screen. Bigger numbers, because that is the whole point of it. */
+.in--big { font-size: 22px !important; font-weight: 800; letter-spacing: -.02em; }
+.money-card { border: 2px solid var(--navy-800); }
+.moneyline {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  display: grid; gap: 9px;
+}
+.moneyline[hidden] { display: none; }
+.moneyline .ml {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  font-size: 15px;
+}
+.moneyline .ml span { color: var(--ink-3); }
+.moneyline .ml b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.moneyline .ml--total { border-top: 1px dashed var(--line); padding-top: 10px; }
+.moneyline .ml--total b { font-size: 21px; }
+.moneyline .ml--good b { color: var(--green-600); }
+.moneyline .ml--bad  b { color: var(--red-600); }
+.moneyline .ml-note { font-size: 13px; color: var(--ink-3); line-height: 1.45; }
 
 .in, .sel, .ta {
   width: 100%;
@@ -320,7 +364,7 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
   padding: 28px 20px;
   text-align: center;
 }
-.photo-drop svg { width: 42px; height: 42px; color: var(--brass-500); margin: 0 auto 12px; }
+.photo-drop svg { width: 42px; height: 42px; color: var(--accent-500); margin: 0 auto 12px; }
 .photo-drop h3 { font-size: 17px; margin-bottom: 5px; }
 .photo-drop p { font-size: 14px; color: var(--ink-3); margin-bottom: 18px; line-height: 1.5; }
 
@@ -338,11 +382,11 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
   box-shadow: var(--sh-1);
 }
 .photo-item img { width: 100%; height: 100%; object-fit: cover; }
-.photo-item.is-main { outline: 3px solid var(--brass-500); outline-offset: -3px; }
+.photo-item.is-main { outline: 3px solid var(--accent-500); outline-offset: -3px; }
 .photo-main-tag {
   position: absolute; top: 5px; left: 5px;
   padding: 2px 7px; border-radius: var(--r-full);
-  background: var(--brass-500); color: var(--navy-900);
+  background: var(--accent-500); color: #fff;
   font-size: 10.5px; font-weight: 800; letter-spacing: .03em;
 }
 .photo-actions {
@@ -383,7 +427,7 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
   background: rgba(255,255,255,.08);
   border: 1px solid rgba(255,255,255,.16);
   display: grid; place-items: center;
-  font-size: 24px; font-weight: 800; color: var(--brass-400);
+  font-size: 24px; font-weight: 800; color: var(--accent-300);
   letter-spacing: -.02em;
 }
 /* Navy artwork on the navy sign-in screen would disappear, so the logo sits
@@ -474,7 +518,7 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
 }
 .enq-dot {
   width: 10px; height: 10px; border-radius: 50%;
-  background: var(--brass-500); flex: none; margin-top: 7px;
+  background: var(--accent-500); flex: none; margin-top: 7px;
 }
 .enq-dot.is-read { background: transparent; }
 .enq-body { flex: 1; min-width: 0; }

@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Our Stock — MBU Car Sales, Newcastle upon Tyne</title>
+<title>Our Stock | MBU Car Sales, Newcastle upon Tyne</title>
 <meta name="description" content="Browse every used car currently in stock at MBU Car Sales in Newcastle upon Tyne. Filter by make, price, mileage, fuel and body type.">
 <link rel="canonical" href="https://mbucarsales.github.io/stock.html">
-<meta property="og:title" content="Our Stock — MBU Car Sales">
+<meta property="og:title" content="Our Stock | MBU Car Sales">
 <meta property="og:description" content="Browse every used car currently in stock at MBU Car Sales, Newcastle upon Tyne.">
 <meta property="og:image" content="https://mbucarsales.github.io/assets/img/og-default.jpg">
-<meta name="theme-color" content="#0D1626">
+<meta name="theme-color" content="#0A1830">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,7 +31,7 @@
         <span>Our stock</span>
       </nav>
       <h1>Cars in stock</h1>
-      <p>Everything priced below is here in Newcastle, ready to view — and the price is what you pay, no admin fees.
+      <p>Everything priced below is here in Newcastle and ready to view. The price is what you pay, no admin fees.
          Cars marked <strong>SOLD</strong> went in the last few weeks; if one of those is what you're after,
          tell us and we'll look out for another.</p>
     </div>
@@ -264,7 +264,7 @@
     writeUrl();   // keep the address bar shareable even when nothing matches
     const list = ALL.filter(matches).sort(SORTS[state.sort] || SORTS.newest);
 
-    // Count available and sold separately — never imply sold cars are stock.
+    // Count available and sold separately. Never imply sold cars are stock.
     const avail = list.filter(c => c.status !== 'sold').length;
     const soldN = list.length - avail;
     countEl.innerHTML = list.length
@@ -296,7 +296,7 @@
       grid.innerHTML = MBU.emptyState(
         ALL.length ? 'No cars match those filters' : 'No cars listed right now',
         ALL.length
-          ? 'Try widening your search — or tell us what you are after and we will look out for one for you.'
+          ? 'Try widening your search, or tell us what you’re after and we’ll look out for one for you.'
           : 'New stock lands most weeks. Message us and we will let you know what is on its way.',
         `<div class="cluster" style="justify-content:center">
            ${ALL.length ? '<button class="btn btn--outline" id="emptyReset" type="button">Clear filters</button>' : ''}

@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sell Your Car — MBU Car Sales, Newcastle upon Tyne</title>
-<meta name="description" content="We buy cars and vans outright in Newcastle upon Tyne — clean, damaged, non-runners or on finance. Free no-obligation valuation, usually the same day.">
+<title>Sell Your Car | MBU Car Sales, Newcastle upon Tyne</title>
+<meta name="description" content="We buy cars and vans outright in Newcastle upon Tyne. Clean, damaged, non-runners or still on finance. Free no-obligation valuation, usually the same day.">
 <link rel="canonical" href="https://mbucarsales.github.io/sell.html">
-<meta property="og:title" content="Sell Your Car — MBU Car Sales">
+<meta property="og:title" content="Sell Your Car | MBU Car Sales">
 <meta property="og:description" content="We buy cars and vans outright. Free no-obligation valuation, usually the same day.">
-<meta name="theme-color" content="#0D1626">
+<meta name="theme-color" content="#0A1830">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,7 +30,7 @@
         <span>Sell your car</span>
       </nav>
       <h1>Sell us your car</h1>
-      <p>We buy outright and pay on collection. Clean cars, scruffy cars, damaged cars, non-runners, cars still on finance — tell us what you have and we will give you an honest number.</p>
+      <p>We buy outright and pay on collection. Clean cars, scruffy cars, damaged cars, non-runners, cars still on finance. Tell us what you’ve got and we’ll give you an honest number.</p>
     </div>
   </section>
 
@@ -43,8 +43,8 @@
           <div class="panel panel--pad-lg">
             <h2 style="font-size:var(--fs-xl);margin-bottom:6px">Get a free valuation</h2>
             <p class="muted small" style="margin-bottom:26px">
-              The more you tell us, the closer our first number will be. Takes about a minute —
-              nothing here commits you to anything.
+              The more you tell us, the closer our first number will be. Takes about a minute
+              and nothing here commits you to anything.
             </p>
 
             <form id="sellForm" novalidate>
@@ -99,7 +99,7 @@
                     <option>Previously written off, unsure of category</option>
                     <option>Not sure</option>
                   </select>
-                  <span class="hint">Be straight with us — it will not stop us buying, and we would rather know now.</span>
+                  <span class="hint">Be straight with us. It won’t stop us buying and we’d rather know now.</span>
                 </div>
 
                 <div class="field">
@@ -128,10 +128,10 @@
                   <label for="sfCondition">Overall condition</label>
                   <select class="select" id="sfCondition" name="condition">
                     <option value="">Please choose…</option>
-                    <option>Excellent — nothing wrong with it</option>
-                    <option>Good — a few marks, drives fine</option>
-                    <option>Fair — needs some work</option>
-                    <option>Damaged — accident or bodywork damage</option>
+                    <option>Excellent, nothing wrong with it</option>
+                    <option>Good, a few marks but drives fine</option>
+                    <option>Fair, needs some work</option>
+                    <option>Damaged, accident or bodywork</option>
                     <option>Non-runner</option>
                   </select>
                 </div>
@@ -139,12 +139,12 @@
                 <div class="field span-2">
                   <label for="sfNotes">Anything else we should know?</label>
                   <textarea class="textarea" id="sfNotes" name="notes"
-                            placeholder="Damage, warning lights, mechanical faults, missing keys, outstanding finance amount — anything at all. We would much rather hear it now than find it later."></textarea>
+                            placeholder="Damage, warning lights, mechanical faults, missing keys, outstanding finance amount. Anything at all. We’d much rather hear it now than find it later."></textarea>
                 </div>
 
                 <div class="field span-2">
                   <label for="sfPrice">What are you hoping to get for it?</label>
-                  <input class="input" id="sfPrice" name="asking" inputmode="numeric" placeholder="e.g. £4,500 — or leave blank and we'll make you an offer">
+                  <input class="input" id="sfPrice" name="asking" inputmode="numeric" placeholder="e.g. £4,500, or leave blank and we'll make you an offer">
                   <span class="hint">Optional. If you have a figure in mind it saves us both some time.</span>
                 </div>
 
@@ -161,7 +161,7 @@
                 <div class="field span-2">
                   <label for="sfEmail">Email address</label>
                   <input class="input" id="sfEmail" name="email" type="email" autocomplete="email">
-                  <span class="hint">Optional — but handy if we need to send you anything in writing.</span>
+                  <span class="hint">Optional, but handy if we need to send you anything in writing.</span>
                 </div>
 
                 <div class="field span-2 hp-field">
@@ -181,8 +181,8 @@
                 <div class="span-2">
                   <button class="btn btn--primary btn--lg" type="submit" id="sfSubmit">Get my valuation</button>
                   <p class="form-note" style="margin-top:12px">
-                    No obligation, no pushy follow-ups. If our number is not right for you, that is
-                    absolutely fine — just tell us and we will leave you be.
+                    No obligation and no pushy follow-ups. If our number isn’t right for you
+                    that’s absolutely fine. Tell us and we’ll leave you be.
                   </p>
                 </div>
               </div>
@@ -331,7 +331,7 @@
       form.innerHTML = `
         <div style="text-align:center;padding:34px 12px">
           <div class="info-card-icon" style="margin:0 auto 18px;background:var(--green-100);color:var(--green-600)">${MBU.icon('checkCirc')}</div>
-          <h3 style="margin-bottom:10px">Thanks ${esc(v('sfName').split(' ')[0])} — we’ve got that</h3>
+          <h3 style="margin-bottom:10px">Thanks ${esc(v('sfName').split(' ')[0])}, we’ve got that</h3>
           <p class="muted" style="max-width:46ch;margin:0 auto 22px;line-height:1.7">
             We will look at your ${esc(v('sfMake'))} ${esc(v('sfModel'))} and come back to you with a
             number, usually the same day. If you have photos to hand, sending them on WhatsApp
