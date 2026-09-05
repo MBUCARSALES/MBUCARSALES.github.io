@@ -523,7 +523,20 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- Pinned to an exact version with a Subresource Integrity hash.
+     "@2" meant "whatever the latest 2.x is", so the code running inside
+     this app - which holds a session that can read every price you paid
+     and every customer's details - could change without anyone knowing.
+     With the hash, the browser refuses to run the file if a single byte
+     differs from what was checked.
+
+     TO UPDATE: pick the new version, then get its hash with
+       curl -sS https://cdn.jsdelivr.net/npm/@supabase/supabase-js@<VERSION>/dist/umd/supabase.min.js \
+         | openssl dgst -sha384 -binary | openssl base64 -A
+     Change BOTH the version and the hash, or the app will not load. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.min.js"
+        integrity="sha384-EyR2P0dlmjnEGcm9xcjdAn0VedZpRHEwDLP9oSS6wYMvzHBHkUrvgonveazJ/sSx"
+        crossorigin="anonymous"></script>
 <script src="../assets/js/config.js"></script>
 <script src="../assets/js/features.js"></script>
 <script src="../assets/js/autotrader-adapter.js"></script>

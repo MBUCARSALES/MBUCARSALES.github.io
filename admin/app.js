@@ -1327,8 +1327,13 @@
    * @returns {Promise<object>}
    */
   async function vehicleLookup(plate) {
+    // Send the signed-in admin's own token, never the publishable key. The
+    // lookup functions now check the caller is an admin before spending any
+    // DVLA or MOT quota, so the key would be rejected anyway — but there is no
+    // reason to make the request at all if the session has expired.
     const { data: { session } } = await sb.auth.getSession();
-    const auth = 'Bearer ' + (session ? session.access_token : SB_KEY);
+    if (!session) throw new Error('Your session has expired. Sign in again to look up a plate.');
+    const auth = 'Bearer ' + session.access_token;
     const call = fn => fetch(`${CFG.supabase.url}/functions/v1/${fn}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: auth },
@@ -2210,7 +2215,16 @@
     const cell = v => {
       if (v == null) return '';
       // Objects and arrays (images, features, details) become JSON text
-      const s = (typeof v === 'object' ? JSON.stringify(v) : String(v)).replace(/"/g, '""');
+      let s = typeof v === 'object' ? JSON.stringify(v) : String(v);
+
+      // Spreadsheet formula injection. Excel and Numbers run a cell starting
+      // with = + - or @ as a formula, and enquiry names and messages are typed
+      // by the public, so somebody could get a formula to run on your machine
+      // just by filling the form in. An apostrophe in front forces plain text.
+      // Genuine negative numbers are left alone so the money columns still add up.
+      if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s)) s = "'" + s;
+
+      s = s.replace(/"/g, '""');
       return /[",\n]/.test(s) ? `"${s}"` : s;
     };
     const csv = [cols.join(',')]
@@ -2416,8 +2430,10 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       `<div class="section-card"><div class="skel" style="height:150px"></div></div>`.repeat(2);
 
     try {
+      // As in vehicleLookup: the admin's own token, never the publishable key.
       const { data: { session } } = await sb.auth.getSession();
-      const auth = 'Bearer ' + (session ? session.access_token : SB_KEY);
+      if (!session) throw new Error('Your session has expired. Sign in again to look up a plate.');
+      const auth = 'Bearer ' + session.access_token;
 
       // Prefer the combined lookup; fall back to the older DVLA-only function
       // so this still works if only that one has been deployed.

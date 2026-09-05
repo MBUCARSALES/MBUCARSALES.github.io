@@ -284,9 +284,57 @@ function buildFlags(dvla: any, mot: ReturnType<typeof analyseMot> | null) {
 }
 
 /* --------------------------------------------------------------------------- */
+/* ============================================================================
+   WHO IS ALLOWED TO CALL THIS
+   ----------------------------------------------------------------------------
+   These lookups spend YOUR DVLA and DVSA quota, and the publishable key that
+   the website ships with is public by design. Without this check anyone who
+   read the page source could run unlimited number plate lookups on your
+   credentials: your quota gets burned (so the bidding tool dies at an auction,
+   exactly when you need it) and it almost certainly breaches the DVLA's terms.
+
+   The check asks the database "is the caller an admin?" using the caller's own
+   token. is_admin() reads auth.uid(), so:
+     · a real signed-in admin  → true
+     · the publishable key     → auth.uid() is null → false
+     · anything else           → false
+   No extra secret is needed here, and no admin list is duplicated.
+   ========================================================================== */
+async function callerIsAdmin(req: Request): Promise<boolean> {
+  const auth = req.headers.get('Authorization') ?? '';
+  if (!auth.toLowerCase().startsWith('bearer ')) return false;
+
+  // Both are injected into every Edge Function by Supabase automatically.
+  const url = Deno.env.get('SUPABASE_URL');
+  const key = Deno.env.get('SUPABASE_ANON_KEY')
+           ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
+  if (!url || !key) {
+    console.error('SUPABASE_URL / anon key missing — refusing the request.');
+    return false;   // fail closed: no way to check means no access
+  }
+
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/is_admin`, {
+      method: 'POST',
+      headers: { apikey: key, Authorization: auth, 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    if (!res.ok) return false;
+    return (await res.json()) === true;
+  } catch (err) {
+    console.error('Admin check failed:', err);
+    return false;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'Use POST' }, 405);
+
+  // Signed-in admins only. See callerIsAdmin above.
+  if (!(await callerIsAdmin(req))) {
+    return json({ error: 'You need to be signed in to the admin app to look up a plate.' }, 401);
+  }
 
   let reg = '';
   try {
