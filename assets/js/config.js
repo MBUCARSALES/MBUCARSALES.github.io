@@ -198,9 +198,16 @@ window.MBU_CONFIG = {
     siteUrl: 'https://mbucarsales.github.io',
 
     // Share car links as /c/<id>/, pre-rendered pages that show the actual
-    // car when forwarded on WhatsApp or Facebook. Requires the
-    // "Build shareable car pages" GitHub Action to be running.
-    // Set to false to fall back to car.html?id=... links.
-    sharePages: true
+    // car when forwarded on WhatsApp or Facebook.
+    //
+    // ⚠️ TURNED OFF because the "Build shareable car pages" Action has never
+    //    once succeeded, so /c/ has never existed and every shared link was a
+    //    404. With this false, links are car.html?id=... which always work;
+    //    the preview just shows the MBU logo instead of the car.
+    //
+    //    TURN IT BACK ON once the Action is green: check that
+    //    https://mbucarsales.github.io/c/ stops 404ing, then set this to true.
+    //    HANDOVER section 9d has the fix, it is one setting on GitHub.
+    sharePages: false
   }
 };

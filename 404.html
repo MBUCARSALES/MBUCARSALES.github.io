@@ -5,6 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- GitHub Pages serves this file for any missing path, so anchor all links to the root -->
 <base href="/">
+<script>
+/* ----------------------------------------------------------------------------
+   RESCUE OLD SHARE LINKS
+
+   Car links were shared as /c/<id>/ for a while, and those pages only exist if
+   the "Build shareable car pages" Action has run. It hadn't, so every one of
+   those links landed here. They are out in the wild on WhatsApp and cannot be
+   recalled, so rather than showing a dead end we send them to the actual car.
+
+   This runs before anything else on the page so the 404 never flashes up.
+   It stays useful even once the Action is working: if a car is later taken
+   down, /c/<id>/ 404s and this still lands the customer on a real page.
+-------------------------------------------------------------------------- */
+(function () {
+  var m = location.pathname.match(/^\/c\/([0-9a-fA-F-]{36})\/?$/);
+  if (m) location.replace('/car.html?id=' + encodeURIComponent(m[1]));
+})();
+</script>
 <title>Page not found | MBU Car Sales</title>
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#0A1830">
