@@ -142,6 +142,37 @@
 }
 
 /* --------------------------------------------------------------------------
+   HOW IT WORKS (homepage)
+
+   This used to be .car-layout with the two columns set in an inline style.
+   Inline styles beat stylesheet rules, media query or not, so the mobile
+   rule that should have stacked it never applied and the text was left in a
+   squeezed half-width column on a phone. It is a proper class now.
+   -------------------------------------------------------------------------- */
+.how-layout {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+  gap: 56px;
+  align-items: center;
+}
+.how-layout > * { min-width: 0; }
+.how-steps { grid-template-columns: 1fr; gap: 28px; }
+.how-media img {
+  width: 100%;
+  border-radius: 22px;
+  box-shadow: var(--sh-3);
+  aspect-ratio: 4/5;
+  object-fit: cover;
+}
+@media (max-width: 900px) {
+  .how-layout { grid-template-columns: 1fr; gap: var(--sp-6); }
+  /* The photo is decoration next to the words, so on a phone it goes first
+     and shorter rather than eating a whole screen at 4:5. */
+  .how-media { order: -1; }
+  .how-media img { aspect-ratio: 16/10; }
+}
+
+/* --------------------------------------------------------------------------
    FEATURED STOCK SWIPE RAIL (homepage)
 
    Plain horizontal scrolling with snap points. No carousel library and no
@@ -610,6 +641,47 @@
 }
 @media (max-width: 980px) { .buy-panel { position: static; } }
 
+/* --------------------------------------------------------------------------
+   "WHERE WE ARE" PANEL (car page sidebar)
+
+   The two icons here had no size rule of their own. An inline SVG with a
+   viewBox and no width falls back to filling its container, so they were
+   rendering about 295px square on a phone. Everywhere else on the site sizes
+   its icons explicitly; this now does too.
+   -------------------------------------------------------------------------- */
+.where-panel { margin-top: var(--sp-4); }
+
+.where-map {
+  display: block; position: relative;
+  border-radius: var(--r-md); overflow: hidden;
+  border: 1px solid var(--line);
+  margin-bottom: var(--sp-4);
+  background: var(--surface-2);
+}
+.where-map img {
+  width: 100%; height: auto; display: block;
+  /* The map is tall; show the useful middle rather than all of it */
+  aspect-ratio: 4/3; object-fit: cover; object-position: center 38%;
+}
+.where-map.is-imageless img { display: none; }
+.where-map-cue {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 12px;
+  background: linear-gradient(to top, rgba(10,24,48,.92), rgba(10,24,48,.55));
+  color: #fff; font-size: var(--fs-sm); font-weight: 700;
+}
+.where-map-cue svg { width: 16px; height: 16px; flex: none; }
+.where-map:hover .where-map-cue { background: var(--navy-900); }
+.where-map.is-imageless .where-map-cue { position: static; background: var(--navy-800); }
+
+.where-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.6;
+}
+.where-row + .where-row { margin-top: var(--sp-3); }
+.where-row svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--ink-4); }
+
 /* Reg plate */
 .reg-plate {
   display: inline-flex; align-items: center;
@@ -724,6 +796,45 @@
 .car-section h2 { font-size: var(--fs-xl); margin-bottom: var(--sp-4); }
 .car-section p { color: var(--ink-2); line-height: 1.75; }
 .car-section p + p { margin-top: var(--sp-3); }
+
+/* --------------------------------------------------------------------------
+   HOW TO FIND US
+
+   The lot is behind a petrol station down an unmarked lane, so the photos do
+   most of the work here. They are given room to breathe rather than being
+   shrunk into a column.
+   -------------------------------------------------------------------------- */
+.find-layout {
+  display: grid; grid-template-columns: minmax(0,1fr) 340px;
+  gap: var(--sp-6); align-items: start;
+}
+.find-layout > * { min-width: 0; }
+@media (max-width: 900px) { .find-layout { grid-template-columns: 1fr; } }
+
+.find-figure { margin: 0 0 var(--sp-5); }
+.find-figure img {
+  width: 100%; height: auto;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  box-shadow: var(--sh-2);
+  background: var(--surface-2);
+}
+.find-figure figcaption {
+  margin-top: var(--sp-3);
+  font-size: var(--fs-sm); color: var(--ink-3); line-height: 1.65;
+}
+.find-figure figcaption strong { color: var(--navy-900); }
+
+/* Numbered steps, one under the other, on every screen size */
+.find-steps { grid-template-columns: 1fr; gap: var(--sp-5); }
+
+.find-address {
+  font-style: normal;
+  font-size: var(--fs-md);
+  line-height: 1.8;
+  color: var(--navy-900);
+  font-weight: 600;
+}
 
 /* --------------------------------------------------------------------------
    CONTACT / FORM PAGES

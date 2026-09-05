@@ -493,17 +493,32 @@
               </div>
             </div>
 
-            <div class="panel panel--flat" style="margin-top:16px">
+            <!-- The lot is behind a petrol station down an unmarked lane, so
+                 the address on its own is not much help. The map doubles as the
+                 way in to the full directions. -->
+            <div class="panel panel--flat where-panel">
               <h3 style="font-size:var(--fs-md);margin-bottom:12px">Where we are</h3>
-              <div class="cluster" style="gap:10px;align-items:flex-start">
-                ${icon('mapPin', 'muted')}
-                <div class="small muted" style="line-height:1.6">
-                  ${esc(MBU_CONFIG.business.town)}<br>${esc(MBU_CONFIG.business.region)}
+
+              <a class="where-map" href="${MBU.link('find-us.html')}"
+                 aria-label="How to find us: directions and photos of the entrance">
+                <img src="${MBU.link('assets/img/find-us-map-thumb.jpg')}" loading="lazy"
+                     alt="Aerial map showing MBU Car Sales behind the Gulf petrol station on Westgate Road"
+                     width="422" height="620"
+                     onerror="this.closest('.where-map').classList.add('is-imageless')">
+                <span class="where-map-cue">${icon('mapPin')} How to find us</span>
+              </a>
+
+              <div class="where-row">
+                ${icon('mapPin')}
+                <div>
+                  ${esc(MBU_CONFIG.business.addressLine)}<br>
+                  ${esc(MBU_CONFIG.business.town)} ${esc(MBU_CONFIG.business.postcode)}<br>
+                  <span class="muted">Behind the Gulf petrol station</span>
                 </div>
               </div>
-              <div class="cluster" style="gap:10px;align-items:flex-start;margin-top:12px">
-                ${icon('clock', 'muted')}
-                <div class="small muted" style="line-height:1.6" id="todayHours"></div>
+              <div class="where-row">
+                ${icon('clock')}
+                <div id="todayHours"></div>
               </div>
             </div>
           </aside>

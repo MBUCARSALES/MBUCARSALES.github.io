@@ -369,10 +369,14 @@ p  { text-wrap: pretty; }
   .header-cta .btn--outline { display: none; }
   .nav a { padding: 9px 11px; }
 }
-@media (max-width: 1080px) {
-  .header-cta .btn--at span.hide-sm,
-  .header-cta .btn--ig span.hide-sm { display: none; }
-}
+/* The Auto Trader and Instagram wordmarks are dropped at every width, not just
+   under 1080px. These breakpoints were written as if the header grew with the
+   window, but .container caps at 1200px, so above that the header has no more
+   room while the media queries think it does — the row overflowed by ~150px on
+   a wide screen. The icons carry the meaning on their own and both buttons keep
+   their aria-labels; this way the phone number stays on screen instead. */
+.header-cta .btn--at span.hide-sm,
+.header-cta .btn--ig span.hide-sm { display: none; }
 @media (max-width: 940px) {
   .nav, .header-cta .btn span.hide-sm { display: none; }
   .nav-toggle { display: flex; }
@@ -861,6 +865,15 @@ p  { text-wrap: pretty; }
 /* --------------------------------------------------------------------------
    11. STICKY MOBILE CONTACT BAR
    -------------------------------------------------------------------------- */
+/* The footer address links through to the directions page, with a quiet cue
+   so it reads as a link rather than as text that happens to be underlined. */
+.footer-address { display: block; }
+.footer-address:hover span { color: #fff; }
+.footer-address-cue {
+  display: inline-block; margin-top: 6px;
+  font-weight: 700; color: var(--accent-300); text-decoration: underline;
+}
+
 .mobile-bar {
   position: fixed;
   left: 0; right: 0; bottom: 0;

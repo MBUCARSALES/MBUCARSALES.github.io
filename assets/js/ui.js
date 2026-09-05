@@ -17,6 +17,7 @@
     { href: 'stock.html',   label: 'Our Stock' },
     { href: 'wanted.html',  label: 'Car Finder' },
     { href: 'sell.html',    label: 'Sell Your Car' },
+    { href: 'find-us.html', label: 'Find Us' },
     { href: 'contact.html', label: 'Contact' }
   ];
 
@@ -144,8 +145,13 @@
       B.autotrader && { href: B.autotrader, icon: 'car', label: 'Our cars on Auto Trader' }
     ].filter(Boolean);
 
-    const location_ = [B.addressLine, B.town, B.postcode, B.region]
-      .filter(Boolean).map(l => `<span>${esc(l)}</span>`).join('<br>');
+    /* The address is a link, because knowing the street is not the same as
+       being able to find the lane it is down. */
+    const location_ =
+      `<a href="${MBU.link('find-us.html')}" class="footer-address">` +
+      [B.addressLine, B.town, B.postcode, B.region]
+        .filter(Boolean).map(l => `<span>${esc(l)}</span>`).join('<br>') +
+      `<span class="footer-address-cue">How to find us</span></a>`;
 
     return `
     <footer class="site-footer">

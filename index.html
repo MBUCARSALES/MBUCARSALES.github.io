@@ -80,8 +80,6 @@
             Message on WhatsApp
           </a>
         </div>
-
-        <ul class="hero-trust" id="heroTrust"></ul>
       </div>
     </div>
     <div class="hero-stat" id="heroStat" aria-hidden="true">
@@ -187,7 +185,7 @@
   <!-- ================================================== HOW IT WORKS -->
   <section class="section">
     <div class="container">
-      <div class="car-layout" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center">
+      <div class="how-layout">
         <div>
           <span class="eyebrow">How it works</span>
           <h2 style="margin-bottom:16px">Straightforward from start to finish</h2>
@@ -195,7 +193,7 @@
             No pressure and no admin fees bolted on at the end. Here’s what
             happens when you find something you like.
           </p>
-          <div class="steps" style="grid-template-columns:1fr;gap:28px">
+          <div class="steps how-steps">
             <div class="step">
               <h3>Get in touch</h3>
               <p>Message us on WhatsApp or give us a ring. Tell us which car and when suits you. Evenings and weekends are fine.</p>
@@ -210,10 +208,9 @@
             </div>
           </div>
         </div>
-        <div class="reveal">
+        <div class="reveal how-media">
           <img src="https://images.unsplash.com/photo-1625047509168-a7026f36de04?w=1000&q=75&auto=format&fit=crop"
-               alt="Preparing a car in the workshop"
-               style="border-radius:22px;box-shadow:var(--sh-3);aspect-ratio:4/5;object-fit:cover;width:100%"
+               alt="Preparing a car in the workshop" loading="lazy"
                onerror="this.style.display='none'">
         </div>
       </div>
@@ -285,14 +282,6 @@
   const waSell = MBU.waLink("Hi MBU Car Sales, I have a car I'd like to sell. Can you give me a price?");
   document.getElementById('heroWa').href = wa;
   document.getElementById('ctaWa').href = waSell;
-
-  /* Trust bullets in the hero */
-  document.getElementById('heroTrust').innerHTML = [
-    'Every car HPI checked',
-    'Prepared in our own workshop',
-    'Part exchange welcome',
-    'Honest about any damage'
-  ].map(t => `<li>${MBU.icon('checkCirc')}${t}</li>`).join('');
 
   /* Promise cards */
   document.getElementById('promiseGrid').innerHTML = B.promises.map(p => `
