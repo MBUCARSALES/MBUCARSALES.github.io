@@ -865,14 +865,10 @@ p  { text-wrap: pretty; }
 /* --------------------------------------------------------------------------
    11. STICKY MOBILE CONTACT BAR
    -------------------------------------------------------------------------- */
-/* The footer address links through to the directions page, with a quiet cue
-   so it reads as a link rather than as text that happens to be underlined. */
+/* The footer address links through to the directions page. No label under it:
+   the address itself is the link and saying so twice just added clutter. */
 .footer-address { display: block; }
 .footer-address:hover span { color: #fff; }
-.footer-address-cue {
-  display: inline-block; margin-top: 6px;
-  font-weight: 700; color: var(--accent-300); text-decoration: underline;
-}
 
 .mobile-bar {
   position: fixed;

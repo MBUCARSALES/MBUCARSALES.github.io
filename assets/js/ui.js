@@ -142,7 +142,8 @@
     const socials = [
       B.instagram && { href: B.instagram, icon: 'instagram', label: 'Instagram' },
       B.facebook && { href: B.facebook, icon: 'facebook', label: 'Facebook' },
-      B.autotrader && { href: B.autotrader, icon: 'car', label: 'Our cars on Auto Trader' }
+      B.autotrader && { href: B.autotrader, icon: 'car', label: 'Our cars on Auto Trader' },
+      B.whatsapp && { href: MBU.waLink('Hi MBU Car Sales,'), icon: 'whatsapp', label: 'Message us on WhatsApp' }
     ].filter(Boolean);
 
     /* The address is a link, because knowing the street is not the same as
@@ -151,7 +152,7 @@
       `<a href="${MBU.link('find-us.html')}" class="footer-address">` +
       [B.addressLine, B.town, B.postcode, B.region]
         .filter(Boolean).map(l => `<span>${esc(l)}</span>`).join('<br>') +
-      `<span class="footer-address-cue">How to find us</span></a>`;
+      `</a>`;
 
     return `
     <footer class="site-footer">
@@ -163,7 +164,7 @@
             </a>
             <p class="footer-blurb">${esc(B.strapline)}</p>
             ${socials.length ? `<div class="social-row">
-              ${socials.map(s => `<a href="${s.href}" target="_blank" rel="noopener" aria-label="${s.label}">${icon(s.icon)}</a>`).join('')}
+              ${socials.map(s => `<a href="${esc(s.href)}" target="_blank" rel="noopener" aria-label="${esc(s.label)}">${icon(s.icon)}</a>`).join('')}
             </div>` : ''}
           </div>
 
