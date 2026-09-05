@@ -343,6 +343,11 @@
    * show, up to the cap. If fewer than `featuredMin` are ticked the rest of
    * the row is topped up with the newest stock, so the homepage never looks
    * broken just because nobody has ticked anything yet.
+   *
+   * The row is then ordered dearest first. Which cars appear is still decided
+   * by the Featured tickbox exactly as before; this only changes the order
+   * they sit in, so the best of the stock leads the homepage. A car with no
+   * price goes last rather than reading as free.
    */
   MBU.getFeatured = async () => {
     const opt = CFG.options || {};
@@ -350,9 +355,13 @@
     const min = opt.featuredMin || 4;
     const avail = await MBU.getAvailable();
     const starred = avail.filter(c => c.featured);
-    if (starred.length >= min) return starred.slice(0, cap);
-    const rest = avail.filter(c => !c.featured);
-    return starred.concat(rest).slice(0, Math.max(min, starred.length));
+    // Every branch below builds a NEW array (filter/slice/concat), so sorting
+    // it never reorders the shared car cache.
+    const picked = starred.length >= min
+      ? starred.slice(0, cap)
+      : starred.concat(avail.filter(c => !c.featured))
+               .slice(0, Math.max(min, starred.length));
+    return picked.sort((a, b) => (b.price ?? -1) - (a.price ?? -1));
   };
 
   MBU.getCar = async (id) => {

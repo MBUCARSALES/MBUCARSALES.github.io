@@ -676,6 +676,10 @@ p  { text-wrap: pretty; }
   color: var(--navy-900);
 }
 .field .hint { font-size: var(--fs-xs); color: var(--ink-3); font-weight: 500; }
+/* A hint can carry a link to the form that suits them better. Without this it
+   inherits the hint's grey and reads as ordinary text nobody would tap. */
+.field .hint a { color: var(--accent-600); font-weight: 700; text-decoration: underline; }
+.field .hint a:hover { color: var(--navy-900); }
 .field .req { color: var(--red-600); }
 
 .input, .select, .textarea {
@@ -870,10 +874,18 @@ p  { text-wrap: pretty; }
   box-shadow: 0 -4px 20px rgba(13,22,38,.07);
 }
 .mobile-bar .btn { flex: 1; }
-/* Instagram rides along as a square icon button so WhatsApp and Call us keep
-   almost all the width. Three equal buttons would squash the labels. */
-.mobile-bar-ig { flex: none !important; width: 54px; padding-inline: 0; }
-.mobile-bar-ig svg { width: 22px; height: 22px; }
+/* Instagram and Auto Trader ride along as square icon buttons so WhatsApp and
+   Call us keep almost all the width. Equal buttons would squash the labels. */
+.mobile-bar-icon { flex: none !important; width: 54px; padding-inline: 0; }
+.mobile-bar-icon svg { width: 22px; height: 22px; }
+/* With two icon buttons alongside, everything tightens up a notch so the two
+   labelled buttons still read properly on a narrow phone. */
+.mobile-bar--4 { gap: 6px; padding-inline: var(--sp-3); }
+.mobile-bar--4 .mobile-bar-icon { width: 46px; }
+.mobile-bar--4 .btn { padding-inline: 10px; gap: 6px; }
+@media (max-width: 340px) {
+  .mobile-bar--4 .btn { font-size: var(--fs-sm); }
+}
 @media (max-width: 780px) {
   .mobile-bar { display: flex; }
   body { padding-bottom: 74px; }

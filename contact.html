@@ -40,6 +40,10 @@
 
         <!-- ============================== FORM -->
         <div>
+          <!-- Filled in only when somebody arrives from a car page
+               (contact.html?car=<id>). Empty and invisible otherwise. -->
+          <div id="ctCarNotice"></div>
+
           <div class="panel panel--pad-lg">
             <h2 style="font-size:var(--fs-xl);margin-bottom:6px">Send us a message</h2>
             <p class="muted small" style="margin-bottom:26px">
@@ -62,15 +66,9 @@
                   <input class="input" id="ctEmail" name="email" type="email" autocomplete="email">
                 </div>
                 <div class="field span-2">
-                  <label for="ctSubject">What is it about?</label>
-                  <select class="select" id="ctSubject" name="subject">
-                    <option>A car I have seen on the website</option>
-                    <option>Looking for a specific car</option>
-                    <option>Part exchange</option>
-                    <option>Selling my car to you</option>
-                    <option>Booking a viewing</option>
-                    <option>Something else</option>
-                  </select>
+                  <span class="fg-title" style="font-size:var(--fs-sm);font-weight:700;color:var(--navy-900);text-transform:none;letter-spacing:0">What is it about? <span class="req">*</span></span>
+                  <div class="chip-row" id="ctReason" style="margin-top:4px"></div>
+                  <span class="hint" id="ctReasonHint" hidden></span>
                 </div>
                 <div class="field span-2">
                   <label for="ctMsg">Your message <span class="req">*</span></label>
@@ -93,6 +91,20 @@
                 </div>
               </div>
             </form>
+
+            <!-- The form emails us and saves the enquiry. Some people would
+                 rather use WhatsApp or their own mail app, so the message they
+                 have written is carried across to whichever they pick. -->
+            <div class="send-via" id="sendVia">
+              <span class="send-via-title">Or send the same message from</span>
+              <div class="send-via-row">
+                <a class="btn btn--wa btn--sm" id="svWa" href="#" target="_blank" rel="noopener"></a>
+                <a class="btn btn--outline btn--sm" id="svMail" href="#"></a>
+                <a class="btn btn--ig btn--sm" id="svIg" href="#" target="_blank" rel="noopener"></a>
+                <a class="btn btn--outline btn--sm" id="svTel" href="#"></a>
+              </div>
+              <p class="tiny muted" id="svNote" style="margin-top:10px;line-height:1.6"></p>
+            </div>
           </div>
         </div>
 
@@ -196,6 +208,199 @@
   ).join('');
   document.getElementById('hoursNote').textContent = B.hoursNote || '';
 
+  /* ======================================================================
+     WHAT IT IS ABOUT, AND HOW THEY WANT TO SEND IT
+
+     Arriving from a car page (contact.html?car=<id>) names the car and offers
+     the reasons people actually write in about. Arriving here directly keeps
+     the general list this page has always had.
+
+     Whatever they pick writes a first draft of the message, which they can
+     then edit. The WhatsApp, email and phone buttons underneath carry that
+     same text, so choosing a route is not choosing to start again.
+     ====================================================================== */
+  const CAR_REASONS = [
+    'Is it still available?',
+    'Part exchange',
+    'More photos or a video',
+    'More details about it',
+    'Book a viewing',
+    'Something else'
+  ];
+  const GENERAL_REASONS = [
+    'A car I have seen on the website',
+    'Looking for a specific car',
+    'Part exchange',
+    'Selling my car to you',
+    'Booking a viewing',
+    'Something else'
+  ];
+
+  let car = null;
+  let reason = '';
+  let messageTouched = false;   // never overwrite something they have typed
+
+  const msg = document.getElementById('ctMsg');
+  const reasonRow = document.getElementById('ctReason');
+  const reasonHint = document.getElementById('ctReasonHint');
+
+  msg.addEventListener('input', () => { messageTouched = true; refreshSendVia(); });
+
+  const carLabel = () => !car ? '' :
+    MBU.fmt.title(car) + (car.registration ? ' (' + MBU.fmt.reg(car.registration) + ')' : '');
+
+  /** The first draft for a chosen reason. Empty means leave the box alone. */
+  function draftFor(r) {
+    const it = car ? 'the ' + carLabel() : 'it';
+    switch (r) {
+      case 'Is it still available?':
+        return `Is ${it} still available, and when could I come and see it?`;
+      case 'Part exchange':
+        return car
+          ? `I am interested in ${it} and I have a car to part exchange. What would you give me for mine?`
+          : 'I have a car to part exchange. What would you give me for it?';
+      case 'More photos or a video':
+        return `Could you send me some more photos of ${it}?`;
+      case 'More details about it':
+        return `Could you tell me a bit more about ${it}? Service history, MOT and anything I should know about.`;
+      case 'Book a viewing':
+        return car ? `I would like to come and see ${it}. When are you free?`
+                   : 'I would like to come and have a look round. When are you free?';
+      case 'Booking a viewing':
+        return 'I would like to come and have a look round. When are you free?';
+      case 'A car I have seen on the website':
+        return 'I am interested in one of the cars on your website. Is it still available?';
+      default:
+        return '';
+    }
+  }
+
+  /* Some reasons have a proper form behind them that captures far more than a
+     free-text message ever will. Point at it rather than duplicating it. */
+  function hintFor(r) {
+    const px = car ? MBU.link('sell.html?px=' + encodeURIComponent(car.id)) : MBU.link('sell.html');
+    if (r === 'Part exchange')
+      return `Want a firm number for yours? <a href="${px}">Fill in the quick valuation form</a> and we will price it properly.`;
+    if (r === 'Selling my car to you')
+      return `<a href="${MBU.link('sell.html')}">The valuation form</a> is quicker, it asks the few things we need to price it.`;
+    if (r === 'Looking for a specific car')
+      return `<a href="${MBU.link('wanted.html')}">The Car Finder</a> takes the full brief so we know exactly what to look out for.`;
+    return '';
+  }
+
+  function buildReasons(list) {
+    reasonRow.innerHTML = list.map((r, i) =>
+      `<button class="chip${i === 0 ? ' is-on' : ''}" type="button" data-value="${esc(r)}">${esc(r)}</button>`
+    ).join('');
+    reason = list[0];
+    reasonRow.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        reasonRow.querySelectorAll('.chip').forEach(c => c.classList.remove('is-on'));
+        chip.classList.add('is-on');
+        reason = chip.dataset.value;
+        applyReason();
+      });
+    });
+    applyReason();
+  }
+
+  function applyReason() {
+    if (!messageTouched) {
+      const draft = draftFor(reason);
+      if (draft) msg.value = draft;
+    }
+    const hint = hintFor(reason);
+    reasonHint.innerHTML = hint;
+    reasonHint.hidden = !hint;
+    refreshSendVia();
+  }
+
+  /* -------------------------------------------------- SEND IT ANOTHER WAY */
+  const svWa   = document.getElementById('svWa');
+  const svMail = document.getElementById('svMail');
+  const svIg   = document.getElementById('svIg');
+  const svTel  = document.getElementById('svTel');
+
+  svWa.innerHTML   = MBU.icon('whatsapp') + ' WhatsApp';
+  svMail.innerHTML = MBU.icon('mail') + ' Email';
+  svTel.innerHTML  = MBU.icon('phone') + ' Call';
+  svTel.href = MBU.telLink();
+
+  if (B.instagram) {
+    svIg.href = B.instagram;
+    svIg.innerHTML = MBU.icon('instagram') + ' Instagram';
+  } else {
+    svIg.remove();
+  }
+
+  document.getElementById('svNote').innerHTML = B.instagram
+    ? 'WhatsApp and email open with your message already written. Instagram opens our page, so you would need to send it as a DM from there.'
+    : 'WhatsApp and email open with your message already written.';
+
+  /**
+   * The message as it stands, ready to hand to another app.
+   *
+   * The draft already names the car, so the greeting stays plain rather than
+   * saying it twice. The link goes last, which identifies the car even if they
+   * have rewritten the message in their own words.
+   */
+  function composed() {
+    const typed = msg.value.trim() || draftFor(reason);
+    return [
+      'Hi MBU Car Sales,',
+      typed,
+      car ? MBU.carUrl(car) : ''
+    ].filter(Boolean).join('\n\n');
+  }
+
+  function refreshSendVia() {
+    const text = composed();
+    svWa.href = MBU.waLink(text);
+    svMail.href = 'mailto:' + B.email +
+      '?subject=' + encodeURIComponent(car ? 'Enquiry: ' + carLabel() : (reason || 'Website enquiry')) +
+      '&body=' + encodeURIComponent(text);
+  }
+
+  /* ------------------------------------------------------- WHICH CAR, IF ANY */
+  const carId = MBU.param('car');
+  const notice = document.getElementById('ctCarNotice');
+
+  function showSoldNotice(c) {
+    notice.innerHTML = `
+      <div class="notice notice--amber ct-notice">
+        ${MBU.icon('shield')}
+        <div>
+          <strong>The ${esc(MBU.fmt.title(c))} has sold</strong>
+          We buy cars like it most weeks though. Tell us what you are after below, or
+          <a href="${MBU.link('wanted.html?car=' + encodeURIComponent(c.id))}" class="ct-link">give the Car Finder the full brief</a>.
+        </div>
+      </div>`;
+  }
+
+  function showCarNotice(c) {
+    notice.innerHTML = `
+      <div class="notice notice--blue ct-notice">
+        ${MBU.icon('car')}
+        <div>
+          <strong>About the ${esc(MBU.fmt.title(c))}${c.price != null ? ', ' + MBU.fmt.price(c.price) : ''}</strong>
+          Pick what you need below and we will come straight back to you.
+          <a href="${MBU.link('car.html?id=' + encodeURIComponent(c.id))}" class="ct-link">Back to that car</a>
+        </div>
+      </div>`;
+  }
+
+  if (carId) {
+    MBU.getCar(carId).then(c => {
+      // A sold car, or an id that no longer exists, falls back to the general
+      // list. Never set someone up to enquire about a car they cannot buy.
+      if (c && c.status !== 'sold') { car = c; showCarNotice(c); buildReasons(CAR_REASONS); return; }
+      if (c) showSoldNotice(c);
+      buildReasons(GENERAL_REASONS);
+    }).catch(() => buildReasons(GENERAL_REASONS));
+  } else {
+    buildReasons(GENERAL_REASONS);
+  }
+
   /* Form */
   const form = document.getElementById('contactForm');
   const status = document.getElementById('ctStatus');
@@ -216,10 +421,14 @@
     btn.disabled = true; btn.textContent = 'Sending…';
     try {
       await MBU.submitEnquiry({
-        kind: 'general',
+        // Tagging it to the car makes it show in the app as "About: <car>"
+        // rather than as an unattached general enquiry.
+        kind: car ? 'car' : 'general',
+        car_id: car ? car.id : null,
+        car_title: car ? MBU.fmt.title(car) : null,
         name: v('ctName'), phone: v('ctPhone'), email: v('ctEmail'),
         message: v('ctMsg'),
-        details: { subject: v('ctSubject') }
+        details: { subject: reason }
       });
       form.innerHTML = `
         <div style="text-align:center;padding:34px 12px">

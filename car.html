@@ -65,6 +65,11 @@
   const id = window.MBU_FORCED_CAR_ID || MBU.param('id');
   const icon = MBU.icon, esc = MBU.esc, fmt = MBU.fmt;
 
+  /* How many items of each equipment group show before the rest fold away,
+     and the smallest number worth folding. */
+  const FEATURES_SHOWN = 5;
+  const FEATURES_MIN_FOLD = 3;
+
   if (!id) return notFound();
 
   MBU.getCar(id).then(car => car ? render(car) : notFound());
@@ -149,6 +154,53 @@
 
     const waHref = MBU.waCarLink(car);
 
+    /* Enquiries go to the contact page carrying this car's id. That page then
+       names the car, offers the reasons people actually write in about (still
+       available, part exchange, more photos, more detail, a viewing) and lets
+       them send it by whichever route suits: the form, WhatsApp, email or
+       Instagram. The enquiry that lands is tagged with the car either way. */
+    const enquireHref = MBU.link('contact.html?car=' + encodeURIComponent(car.id));
+
+    const reduced = !sold && car.previous_price && car.price != null
+                    && car.previous_price > car.price;
+
+    /* THE PRICE, ON A PHONE.
+       The buy panel is a sticky column on a desktop, but below 980px it drops
+       underneath the entire left column, which put the price about five
+       screens down: you could read the photos, the spec and the description
+       without ever being told what the car costs. This repeats it directly
+       under the photos, where the eye lands after the gallery, with Enquire
+       and Share beside it. Desktop hides it again, because there the panel is
+       already sitting alongside. */
+    const priceBar = `
+            <div class="car-price-bar">
+              <div class="cpb-figure">
+                ${sold
+                  ? `<span class="cpb-price cpb-price--sold">Now sold</span>
+                     <span class="cpb-note">${car.sold_at
+                        ? 'Sold ' + esc(fmt.ago(car.sold_at))
+                        : 'This car has found a new home'}</span>`
+                  : `<span class="cpb-price">${fmt.price(car.price)}${reduced
+                        ? `<span class="cpb-was">${fmt.price(car.previous_price)}</span>` : ''}</span>
+                     <span class="cpb-note">${reduced
+                        ? 'Reduced by ' + fmt.price(car.previous_price - car.price) + '. No admin fees.'
+                        : 'No admin fees. Part exchange welcome.'}</span>`}
+              </div>
+              <div class="cpb-actions">
+                ${sold
+                  ? `<a class="btn btn--accent" href="${MBU.link('wanted.html?car=' + encodeURIComponent(car.id))}">
+                       ${icon('heart')} Want one like this?
+                     </a>`
+                  : `<a class="btn btn--primary" href="${enquireHref}">
+                       ${icon('mail')} Enquire now
+                     </a>`}
+                <button class="btn btn--outline cpb-share" type="button" data-share
+                        aria-label="Share this car">
+                  ${icon('share')}<span class="cpb-share-label">Share</span>
+                </button>
+              </div>
+            </div>`;
+
     root.innerHTML = `
     <section class="page-head" style="padding-block:28px">
       <div class="container">
@@ -204,6 +256,8 @@
                 </div>` : ''}
             </div>
 
+            ${priceBar}
+
             <div class="cluster" style="margin-top:22px;gap:8px">
               ${pills.map(p => `<span class="spec-pill">${icon(p.i)}${esc(p.t)}</span>`).join('')}
             </div>
@@ -240,13 +294,37 @@
               <div class="car-section">
                 <h2>Equipment &amp; features</h2>
                 ${(window.MBU_FEATURES ? MBU_FEATURES.group(car.features) : [{ label: '', items: car.features }])
-                  .map(g => `
+                  .map((g, gi) => {
+                    /* A well-specced car can list thirty-odd items, which on a
+                       phone is one per line and an awful lot of scrolling to get
+                       past. Each group shows the first few and folds the rest
+                       away behind a count, so the page stays walkable and the
+                       full spec is still one tap off. */
+                    /* Folding away one or two items is not worth a tap: the
+                       button is about as tall as the items it would hide. So a
+                       group only folds when there is something real to save. */
+                    const fold = g.items.length > FEATURES_SHOWN + FEATURES_MIN_FOLD - 1;
+                    const shown = fold ? g.items.slice(0, FEATURES_SHOWN) : g.items;
+                    const rest  = fold ? g.items.slice(FEATURES_SHOWN) : [];
+                    const restId = `featMore${gi}`;
+                    return `
                     <div class="feature-group">
                       ${g.label ? `<h3 class="feature-group-title">${esc(g.label)}</h3>` : ''}
                       <ul class="feature-list">
-                        ${g.items.map(f => `<li>${icon('check')}${esc(f)}</li>`).join('')}
+                        ${shown.map(f => `<li>${icon('check')}${esc(f)}</li>`).join('')}
                       </ul>
-                    </div>`).join('')}
+                      ${rest.length ? `
+                        <ul class="feature-list feature-list--more" id="${restId}" hidden>
+                          ${rest.map(f => `<li>${icon('check')}${esc(f)}</li>`).join('')}
+                        </ul>
+                        <button class="feature-toggle" type="button"
+                                aria-expanded="false" aria-controls="${restId}"
+                                data-more="${rest.length}">
+                          <span class="feature-toggle-label">Show ${rest.length} more</span>
+                          ${icon('chevronD')}
+                        </button>` : ''}
+                    </div>`;
+                  }).join('')}
               </div>` : ''}
 
             <div class="car-section">
@@ -394,18 +472,24 @@
                   <a class="btn btn--primary" href="${MBU.telLink()}">
                     ${icon('phone')} ${esc(MBU_CONFIG.business.phone)}
                   </a>
-                  <a class="btn btn--outline" href="#enquire">
-                    ${icon('mail')} Send an enquiry
-                  </a>
+                  <div class="buy-panel-pair">
+                    <a class="btn btn--outline" href="${enquireHref}">
+                      ${icon('mail')} Enquire now
+                    </a>
+                    <button class="btn btn--outline" type="button" data-share>
+                      ${icon('share')} Share
+                    </button>
+                  </div>
                   <p class="buy-note">
                     Viewings by appointment, seven days a week.<br>
                     Message any time. We usually reply within the hour.
                   </p>
                 `}
+                ${sold ? `
                 <hr class="divider" style="margin:8px 0">
-                <button class="btn btn--ghost btn--sm" id="shareBtn" type="button" style="width:100%">
+                <button class="btn btn--ghost btn--sm" type="button" data-share style="width:100%">
                   ${icon('share')} Share this car
-                </button>
+                </button>` : ''}
               </div>
             </div>
 
@@ -440,6 +524,7 @@
     </section>`;
 
     wireGallery(images, title);
+    wireFeatures();
     wireShare(car, title);
     wireForm(car, title);
     showTodayHours();
@@ -531,21 +616,55 @@
     });
   }
 
+  /* ------------------------------------------------------ EQUIPMENT */
+  /**
+   * Fold the rest of each equipment group away behind its count.
+   *
+   * The hidden items are in the markup from the start rather than built on
+   * demand, so they are there for search engines and for anyone who prints
+   * the page, and the toggle is only ever showing and hiding.
+   */
+  function wireFeatures() {
+    MBU.qsa('.feature-toggle').forEach(btn => {
+      const rest = document.getElementById(btn.getAttribute('aria-controls'));
+      if (!rest) return;
+      const label = btn.querySelector('.feature-toggle-label');
+      const count = btn.dataset.more;
+
+      btn.addEventListener('click', () => {
+        const open = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', String(!open));
+        btn.classList.toggle('is-open', !open);
+        rest.hidden = open;
+        label.textContent = open ? `Show ${count} more` : 'Show less';
+      });
+    });
+  }
+
   /* --------------------------------------------------------- SHARE */
+  /**
+   * There is more than one Share button now (beside the price on a phone, in
+   * the buy panel on a laptop), so every [data-share] gets the same behaviour.
+   * Each one remembers its own label, because they don't all say the same
+   * thing and the "Link copied" flash has to put the right words back.
+   */
   function wireShare(car, title) {
-    const btn = document.getElementById('shareBtn');
-    btn.addEventListener('click', async () => {
-      MBU.track('share', car.id);
-      // Always share the pre-rendered URL. That's the one with a proper
-      // preview, even if you're currently on the ?id= version.
-      const url = MBU.carUrl(car);
-      const data = { title: `${title} | MBU Car Sales`, text: `Have a look at this ${title} at MBU Car Sales`, url };
-      if (navigator.share) { try { await navigator.share(data); return; } catch { /* cancelled */ } }
-      try {
-        await navigator.clipboard.writeText(url);
-        btn.innerHTML = MBU.icon('check') + ' Link copied';
-        setTimeout(() => { btn.innerHTML = MBU.icon('share') + ' Share this car'; }, 2200);
-      } catch { prompt('Copy this link:', url); }
+    // Always share the pre-rendered URL. That's the one with a proper
+    // preview, even if you're currently on the ?id= version.
+    const url = MBU.carUrl(car);
+    const data = { title: `${title} | MBU Car Sales`, text: `Have a look at this ${title} at MBU Car Sales`, url };
+
+    MBU.qsa('[data-share]').forEach(btn => {
+      const label = btn.innerHTML;
+      btn.addEventListener('click', async () => {
+        MBU.track('share', car.id);
+        if (navigator.share) { try { await navigator.share(data); return; } catch { /* cancelled */ } }
+        try {
+          await navigator.clipboard.writeText(url);
+          btn.innerHTML = MBU.icon('check') + ' Link copied';
+          setTimeout(() => { btn.innerHTML = label; }, 2200);
+        } catch { prompt('Copy this link:', url); }
+      });
     });
   }
 

@@ -40,6 +40,12 @@
 
         <!-- ============================== FORM -->
         <div>
+          <!-- Filled in only when somebody arrives wanting a valuation against a
+               particular car (sell.html?px=<car id>), which is where the contact
+               page sends them when they pick Part exchange. Empty and invisible
+               otherwise, so the page is unchanged for everyone else. -->
+          <div id="pxNotice"></div>
+
           <div class="panel panel--pad-lg">
             <h2 style="font-size:var(--fs-xl);margin-bottom:6px">Get a free valuation</h2>
             <p class="muted small" style="margin-bottom:26px">
@@ -262,6 +268,41 @@
     'It has high mileage or no service history'
   ].map(t => `<li>${MBU.icon('check')}${esc(t)}</li>`).join('');
 
+  /* ------------------------------------------------------- PART EXCHANGE
+     Arriving with ?px=<id>, from the Part exchange option on the contact page.
+     The form is the same one everybody else fills in, but we
+     say which car it is against so the customer knows the message got through,
+     and we attach the car to the enquiry so it can be answered with a single
+     figure (the difference) rather than two separate conversations.
+
+     If the id is unknown or the stock list fails to load, nothing is shown and
+     the page simply behaves as the normal valuation form. */
+  let pxCar = null;
+  const pxId = MBU.param('px');
+
+  if (pxId) {
+    MBU.getCar(pxId).then(car => {
+      // An old or hand-typed link could point at a car that has since sold.
+      // There is nothing to part exchange against, so fall back to the plain
+      // valuation form rather than naming a car they cannot buy.
+      if (!car || car.status === 'sold') return;
+      pxCar = car;
+      const title = MBU.fmt.title(car);
+      document.getElementById('pxNotice').innerHTML = `
+        <div class="notice notice--blue px-notice">
+          ${MBU.icon('tag')}
+          <div>
+            <strong>Part exchange against the ${esc(title)}</strong>
+            Tell us what you are driving now and we will work out the difference
+            between the two.${car.price != null
+              ? ' The ' + esc(title) + ' is up at ' + MBU.fmt.price(car.price) + '.' : ''}
+            <a href="${MBU.link('car.html?id=' + encodeURIComponent(car.id))}"
+               class="px-back">Back to that car</a>
+          </div>
+        </div>`;
+    }).catch(() => {});
+  }
+
   /* Vehicle type chips */
   let vehicleType = 'Car';
   MBU.qsa('#vehType .chip').forEach(chip => {
@@ -313,7 +354,11 @@
         phone: v('sfPhone'),
         email: v('sfEmail'),
         message: v('sfNotes'),
-        details: {
+        // Only set when they came from a car page, so a plain "sell my car"
+        // enquiry looks exactly as it always has in the admin app.
+        car_id: pxCar ? pxCar.id : null,
+        car_title: pxCar ? MBU.fmt.title(pxCar) : null,
+        details: Object.assign(pxCar ? { part_exchange_against: MBU.fmt.title(pxCar) } : {}, {
           vehicle_type: vehicleType,
           registration: v('sfReg'),
           make: v('sfMake'),
@@ -325,7 +370,7 @@
           mot: v('sfMot'),
           condition: v('sfCondition'),
           asking_price: v('sfPrice')
-        }
+        })
       });
 
       form.innerHTML = `

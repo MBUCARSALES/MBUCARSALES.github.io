@@ -1716,7 +1716,11 @@
   /** One enquiry, as a card. */
   function enquiryRow(e) {
     const when = new Date(e.created_at);
-    const kind = e.kind === 'sell' ? 'Wants to sell a car'
+    // A "sell" enquiry with a car attached came in through the part exchange
+    // button on that car's page, so say which car it is against. Answering it
+    // is one number (the difference), not two separate conversations.
+    const kind = e.kind === 'sell'
+                 ? (e.car_title ? 'Part exchange against: ' + e.car_title : 'Wants to sell a car')
                : e.kind === 'car' ? 'About: ' + (e.car_title || 'a car')
                : (e.details && e.details.subject) || 'General enquiry';
     const d = e.details || {};
@@ -1725,6 +1729,12 @@
          d.mileage ? Number(d.mileage).toLocaleString('en-GB') + ' mi' : null,
          d.hpi, d.condition, d.asking_price ? 'Wants ' + d.asking_price : null]
          .filter(Boolean).join(' · ')
+      // What they picked on the contact page: still available, part exchange,
+      // more photos, a viewing. That decides how you answer, so it belongs on
+      // the card rather than two taps away under "More".
+      // A general enquiry already uses the subject as its title, so it is not
+      // repeated here.
+      : e.kind === 'car' ? (d.subject || '')
       : '';
 
     return `<div class="card"><div class="enq">

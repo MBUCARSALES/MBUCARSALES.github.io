@@ -20,6 +20,12 @@
     { href: 'contact.html', label: 'Contact' }
   ];
 
+  /* Every internal link below goes through MBU.link(). On the pre-rendered
+     share pages at /c/<id>/ that prefixes them with '/', without which they
+     resolve inside that folder and 404. The header nav was already doing this;
+     the mobile menu and the footer list were not, so on a car link forwarded
+     over WhatsApp and opened on a phone (where the hamburger IS the whole
+     navigation) every menu item was dead. */
   const page = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
   const isActive = href => href === page || (page === '' && href === 'index.html');
 
@@ -108,7 +114,7 @@
           <span class="brand-name">Menu</span>
           <button class="nav-toggle" id="navClose" aria-label="Close menu">${icon('close')}</button>
         </div>
-        ${NAV.map(n => `<a class="m-link" href="${n.href}">${n.label}</a>`).join('')}
+        ${NAV.map(n => `<a class="m-link" href="${MBU.link(n.href)}">${n.label}</a>`).join('')}
         <div class="mobile-nav-foot">
           <a class="btn btn--wa btn--block" target="_blank" rel="noopener"
              href="${MBU.waLink('Hi MBU Car Sales, I have a question about a car.')}">
@@ -158,7 +164,7 @@
           <div>
             <h4>Browse</h4>
             <ul class="footer-links">
-              ${NAV.map(n => `<li><a href="${n.href}">${n.label}</a></li>`).join('')}
+              ${NAV.map(n => `<li><a href="${MBU.link(n.href)}">${n.label}</a></li>`).join('')}
             </ul>
           </div>
 
@@ -191,14 +197,18 @@
       </div>
     </footer>
 
-    <div class="mobile-bar${igLink ? ' mobile-bar--3' : ''}">
+    <div class="mobile-bar mobile-bar--${2 + (igLink ? 1 : 0) + (atLink ? 1 : 0)}">
       <a class="btn btn--wa" href="${MBU.waLink('Hi MBU Car Sales,')}" target="_blank" rel="noopener">
         ${icon('whatsapp')} WhatsApp
       </a>
       <a class="btn btn--primary" href="${MBU.telLink()}">${icon('phone')} Call us</a>
-      ${igLink ? `<a class="btn btn--ig mobile-bar-ig" href="${esc(igLink)}"
+      ${igLink ? `<a class="btn btn--ig mobile-bar-icon" href="${esc(igLink)}"
          target="_blank" rel="noopener" aria-label="MBU Car Sales on Instagram">
         ${icon('instagram')}
+      </a>` : ''}
+      ${atLink ? `<a class="btn btn--at mobile-bar-icon" href="${esc(atLink)}"
+         target="_blank" rel="noopener" aria-label="Our cars on Auto Trader">
+        ${icon('car')}
       </a>` : ''}
     </div>`;
   }

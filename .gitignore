@@ -23,3 +23,6 @@ MAINTENANCE.md
 
 # Scratch space — put anything you don't want published in here
 _private/
+
+# Local editor/tooling settings, not part of the website
+.claude/

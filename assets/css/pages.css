@@ -109,7 +109,7 @@
   border: 1px solid var(--line-2);
   padding: var(--sp-5);
   display: grid;
-  grid-template-columns: repeat(4, 1fr) auto;
+  grid-template-columns: repeat(5, 1fr) auto;
   gap: var(--sp-4);
   align-items: end;
 }
@@ -121,10 +121,20 @@
 .qs-submit .btn--primary { min-width: 130px; }
 .qs-reset { width: auto; flex: none; color: var(--ink-3); }
 .qs-reset[hidden] { display: none; }
-@media (max-width: 1040px) {
-  .quick-search { grid-template-columns: repeat(2, 1fr); }
-  .quick-search .qs-submit { grid-column: 1 / -1; }
+/* Five fields plus a button need more room than four did, so they fold down
+   in stages: three across, then two, then one. Search always takes the cell
+   at the end of the last row rather than being left stranded on its own. */
+@media (max-width: 1180px) {
+  .quick-search { grid-template-columns: repeat(3, 1fr); }
+  .quick-search .qs-submit { grid-column: 3 / -1; }
   .qs-submit .btn--primary { flex: 1; min-width: 0; }
+}
+@media (max-width: 780px) {
+  .quick-search { grid-template-columns: repeat(2, 1fr); }
+  /* Max price is the odd one out at two across, so it takes the full width
+     and Search sits on the row below it. */
+  .quick-search .field:nth-of-type(5) { grid-column: 1 / -1; }
+  .quick-search .qs-submit { grid-column: 1 / -1; }
 }
 @media (max-width: 520px) {
   .quick-search-wrap { margin-top: -40px; }
@@ -493,6 +503,85 @@
   background: rgba(255,255,255,.12); padding: 6px 14px; border-radius: var(--r-full);
 }
 
+/* --------------------------------------------------------------------------
+   PRICE BAR (car page, phones and tablets)
+
+   The buy panel below is a sticky column on a desktop, but under 980px it
+   drops beneath the whole left column, so the price ended up around five
+   screens down the page. This sits directly under the photos and says the
+   price straight away, with the part exchange route next to it. Above 980px
+   it hides, because the panel is already there in the corner of the eye.
+   -------------------------------------------------------------------------- */
+.car-price-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-top: var(--sp-5);
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+}
+.cpb-figure { min-width: 0; }
+.cpb-price {
+  display: block;
+  font-size: clamp(1.7rem, 7vw, 2.1rem);
+  font-weight: 800;
+  letter-spacing: -.035em;
+  line-height: 1.05;
+  color: var(--navy-900);
+}
+.cpb-price--sold { color: var(--ink-3); }
+.cpb-was {
+  margin-left: 10px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink-3);
+  text-decoration: line-through;
+  letter-spacing: 0;
+}
+.cpb-note {
+  display: block;
+  margin-top: 5px;
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+/* Enquire and Share sit together beside the price on a tablet, and drop to
+   their own full-width line once the phone is too narrow for both. Enquire
+   takes the spare room; Share only needs enough for the word. */
+.cpb-actions { display: flex; gap: var(--sp-2); flex: 0 1 auto; }
+.cpb-actions .btn { justify-content: center; }
+/* The first button takes the room that is going and may wrap its label if it
+   has to ("Want one like this?" on a sold car). Share never wraps. */
+.cpb-actions .btn:first-child { flex: 1 1 auto; min-width: 0; }
+.cpb-share { flex: 0 0 auto; white-space: nowrap; }
+@media (max-width: 520px) {
+  .car-price-bar { flex-direction: column; align-items: stretch; gap: var(--sp-3); }
+  .cpb-actions { width: 100%; }
+}
+/* On a phone the card gives back some of its padding so both labels still fit
+   across a 375px screen with room to spare, rather than only just. */
+@media (max-width: 420px) {
+  .car-price-bar { padding-inline: var(--sp-4); }
+  .cpb-actions .btn { padding-inline: 14px; }
+}
+/* Below that they genuinely do not fit, so Share drops back to its icon rather
+   than pushing itself off the edge of the card. It keeps its aria-label, so it
+   still announces itself properly to a screen reader. */
+@media (max-width: 370px) {
+  .cpb-share { width: 46px; padding-inline: 0; }
+  .cpb-share-label { display: none; }
+}
+@media (min-width: 981px) { .car-price-bar { display: none; } }
+
+/* Enquire and Share as a pair in the buy panel, so Share sits with the action
+   it belongs to rather than stranded at the bottom of the panel. */
+.buy-panel-pair { display: grid; grid-template-columns: 1fr auto; gap: var(--sp-2); }
+.buy-panel-pair .btn { width: 100%; white-space: nowrap; }
+
 /* Buy panel */
 .buy-panel {
   position: sticky;
@@ -568,6 +657,25 @@
 .feature-list li { display: flex; align-items: flex-start; gap: 9px; font-size: var(--fs-sm); color: var(--ink-2); }
 .feature-list svg { width: 17px; height: 17px; color: var(--green-600); flex: none; margin-top: 2px; }
 
+/* The folded-away remainder of a group. It is a second grid rather than more
+   items in the first, so it needs the row gap putting back between them. */
+.feature-list--more { margin-top: 10px; }
+
+.feature-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: var(--sp-3);
+  padding: 8px 15px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  font-size: var(--fs-sm); font-weight: 700;
+  color: var(--navy-900);
+  transition: background .16s ease, border-color .16s ease;
+}
+.feature-toggle:hover { background: var(--surface-2); border-color: var(--navy-800); }
+.feature-toggle svg { width: 16px; height: 16px; transition: transform .2s ease; }
+.feature-toggle.is-open svg { transform: rotate(180deg); }
+
 .notice {
   display: flex; gap: var(--sp-3);
   padding: var(--sp-4);
@@ -581,6 +689,35 @@
 .notice--blue { background: var(--blue-100); color: var(--navy-700); }
 .notice--blue svg { color: var(--navy-600); }
 .notice strong { display: block; margin-bottom: 3px; color: inherit; }
+
+/* Shown on the Sell Your Car page when somebody arrives from a car listing
+   wanting a valuation against it, and on the contact page when they arrive
+   from a car listing wanting to ask about it. */
+.px-notice, .ct-notice { margin-bottom: var(--sp-4); }
+.px-back, .ct-link {
+  display: inline-block; margin-top: 6px;
+  font-weight: 700; color: var(--accent-600); text-decoration: underline;
+}
+.px-back:hover, .ct-link:hover { color: var(--navy-900); }
+
+/* --------------------------------------------------------------------------
+   SEND IT ANOTHER WAY (contact page)
+
+   Under the form. The message they have typed is carried into whichever of
+   these they pick, so choosing WhatsApp over the form is not starting again.
+   -------------------------------------------------------------------------- */
+.send-via {
+  margin-top: var(--sp-5);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--line);
+}
+.send-via-title {
+  display: block; margin-bottom: var(--sp-3);
+  font-size: var(--fs-xs); font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3);
+}
+.send-via-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.send-via-row .btn { flex: 1 1 auto; justify-content: center; min-width: 120px; }
 
 .car-section { padding-block: var(--sp-6); border-top: 1px solid var(--line-2); }
 .car-section:first-child { border-top: 0; padding-top: 0; }

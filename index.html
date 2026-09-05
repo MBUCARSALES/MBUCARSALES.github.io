@@ -101,6 +101,10 @@
         <select class="select" id="qsModel" name="model"><option value="">Any model</option></select>
       </div>
       <div class="field">
+        <label for="qsFuel">Fuel</label>
+        <select class="select" id="qsFuel" name="fuel"><option value="">Any fuel</option></select>
+      </div>
+      <div class="field">
         <label for="qsTrans">Gearbox</label>
         <select class="select" id="qsTrans" name="transmission">
           <option value="">Either</option>
@@ -368,17 +372,31 @@
   /* Count clicks through to a car from the homepage grid */
   MBU.trackGrid(grid);
 
-  /* Quick search: Make → Model → Max price.
+  /* Quick search: Make → Model → Fuel → Gearbox → Max price.
      Picking a make narrows the model list to that make's cars only. */
   MBU.getAvailable().then(cars => {
     const mk = document.getElementById('qsMake');
     const md = document.getElementById('qsModel');
     const mx = document.getElementById('qsMax');
     const tx = document.getElementById('qsTrans');
+    const fu = document.getElementById('qsFuel');
     const reset = document.getElementById('qsReset');
 
     [...new Set(cars.map(c => c.make).filter(Boolean))].sort()
       .forEach(m => mk.add(new Option(m, m)));
+
+    /* Fuel is built from what is actually on the forecourt, the same way Make
+       is, so the list can never offer a search that comes back empty. Ordered
+       the way MBU.labels lists them (petrol, diesel, hybrid, electric...)
+       rather than alphabetically. */
+    const fuelOrder = Object.keys(MBU.labels.fuel);
+    const fuelRank = v => { const i = fuelOrder.indexOf(v); return i === -1 ? 999 : i; };
+    [...new Set(cars.map(c => c.fuel).filter(Boolean))]
+      .sort((a, b) => fuelRank(a) - fuelRank(b) || String(a).localeCompare(String(b)))
+      .forEach(f => fu.add(new Option(MBU.label('fuel', f), f)));
+    // Only "Any fuel" left means every car runs on the same thing, and a
+    // filter with one choice is just clutter.
+    if (fu.options.length < 2) fu.closest('.field').hidden = true;
 
     function fillModels() {
       const chosen = mk.value;
@@ -393,16 +411,17 @@
     /* Reset only appears once something is actually chosen. An always-on
        Reset next to Search just adds noise to an empty form. */
     function syncReset() {
-      reset.hidden = !(mk.value || md.value || mx.value || tx.value);
+      reset.hidden = !(mk.value || md.value || mx.value || tx.value || fu.value);
     }
 
     mk.addEventListener('change', () => { fillModels(); syncReset(); });
-    [md, mx, tx].forEach(el => el.addEventListener('change', syncReset));
+    [md, mx, tx, fu].forEach(el => el.addEventListener('change', syncReset));
 
     reset.addEventListener('click', () => {
       mk.value = '';
       mx.value = '';
       tx.value = '';
+      fu.value = '';
       fillModels();          // rebuild the full model list and clear the choice
       syncReset();
       mk.focus();
