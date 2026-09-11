@@ -1,0 +1,163 @@
+# ============================================================================
+# NIGHTLY DATABASE BACKUP
+# ----------------------------------------------------------------------------
+# Dumps the `public` schema out of Supabase every night and keeps the file as
+# a GitHub Actions artifact for 30 days.
+#
+# Everything the business actually owns lives in `public`: cars, enquiries,
+# wanted_requests, car_events, price_checks, price_history, admins. Restoring
+# this file into an empty Supabase project gets the stock list and the history
+# back.
+#
+# SETUP — one repo secret is required:
+#   SUPABASE_DB_URL   the SESSION POOLER connection string, port 5432
+#
+# ⚠️  It MUST be the session pooler string, not the direct one.
+#     Supabase's direct connection (db.<ref>.supabase.co) is IPv6-only, and
+#     GitHub's runners have no IPv6, so a direct string fails to connect with
+#     a misleading "could not translate host name" error. The pooler host
+#     (aws-N-<region>.pooler.supabase.com) answers on IPv4.
+#
+# ⚠️  Port 5432 (session mode), NOT 6543 (transaction mode). pg_dump needs
+#     session features that transaction mode does not provide.
+#
+# WHAT IS NOT IN HERE: Supabase Auth users (the `auth` schema). That schema is
+# owned by Supabase's internal roles and is not dumpable from the pooler. The
+# two admin logins would have to be recreated by hand after a restore, and the
+# `admins` table repointed at the new user ids. Everything else is covered.
+# ============================================================================
+
+name: Backup database
+
+on:
+  schedule:
+    - cron: '0 2 * * *'      # 02:00 UTC nightly
+  workflow_dispatch:          # and a "Run workflow" button
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-db
+  cancel-in-progress: false   # never cut a backup short
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check the secret is set
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DB_URL:-}" ]; then
+            echo "::error::SUPABASE_DB_URL is not set. Add it under"
+            echo "::error::Settings -> Secrets and variables -> Actions -> New repository secret."
+            exit 1
+          fi
+          # Catch the two mistakes that actually happen, before wasting a connection.
+          case "$DB_URL" in
+            *db.*.supabase.co*)
+              echo "::error::That looks like the DIRECT connection string, which is IPv6-only."
+              echo "::error::GitHub runners cannot reach it. Use the Session Pooler string instead:"
+              echo "::error::postgresql://postgres.<ref>:<password>@aws-N-<region>.pooler.supabase.com:5432/postgres"
+              exit 1 ;;
+          esac
+          case "$DB_URL" in
+            *:6543/*)
+              echo "::error::Port 6543 is the transaction pooler. pg_dump needs session mode."
+              echo "::error::Use the same host on port 5432."
+              exit 1 ;;
+          esac
+          echo "Secret is present and the shape looks right."
+
+      - name: Install PostgreSQL 17 client
+        run: |
+          set -euo pipefail
+          # Ubuntu's default pg_dump lags behind Supabase's server and refuses to
+          # run against a newer server ("server version X; pg_dump version Y").
+          # pg_dump is forward compatible, so install the newest and it works
+          # against whatever version the project is on.
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+            https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          pg_dump --version
+
+      - name: Dump the public schema
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail   # pipefail matters: without it, gzip masks a pg_dump failure
+
+          STAMP="$(date -u +%Y-%m-%d_%H%M)"
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          OUT="mbu-db-${STAMP}.sql.gz"
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+
+          # --no-owner / --no-privileges so the dump restores cleanly into a
+          # different Supabase project, where the role names differ.
+          pg_dump "$DB_URL" \
+            --schema=public \
+            --no-owner \
+            --no-privileges \
+            --clean \
+            --if-exists \
+            --quote-all-identifiers \
+          | gzip -9 > "$OUT"
+
+          echo "Wrote $OUT"
+
+      - name: Verify the backup is real
+        run: |
+          set -euo pipefail
+
+          # 1. Non-trivial size. A permissions failure can still produce a
+          #    valid-but-empty gzip, which is the silent failure to avoid.
+          SIZE=$(stat -c%s "$OUT")
+          echo "Compressed size: $SIZE bytes"
+          if [ "$SIZE" -lt 1024 ]; then
+            echo "::error::Backup is only $SIZE bytes. That is not a real dump."
+            exit 1
+          fi
+
+          # 2. The gzip is not truncated.
+          gzip -t "$OUT"
+          echo "gzip integrity: OK"
+
+          # 3. It actually contains the tables that matter, and the car rows.
+          #    Grep the decompressed stream rather than unpacking to disk.
+          for tbl in cars enquiries wanted_requests car_events; do
+            if ! gzip -dc "$OUT" | grep -q "CREATE TABLE \"public\".\"${tbl}\""; then
+              echo "::error::Table '${tbl}' is missing from the dump."
+              exit 1
+            fi
+            echo "  found table: ${tbl}"
+          done
+
+          # 4. Count the COPY rows for `cars` so the log proves data came across.
+          CARS=$(gzip -dc "$OUT" \
+            | awk '/^COPY "public"."cars" /{f=1;next} f&&/^\\\.$/{f=0} f' \
+            | wc -l | tr -d ' ')
+          echo "Car records in this backup: $CARS"
+          if [ "$CARS" -lt 1 ]; then
+            echo "::error::The dump contains zero car records. Refusing to call this a backup."
+            exit 1
+          fi
+
+          echo "Backup verified."
+
+      - name: Upload the backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: mbu-db-backup-${{ env.STAMP }}
+          path: ${{ env.OUT }}
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0   # already gzipped
