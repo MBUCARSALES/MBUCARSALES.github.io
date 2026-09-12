@@ -153,6 +153,8 @@
     tab: 'available',
     enqTab: 'new',
     dataTab: 'cars',
+    soldMonth: 'all',        // 'all' or 'YYYY-MM', for the Sold tab
+
     view: 'stock',
     editing: null,       // car being edited (null = new)
     photos: [],          // [{public_id,url,width,height,uploading,progress,localUrl}]
@@ -1869,7 +1871,8 @@
   function renderInsights() {
     if (!stats) return;
     $('#dataBody').innerHTML =
-      state.dataTab === 'ageing' ? ageingInsights()
+      state.dataTab === 'sold'   ? soldInsights()
+      : state.dataTab === 'ageing' ? ageingInsights()
       : state.dataTab === 'demand' ? demandInsights()
       : carInsights();
     wireInsightActions();
@@ -2102,6 +2105,145 @@
       </button>`;
   }
 
+  /* ---- Sold: what actually got made ---------------------------------------
+     The Cars tab answers "what is happening now". This answers "what did we
+     make", which is the number that matters at the end of a month and the one
+     that has to survive into the accounts. Filterable by month and exportable,
+     because it gets typed into a spreadsheet either way.
+
+     Margin comes from car_stats: sale_price - purchase_price - prep_cost. It
+     is null until the private figures are filled in on the car, so those are
+     counted and called out rather than silently averaged away.
+     ------------------------------------------------------------------------ */
+  /* money() renders a loss as "£-400", which reads badly for the one number
+     on this screen most likely to be negative. Sign goes in front of the £. */
+  const signed = n => n == null ? '—'
+    : (n < 0 ? '\u2212£' : '£') + Math.abs(n).toLocaleString('en-GB');
+
+  const monthKey  = d => new Date(d).toISOString().slice(0, 7);          // YYYY-MM
+  const monthName = k => {
+    const [y, m] = k.split('-');
+    return new Date(+y, +m - 1, 1)
+      .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  };
+
+  /** Sold cars for the month currently selected, newest first. */
+  function soldRows() {
+    const all = (stats || [])
+      .filter(c => c.status === 'sold' && c.sold_at)
+      .sort((a, b) => new Date(b.sold_at) - new Date(a.sold_at));
+    return state.soldMonth === 'all'
+      ? all
+      : all.filter(c => monthKey(c.sold_at) === state.soldMonth);
+  }
+
+  function soldInsights() {
+    const everySold = (stats || []).filter(c => c.status === 'sold' && c.sold_at);
+
+    if (!everySold.length) {
+      return `<div class="empty">${icon('car')}<h3>Nothing sold yet</h3>
+        <p>Mark a car as sold and it will show up here with what you made on it.</p></div>`;
+    }
+
+    // Month list, newest first, built from what has actually sold
+    const months = [...new Set(everySold.map(c => monthKey(c.sold_at)))].sort().reverse();
+    if (state.soldMonth !== 'all' && !months.includes(state.soldMonth)) state.soldMonth = 'all';
+
+    const rows      = soldRows();
+    const withMargin = rows.filter(c => c.margin != null);
+    const missing    = rows.length - withMargin.length;
+    const totalMargin = withMargin.reduce((n, c) => n + c.margin, 0);
+    const avgMargin   = withMargin.length ? Math.round(totalMargin / withMargin.length) : null;
+    const withDays    = rows.filter(c => c.days_in_stock != null);
+    const avgDays     = withDays.length
+      ? Math.round(withDays.reduce((n, c) => n + c.days_in_stock, 0) / withDays.length) : null;
+
+    /* Month on month: only meaningful when looking at a single month */
+    let compare = '';
+    if (state.soldMonth !== 'all') {
+      const i = months.indexOf(state.soldMonth);
+      const prevKey = months[i + 1];
+      if (prevKey) {
+        const prev = everySold.filter(c => monthKey(c.sold_at) === prevKey && c.margin != null);
+        if (prev.length && withMargin.length) {
+          const prevTotal = prev.reduce((n, c) => n + c.margin, 0);
+          const diff = totalMargin - prevTotal;
+          const up = diff >= 0;
+          compare = `<p class="hint" style="margin:-4px 0 14px">
+            ${up ? 'Up' : 'Down'} <strong style="color:${up ? 'var(--green-600)' : 'var(--red-600)'}">
+            £${Math.abs(diff).toLocaleString('en-GB')}</strong> on ${esc(monthName(prevKey))}
+            (${prev.length} sold, ${signed(prevTotal)}).</p>`;
+        }
+      }
+    }
+
+    const list = rows.map(c => {
+      const title = [c.year, c.make, c.model].filter(Boolean).join(' ') || 'Untitled';
+      const when  = new Date(c.sold_at).toLocaleDateString('en-GB',
+        { day: 'numeric', month: 'short', year: 'numeric' });
+      const good  = c.margin != null && c.margin >= 0;
+
+      return `<div class="card" style="margin-bottom:10px"><div style="padding:14px">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+          <div>
+            <strong style="font-size:15.5px">${esc(title)}</strong>
+            <div style="font-size:13px;color:var(--ink-3);margin-top:2px">
+              ${esc(when)}${c.days_in_stock != null ? ' · ' + c.days_in_stock + ' days in stock' : ''}
+            </div>
+          </div>
+          <div style="text-align:right;white-space:nowrap">
+            <div style="font-size:17px;font-weight:800;color:${
+              c.margin == null ? 'var(--ink-3)' : good ? 'var(--green-600)' : 'var(--red-600)'}">
+              ${signed(c.margin)}
+            </div>
+            <div style="font-size:11px;color:var(--ink-3)">margin</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:14px;margin-top:10px;font-size:13px;color:var(--ink-3);flex-wrap:wrap">
+          <span>Sold for <strong style="color:var(--navy-900)">${money(c.sale_price)}</strong></span>
+          <span>Paid <strong style="color:var(--navy-900)">${money(c.purchase_price)}</strong></span>
+          <span>Prep <strong style="color:var(--navy-900)">${money(c.prep_cost)}</strong></span>
+        </div>
+      </div></div>`;
+    }).join('');
+
+    return `
+      <div class="section-card" style="padding:12px;margin-bottom:12px">
+        <label for="soldMonth" style="font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)">Month</label>
+        <select class="sel" id="soldMonth" style="margin-top:6px">
+          <option value="all"${state.soldMonth === 'all' ? ' selected' : ''}>All time (${everySold.length} sold)</option>
+          ${months.map(k => {
+            const n = everySold.filter(c => monthKey(c.sold_at) === k).length;
+            return `<option value="${k}"${state.soldMonth === k ? ' selected' : ''}>${esc(monthName(k))} (${n})</option>`;
+          }).join('')}
+        </select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">
+        ${statTile(nf(rows.length), 'Cars sold')}
+        ${statTile(withMargin.length ? signed(totalMargin) : 'Not yet', 'Total margin',
+          totalMargin < 0 ? 'var(--red-600)' : 'var(--green-600)')}
+        ${statTile(avgMargin != null ? signed(avgMargin) : 'Not yet', 'Avg per car', 'var(--accent-600)')}
+        ${statTile(avgDays != null ? avgDays + ' days' : 'Not yet', 'Avg time to sell')}
+      </div>
+
+      ${compare}
+
+      ${missing ? `<div class="msg msg--info is-shown" style="margin-bottom:14px">
+        <strong>${missing} of these ${missing === 1 ? 'has' : 'have'} no margin figure.</strong>
+        Fill in what you paid, the prep and what it sold for on the car itself and
+        it will be counted here.</div>` : ''}
+
+      <div class="section-card">
+        <h2>${state.soldMonth === 'all' ? 'Everything sold' : esc(monthName(state.soldMonth))}, newest first</h2>
+        ${list || '<p class="hint">Nothing sold in that month.</p>'}
+      </div>
+
+      <button class="btn btn--outline btn--block" id="exportSold" style="margin-top:14px">
+        ${icon('copy')} Export ${state.soldMonth === 'all' ? 'all sales' : esc(monthName(state.soldMonth))} as a spreadsheet
+      </button>`;
+  }
+
   function demandInsights() {
     if (!demand.length) {
       return `<div class="empty">${icon('inbox')}<h3>No requests yet</h3>
@@ -2160,6 +2302,32 @@
     if (ec) ec.onclick = () => downloadCsv('mbu-car-figures', stats);
     const ed = $('#exportDemand');
     if (ed) ed.onclick = () => downloadCsv('mbu-car-requests', demand);
+
+    /* Sold tab: month picker re-renders, export follows whatever is on screen */
+    const sm = $('#soldMonth');
+    if (sm) sm.onchange = () => { state.soldMonth = sm.value; renderInsights(); };
+
+    const es = $('#exportSold');
+    if (es) es.onclick = () => {
+      const rows = soldRows().map(c => ({
+        sold_on:        c.sold_at ? new Date(c.sold_at).toISOString().slice(0, 10) : '',
+        year:           c.year,
+        make:           c.make,
+        model:          c.model,
+        variant:        c.variant,
+        advertised_at:  c.price,
+        sold_for:       c.sale_price,
+        purchase_price: c.purchase_price,
+        prep_cost:      c.prep_cost,
+        margin:         c.margin,
+        days_in_stock:  c.days_in_stock,
+        views:          c.views,
+        enquiries:      c.enquiries
+      }));
+      if (!rows.length) return toast('Nothing to export for that month');
+      const tag = state.soldMonth === 'all' ? 'all-time' : state.soldMonth;
+      downloadCsv('mbu-sales-' + tag, rows);
+    };
     $$('#dataBody [data-reprice]').forEach(b => {
       b.onclick = () => repriceCar(b.dataset.reprice);
     });

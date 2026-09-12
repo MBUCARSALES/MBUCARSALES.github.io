@@ -176,11 +176,17 @@ window.MBU_CONFIG = {
      5. SITE BEHAVIOUR
      ------------------------------------------------------------------- */
   options: {
-    // Sold cars stay visible in the stock list for this many days, mixed in
-    // with available stock but clearly marked as sold. The database also
-    // enforces a 45-day cut-off, so raising this above 45 has no effect.
-    // change the `cars_public` view in supabase/schema-v4-pricing-video.sql too.
-    soldVisibleDays: 45,
+    // Sold cars stay in the stock list and the search results for this many
+    // days, mixed in with available stock but clearly marked as sold. Kept
+    // short deliberately: a fortnight of old cars makes the forecourt look
+    // stale and customers said so.
+    //
+    // The database view `cars_public` still returns sold cars for 45 days,
+    // and that is on purpose. It means a link somebody was sent on WhatsApp
+    // three weeks ago still opens the car and says it has gone, instead of
+    // dropping them on a 404. Only the LISTINGS are trimmed to the number
+    // below; direct links outlive it.
+    soldVisibleDays: 4,
 
     // Sold prices are hidden by the DATABASE, not by this setting. The
     // `cars_public` view returns null for them, so the figure never reaches

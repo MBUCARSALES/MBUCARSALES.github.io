@@ -257,7 +257,7 @@
     // "Register interest" exactly where the price would otherwise be. Nobody
     // should be able to mistake one for something they can buy.
     const priceBlock = sold
-      ? `<div class="car-price car-price--sold">Now sold${car.sold_at ? `<small>${esc(MBU.fmt.ago(car.sold_at))}</small>` : ''}</div>`
+      ? `<div class="car-price car-price--sold">Now sold</div>`
       : `<div class="car-price">${MBU.fmt.price(car.price)}${
           reduced ? `<small class="was-price">was ${MBU.fmt.price(car.previous_price)}</small>` : ''
         }</div>`;

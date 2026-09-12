@@ -177,9 +177,7 @@
               <div class="cpb-figure">
                 ${sold
                   ? `<span class="cpb-price cpb-price--sold">Now sold</span>
-                     <span class="cpb-note">${car.sold_at
-                        ? 'Sold ' + esc(fmt.ago(car.sold_at))
-                        : 'This car has found a new home'}</span>`
+                     <span class="cpb-note">Sold recently</span>`
                   : `<span class="cpb-price">${fmt.price(car.price)}${reduced
                         ? `<span class="cpb-was">${fmt.price(car.previous_price)}</span>` : ''}</span>
                      <span class="cpb-note">${reduced
@@ -438,7 +436,7 @@
               <div class="buy-panel-head">
                 ${sold
                   ? `<div class="price" style="font-size:1.6rem;color:#fff">Now sold</div>
-                     <div class="price-sub">${car.sold_at ? 'Sold ' + esc(fmt.ago(car.sold_at)) : 'This car has found a new home'}</div>`
+                     <div class="price-sub">Sold recently</div>`
                   : `<div class="price">${fmt.price(car.price)}</div>
                      ${(car.previous_price && car.price != null && car.previous_price > car.price)
                        ? `<div class="price-sub">
