@@ -96,6 +96,42 @@ jobs:
         run: |
           set -euo pipefail   # pipefail matters: without it, gzip masks a pg_dump failure
 
+          # Take the connection string apart and hand pg_dump the pieces via
+          # libpq's environment variables instead of a URI.
+          #
+          # Why: a database password is very likely to contain characters that
+          # are structural in a URI. A single "@" in the password makes libpq
+          # split the string in the wrong place and it goes looking for a host
+          # called something like "£$@aws-0-eu-west-2.pooler.supabase.com".
+          # Percent-encoding by hand works but is easy to get wrong, especially
+          # for non-ASCII (£ is %C2%A3). PGPASSWORD takes the password verbatim,
+          # so any character is fine and nothing needs encoding.
+          #
+          # Splitting on the LAST "@" is safe here because the host is always
+          # the pooler, which contains no "@".
+          REST="${DB_URL#*://}"
+          HOSTPART="${REST##*@}"            # after the last @  -> host:port/db
+          USERINFO="${REST%@*}"             # before the last @ -> user:password
+
+          PGUSER="${USERINFO%%:*}"
+          PGPASSWORD="${USERINFO#*:}"
+          HOSTPORT="${HOSTPART%%/*}"
+          PGDATABASE="${HOSTPART#*/}"; PGDATABASE="${PGDATABASE%%\?*}"
+          [ "$PGDATABASE" = "$HOSTPART" ] && PGDATABASE="postgres"
+          PGHOST="${HOSTPORT%%:*}"
+          if [ "$HOSTPORT" = "$PGHOST" ]; then PGPORT=5432; else PGPORT="${HOSTPORT##*:}"; fi
+
+          # Keep the password out of the log even if something below goes wrong.
+          echo "::add-mask::$PGPASSWORD"
+          export PGUSER PGPASSWORD PGHOST PGPORT PGDATABASE
+
+          if [ -z "$PGHOST" ] || [ -z "$PGUSER" ]; then
+            echo "::error::Could not read a host and user out of SUPABASE_DB_URL."
+            echo "::error::Expected postgresql://user:password@host:5432/postgres"
+            exit 1
+          fi
+          echo "Connecting to $PGHOST:$PGPORT as $PGUSER, database $PGDATABASE"
+
           STAMP="$(date -u +%Y-%m-%d_%H%M)"
           echo "STAMP=$STAMP" >> "$GITHUB_ENV"
           OUT="mbu-db-${STAMP}.sql.gz"
@@ -103,7 +139,7 @@ jobs:
 
           # --no-owner / --no-privileges so the dump restores cleanly into a
           # different Supabase project, where the role names differ.
-          pg_dump "$DB_URL" \
+          pg_dump \
             --schema=public \
             --no-owner \
             --no-privileges \
