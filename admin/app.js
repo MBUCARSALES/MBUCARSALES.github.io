@@ -34,6 +34,13 @@
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
   });
 
+  // Auto Trader calls go out with the signed-in admin's own token, never a key
+  const AT = window.MBU_AUTOTRADER || null;
+  if (AT) AT.init({ getToken: async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    return session ? session.access_token : null;
+  } });
+
   /* ============================================================ ICONS */
   const P = 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"';
   const ICONS = {
@@ -54,7 +61,9 @@
     car:      `<path ${P} d="M3 17v-4.2a2 2 0 0 1 .2-.9l2-4A2 2 0 0 1 7 6.8h10a2 2 0 0 1 1.8 1.1l2 4a2 2 0 0 1 .2.9V17"/><line ${P} x1="3" y1="14" x2="21" y2="14"/><circle ${P} cx="7.5" cy="17" r="2"/><circle ${P} cx="16.5" cy="17" r="2"/>`,
     eye:      `<path ${P} d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle ${P} cx="12" cy="12" r="3"/>`,
     copy:     `<rect ${P} x="9" y="9" width="12" height="12" rx="2"/><path ${P} d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>`,
-    inbox:    `<path ${P} d="M3 13h5l1.5 3h5L16 13h5"/><path ${P} d="M4.6 5.5 3 13v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5l-1.6-7.5A2 2 0 0 0 17.4 4H6.6a2 2 0 0 0-2 1.5Z"/>`
+    inbox:    `<path ${P} d="M3 13h5l1.5 3h5L16 13h5"/><path ${P} d="M4.6 5.5 3 13v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5l-1.6-7.5A2 2 0 0 0 17.4 4H6.6a2 2 0 0 0-2 1.5Z"/>`,
+    search:   `<circle ${P} cx="11" cy="11" r="7"/><line ${P} x1="20.5" y1="20.5" x2="16" y2="16"/>`,
+    checkCirc:`<circle ${P} cx="12" cy="12" r="9"/><polyline ${P} points="8 12.2 11 15.2 16 9.5"/>`
   };
   const icon = n => ICONS[n] ? `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>` : '';
 
@@ -154,6 +163,8 @@
     enqTab: 'new',
     dataTab: 'cars',
     soldMonth: 'all',        // 'all' or 'YYYY-MM', for the Sold tab
+    marginOpen: false,       // per-car breakdown under the margin figure
+    schema: { v6: null, v7: null },   // optional upgrades: true, false, or null = not checked yet
 
     view: 'stock',
     editing: null,       // car being edited (null = new)
@@ -362,6 +373,21 @@
       } catch { missing.push(file); }
     }
 
+    // The newer files are upgrades, not setup. Nothing breaks without them, so
+    // they're offered on the More tab rather than shouted about on Stock.
+    const has = async run => {
+      try {
+        const { error } = await run();
+        return !(error && /does not exist|schema cache|not find the table/i.test(error.message));
+      } catch { return false; }
+    };
+    const [v6, v7] = await Promise.all([
+      has(() => sb.from('tracking_status').select('v2_since').limit(1)),
+      has(() => sb.from('insight_actions').select('id').limit(1))
+    ]);
+    state.schema = { v6, v7 };
+    renderUpgrades();
+
     if (!missing.length) return;
 
     msg('#stockMsg',
@@ -372,6 +398,69 @@
        Do them in the order listed. Until then some things won’t save.`,
       'err');
   }
+
+  /**
+   * More → "Ready to switch on". Lists the upgrades that are written but not
+   * yet turned on, in the order they have to happen, and says what each gets
+   * you. Hidden once there's nothing left to do.
+   */
+  function renderUpgrades() {
+    const items = [];
+    const via = (CFG.tracking && CFG.tracking.via) || 'rest';
+
+    if (state.schema.v6 === false) {
+      items.push(['Count people, not page loads',
+        'Run <strong>schema-v6-tracking.sql</strong> in Supabase → SQL Editor. Then deploy the <strong>track</strong> function. HANDOVER 9f has the steps.']);
+    } else if (state.schema.v6 && via !== 'function') {
+      items.push(['Switch the website to the new tracking',
+        'The database is ready. Deploy the <strong>track</strong> function with JWT verification off, then set <strong>tracking: { via: \'function\' }</strong> in config.js.']);
+    }
+    if (state.schema.v7 === false) {
+      items.push(['"Price is right" and "Remind me" on insights',
+        'Run <strong>schema-v7-insights.sql</strong> in Supabase → SQL Editor, after v6.']);
+    }
+
+    $('#upgradesCard').hidden = !items.length;
+    $('#upgradesBody').innerHTML = items.map(([title, how]) => `
+      <div style="padding:10px 0;border-bottom:1px solid var(--line-2)">
+        <strong style="display:block;font-size:15.5px">${esc(title)}</strong>
+        <span class="hint" style="display:block;margin-top:3px;font-size:14px;line-height:1.5">${how}</span>
+      </div>`).join('');
+  }
+
+  /* ---- More → Auto Trader --------------------------------------------- */
+  function atIntro() {
+    if (!AT || !AT.isEnabled()) {
+      $('#atStatus').innerHTML = `Not switched on yet. Once Auto Trader approve access, deploy the
+        <strong>autotrader</strong> function with your key and secret (HANDOVER 9f), tap Test,
+        then set <strong>enabled: true</strong> for autotrader in config.js.`;
+    } else {
+      $('#atStatus').textContent = 'Switched on. Tap Test to check the connection.';
+    }
+  }
+
+  $('#atTest').onclick = async () => {
+    const btn = $('#atTest');
+    const box = $('#atStatus');
+    if (!AT) return;
+    btn.disabled = true; btn.textContent = 'Testing…';
+    const s = await AT.status();
+    btn.disabled = false; btn.textContent = 'Test the connection';
+
+    if (s.connected) {
+      box.innerHTML = s.env === 'sandbox'
+        ? `<span style="color:var(--green-600);font-weight:700">Connected to the Auto Trader sandbox.</span>
+           That is test data, not real prices. Switch AT_ENV to production when they give you live credentials.`
+        : `<span style="color:var(--green-600);font-weight:700">Connected to Auto Trader.</span>
+           Advertiser ${esc(s.advertiserId || '')}.${AT.isEnabled() ? '' : ' Set enabled: true in config.js to start using it.'}`;
+    } else if (s.code === 'not_deployed') {
+      box.innerHTML = 'The <strong>autotrader</strong> function isn’t deployed in Supabase yet.';
+    } else if (s.configured === false && s.missing) {
+      box.innerHTML = `The function is deployed but these secrets are missing: <strong>${s.missing.map(esc).join(', ')}</strong>.`;
+    } else {
+      box.innerHTML = `<span style="color:var(--red-600);font-weight:700">Not connected.</span> ${esc(s.error || '')}`;
+    }
+  };
 
   sb.auth.onAuthStateChange((event) => {
     if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && !state.user) {
@@ -486,6 +575,7 @@
 
     // Figures are loaded on demand, and refreshed each time you open the tab
     if (view === 'data') loadInsights();
+    if (view === 'more') atIntro();
 
     $$('#tabbar button').forEach(b => b.classList.toggle('is-on', b.dataset.view === view));
     window.scrollTo(0, 0);
@@ -591,6 +681,11 @@
     }
 
     if (car.status === 'available' || car.status === 'reserved') {
+      acts.push({ label: 'Check the market price', icon: 'search',
+        sub: AT && AT.isEnabled() ? 'Asks Auto Trader where your price sits'
+                                  : 'See what similar cars are up for and record it',
+        run: () => checkMarket(car) });
+
       const a = advertAllowance();
       const atOn = !!car.at_published;
       acts.push({
@@ -699,9 +794,10 @@
       ? `Marked for Auto Trader (${after.used}/${after.limit} slots used)`
       : `Taken off Auto Trader (${after.remaining} slots free)`, 'ok');
 
-    // Once the API is connected this is where the advert actually goes live.
-    const AT = window.MBU_AUTOTRADER;
-    if (AT && AT.isEnabled()) {
+    // Once stock sync is built this is where the advert actually goes live.
+    // Separate from the read-only connection, so switching that on can't
+    // start changing live adverts.
+    if (AT && AT.syncEnabled()) {
       AT.syncStock(car, { publish: next }).catch(err => {
         console.warn('Auto Trader sync failed', err);
         toast('Saved here, but the Auto Trader sync failed');
@@ -743,7 +839,7 @@
     $('#fColour').addEventListener('change', () => syncOther('#fColour', '#fColourOther'));
 
     // Running total under the private figures, updated as you type
-    ['#fPurchase', '#fPrep', '#fPrice'].forEach(sel =>
+    ['#fPurchase', '#fPrep', '#fPrice', '#fSale'].forEach(sel =>
       $(sel).addEventListener('input', renderCostSummary));
 
     const reg = $('#fReg');
@@ -772,18 +868,21 @@
     const paid = int($('#fPurchase').value) || 0;
     const prep = int($('#fPrep').value) || 0;
     const ask  = int($('#fPrice').value) || 0;
+    // On a sold car, what it actually went for beats what it was advertised at
+    const sold = !$('#fSaleWrap').hidden ? int($('#fSale').value) : null;
     const inCar = paid + prep;
 
     if (!inCar) { box.hidden = true; box.innerHTML = ''; return; }
     box.hidden = false;
 
-    const margin = ask ? ask - inCar : null;
+    const against = sold != null ? sold : ask;
+    const margin = against ? against - inCar : null;
     box.innerHTML =
       `<div class="ml ml--total"><span>Total in the car</span><b>${money(inCar)}</b></div>` +
       (margin === null
         ? '<div class="ml-note">Put an asking price in and this will show what is left in it.</div>'
         : `<div class="ml ${margin >= 0 ? 'ml--good' : 'ml--bad'}">
-             <span>${margin >= 0 ? 'Margin at asking price' : 'Short by'}</span>
+             <span>${margin >= 0 ? (sold != null ? 'Margin on the sale' : 'Margin at asking price') : (sold != null ? 'Lost on the sale' : 'Short by')}</span>
              <b>${money(Math.abs(margin))}</b>
            </div>`);
   }
@@ -1047,6 +1146,8 @@
     v('#fDescription', car && car.description);
     v('#fPurchase', car && car.purchase_price);
     v('#fPrep', car && car.prep_cost);
+    $('#fSaleWrap').hidden = !(car && car.status === 'sold');
+    v('#fSale', car && car.sale_price);
     v('#fPrivateNotes', car && car.private_notes);
     $('#fFeatured').checked = !!(car && car.featured);
     renderCostSummary();
@@ -1521,6 +1622,8 @@
       purchase_price: int(g('#fPurchase')),
       prep_cost: int(g('#fPrep')),
       private_notes: g('#fPrivateNotes') || null,
+      // Only a sold car shows the field, so only a sold car can change it
+      ...(state.editing && state.editing.status === 'sold' ? { sale_price: int(g('#fSale')) } : {}),
       features: [...state.features],
       // Only keep photos that actually finished uploading and have an id.
       // A half-finished one would render as a broken image on the website.
@@ -1835,6 +1938,12 @@
      schema-v2-additions.sql) so the phone doesn't have to do the work.
      ========================================================================== */
   let stats = null, demand = null, ageing = null;
+  // Schema v6/v7. null means that upgrade hasn't been run, which is fine.
+  let interest = null;        // car_interest rows: people, not page loads
+  let trackStatus = null;     // tracking_status: when counting people began
+  let insightActs = null;     // insight_actions: "price is right", snoozes
+  let priceChecks = [];       // recent price_checks, for the market comparison
+  let analysis = null;        // the insight engine's last answer
 
   $$('#dataTabs button').forEach(b => b.onclick = () => {
     state.dataTab = b.dataset.tab;
@@ -1847,10 +1956,17 @@
     $('#dataBody').innerHTML =
       `<div class="section-card"><div class="skel" style="height:130px"></div></div>`.repeat(3);
 
-    const [s, d, a] = await Promise.all([
+    const since = new Date(Date.now() - 90 * 86400000).toISOString();
+    const [s, d, a, ci, ts, ia, pc] = await Promise.all([
       sb.from('car_stats').select('*'),
       sb.from('demand_summary').select('*'),
-      sb.from('stock_ageing').select('*')
+      sb.from('stock_ageing').select('*'),
+      sb.from('car_interest').select('*'),
+      sb.from('tracking_status').select('*').maybeSingle(),
+      sb.from('insight_actions').select('*').gte('created_at', since)
+        .order('created_at', { ascending: false }).limit(500),
+      sb.from('price_checks').select('*').gte('created_at', since)
+        .order('created_at', { ascending: false }).limit(500)
     ]);
 
     if (s.error || d.error) {
@@ -1865,11 +1981,32 @@
     stats = s.data || [];
     demand = d.data || [];
     ageing = a.error ? null : (a.data || []);   // null = schema v4 not run yet
+    interest = ci.error ? null : (ci.data || []);
+    trackStatus = ts.error ? null : ts.data;
+    insightActs = ia.error ? null : (ia.data || []);
+    priceChecks = pc.error ? [] : (pc.data || []);
     renderInsights();
+  }
+
+  /** True once the new tracking has actually counted somebody. */
+  const countingPeople = () => !!(interest && trackStatus && trackStatus.v2_since);
+  const interestFor = id => (interest || []).find(r => String(r.car_id) === String(id)) || null;
+
+  function runEngine() {
+    if (!window.MBU_INSIGHTS) return null;
+    return window.MBU_INSIGHTS.analyse({
+      now: Date.now(),
+      cars: state.cars,
+      interest: countingPeople() ? interest : [],
+      ageing: ageing || [],
+      checks: priceChecks,
+      actions: insightActs || []
+    });
   }
 
   function renderInsights() {
     if (!stats) return;
+    analysis = runEngine();
     $('#dataBody').innerHTML =
       state.dataTab === 'sold'   ? soldInsights()
       : state.dataTab === 'ageing' ? ageingInsights()
@@ -1932,8 +2069,7 @@
                ${gapToAvg > 200 ? `This one is <strong style="color:var(--amber-600)">${money(gapToAvg)} above</strong> that.` : ''}`
             : `No history on this model to compare against.`}
           <br>
-          ${nf(c.views)} views, ${nf(c.contacts)} got in touch.
-          ${c.views >= 25 && c.contacts === 0 ? '<strong style="color:var(--red-600)">Plenty of interest but nobody ringing. That\'s a price problem.</strong>' : ''}
+          ${ageingInterestLine(c)}
           ${lastChange != null ? `<br>Price last changed ${lastChange} days ago.` : '<br>Price never changed.'}
         </div>
 
@@ -1972,31 +2108,80 @@
         <p>Nothing has been here long enough to worry about.</p></div>`}`;
   }
 
-  /** Change a price from the ageing list, with the history recorded. */
-  async function repriceCar(carId) {
+  /**
+   * Interest on an ageing car. People and contacts from the new tracking when
+   * it's live, the old page-view counts otherwise. The cause, if any, comes
+   * from the insight engine rather than a blanket "that's a price problem".
+   */
+  function ageingInterestLine(c) {
+    const f = analysis && analysis.findings.find(x => String(x.carId) === String(c.id));
+    const cause = f && CAUSE_LABEL[f.cause]
+      ? ` <strong style="color:${f.severity === 'act' ? 'var(--red-600)' : 'var(--amber-600)'}">${CAUSE_LABEL[f.cause]}.</strong> See the Cars tab.`
+      : '';
+
+    if (countingPeople()) {
+      const i = interestFor(c.id);
+      if (i) {
+        const got = Math.max(i.contacted || 0, i.enquiries_since_tracking || 0);
+        return `${nf(i.visitors)} ${i.visitors === 1 ? 'person' : 'people'} looked, ${nf(got)} got in touch since ${shortDay(trackStatus.v2_since)}.${cause}`;
+      }
+    }
+    return `${nf(c.views)} page views, ${nf(c.contacts)} taps to get in touch.${cause}`;
+  }
+
+  const CAUSE_LABEL = {
+    price: 'Priced above the market',
+    price_unchecked: 'Probably the price, not checked yet',
+    photos: 'Needs more photos',
+    first_impression: 'People leave before the photos',
+    visibility: 'Not enough people finding it',
+    unclear: 'Priced right, cause not obvious',
+    interest_falling: 'Interest is falling off',
+    ageing: 'Price hasn’t moved'
+  };
+
+  const shortDay = d => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+  /**
+   * Change a price, with the history recorded.
+   * @param {string} carId
+   * @param {number} [suggested]  pre-filled, e.g. from an insight
+   * @param {object} [finding]    the insight that led to it, recorded if v7 is in
+   */
+  async function repriceCar(carId, suggested, finding) {
     const car = state.cars.find(c => String(c.id) === String(carId));
     const info = (ageing || []).find(c => String(c.id) === String(carId));
     if (!car) return toast('Couldn’t find that car');
 
     const title = [car.year, car.make, car.model].filter(Boolean).join(' ');
-    const suggestion = info && info.avg_achieved != null ? info.avg_achieved : null;
+    const avg = info && info.avg_achieved != null ? info.avg_achieved : null;
 
     const entered = prompt(
       `New price for the ${title}\n\n` +
       `Currently ${money(car.price)}.` +
-      (suggestion ? `\nYou've averaged ${money(suggestion)} on these.` : '') +
+      (suggested ? `\nSuggested: ${money(suggested)}.` : '') +
+      (!suggested && avg ? `\nYou've averaged ${money(avg)} on these.` : '') +
       `\n\nDropping it shows a "Reduced" badge on the website for two weeks.`,
-      car.price != null ? String(car.price) : '');
+      suggested ? String(suggested) : car.price != null ? String(car.price) : '');
 
     if (entered === null) return;
     const price = parseInt(String(entered).replace(/[^0-9]/g, ''), 10);
     if (isNaN(price) || price <= 0) return toast('That wasn’t a valid price');
     if (price === car.price) return;
+    const oldPrice = car.price;
 
     const { error } = await sb.from('cars').update({ price }).eq('id', car.id);
     if (error) return toast('Couldn’t update: ' + error.message);
 
-    const wentDown = car.price != null && price < car.price;
+    // Remember which insight led to it, so later you can see if acting on them works
+    if (finding && insightActs !== null) {
+      sb.from('insight_actions').insert({
+        car_id: car.id, rule: finding.rule, cause: finding.cause, action: 'repriced',
+        price_at_action: oldPrice, new_price: price
+      }).then(({ error: e }) => { if (e) console.warn('insight action not saved', e); });
+    }
+
+    const wentDown = oldPrice != null && price < oldPrice;
     car.price = price;
     renderStock();
     loadInsights();
@@ -2015,85 +2200,59 @@
   function carInsights() {
     const live = stats.filter(c => c.status === 'available' || c.status === 'reserved');
     const sold = stats.filter(c => c.status === 'sold');
-
-    const totalViews = stats.reduce((n, c) => n + (c.views || 0), 0);
-    const totalContacts = stats.reduce((n, c) =>
-      n + (c.whatsapp_clicks || 0) + (c.phone_clicks || 0) + (c.enquiries || 0), 0);
+    const people = countingPeople();
 
     const soldWithDays = sold.filter(c => c.days_in_stock != null);
     const avgDays = soldWithDays.length
       ? Math.round(soldWithDays.reduce((n, c) => n + c.days_in_stock, 0) / soldWithDays.length)
       : null;
 
-    const withMargin = sold.filter(c => c.margin != null);
-    const totalMargin = withMargin.reduce((n, c) => n + c.margin, 0);
-
-    if (!totalViews && !stats.length) {
+    if (!stats.length) {
       return `<div class="empty">${icon('car')}<h3>Nothing to show yet</h3>
         <p>Once the website has had a few visitors you'll see which cars people
         are actually looking at.</p></div>`;
     }
 
+    /* Tiles: this week in people once that's being counted, else the old totals */
+    let tiles;
+    if (people) {
+      const liveIds = new Set(live.map(c => String(c.car_id)));
+      const liveInterest = interest.filter(r => liveIds.has(String(r.car_id)));
+      const week = liveInterest.reduce((n, r) => n + (r.visitors_7d || 0), 0);
+      const got = liveInterest.reduce((n, r) => n + (r.contacted_7d || 0), 0);
+      tiles = `
+        ${statTile(nf(week), 'People this week')}
+        ${statTile(nf(got), 'Got in touch', 'var(--green-600)')}
+        ${statTile(avgDays != null ? avgDays + 'd' : 'Not yet', 'Avg to sell')}`;
+    } else {
+      const totalViews = stats.reduce((n, c) => n + (c.views || 0), 0);
+      const totalContacts = stats.reduce((n, c) =>
+        n + (c.whatsapp_clicks || 0) + (c.phone_clicks || 0) + (c.enquiries || 0), 0);
+      tiles = `
+        ${statTile(nf(totalViews), 'Page views')}
+        ${statTile(nf(totalContacts), 'Taps to contact', 'var(--green-600)')}
+        ${statTile(avgDays != null ? avgDays + 'd' : 'Not yet', 'Avg to sell')}`;
+    }
+
     /* Ranked list of live stock by interest */
-    const ranked = live.slice().sort((a, b) =>
-      (b.views || 0) - (a.views || 0) || (b.enquiries || 0) - (a.enquiries || 0));
-
-    const rows = ranked.map(c => {
-      const title = [c.year, c.make, c.model].filter(Boolean).join(' ') || 'Untitled';
-      const contacts = (c.whatsapp_clicks || 0) + (c.phone_clicks || 0) + (c.enquiries || 0);
-      const stale = c.days_in_stock >= 60;
-      const noInterest = c.views >= 25 && contacts === 0;
-
-      return `<div class="card" style="margin-bottom:10px"><div style="padding:14px">
-        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
-          <div style="min-width:0;flex:1">
-            <h3 style="font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title)}</h3>
-            <div style="font-size:13px;color:var(--ink-3);margin-top:2px">
-              ${money(c.price)} · ${nf(c.days_in_stock)} days in stock
-            </div>
-          </div>
-          ${stale ? '<span class="pill pill--amber">Sitting</span>'
-            : noInterest ? '<span class="pill pill--red">No contact</span>'
-            : contacts >= 3 ? '<span class="pill pill--green">Hot</span>' : ''}
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;text-align:center">
-          <div><b style="font-size:17px">${nf(c.views)}</b><br><span style="font-size:11px;color:var(--ink-3)">views</span></div>
-          <div><b style="font-size:17px">${nf(c.gallery_opens)}</b><br><span style="font-size:11px;color:var(--ink-3)">photos</span></div>
-          <div><b style="font-size:17px">${nf(contacts)}</b><br><span style="font-size:11px;color:var(--ink-3)">contacts</span></div>
-          <div><b style="font-size:17px">${c.contact_rate_pct != null ? c.contact_rate_pct + '%' : 'n/a'}</b><br><span style="font-size:11px;color:var(--ink-3)">rate</span></div>
-        </div>
-      </div></div>`;
-    }).join('');
-
-    const advice = [];
-    const sitting = live.filter(c => c.days_in_stock >= 60);
-    const ignored = live.filter(c => (c.views || 0) >= 25 &&
-      ((c.whatsapp_clicks||0)+(c.phone_clicks||0)+(c.enquiries||0)) === 0);
-
-    if (sitting.length) {
-      advice.push(`<strong>${sitting.length} car${sitting.length === 1 ? ' has' : 's have'} been here over 60 days.</strong>
-        Worth a price review. The longer they sit the more they cost you.`);
-    }
-    if (ignored.length) {
-      advice.push(`<strong>${ignored.length} car${ignored.length === 1 ? ' is' : 's are'} getting looked at but nobody's making contact.</strong>
-        Usually means the price is out of line, or the photos aren't selling it.`);
-    }
+    const legacyById = Object.fromEntries(stats.map(c => [String(c.car_id), c]));
+    const rows = (people
+      ? live.map(c => ({ c, i: interestFor(c.car_id) })).sort((a, b) =>
+          ((b.i && b.i.visitors) || 0) - ((a.i && a.i.visitors) || 0))
+      : live.map(c => ({ c, i: null })).sort((a, b) =>
+          (b.c.views || 0) - (a.c.views || 0) || (b.c.enquiries || 0) - (a.c.enquiries || 0))
+    ).map(({ c, i }) => people && i ? interestRow(c, i, legacyById) : legacyRow(c)).join('');
 
     return `
-      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">
-        ${statTile(nf(totalViews), 'Car views')}
-        ${statTile(nf(totalContacts), 'People made contact', 'var(--green-600)')}
-        ${statTile(avgDays != null ? avgDays + ' days' : 'Not yet', 'Avg time to sell')}
-        ${statTile(withMargin.length ? money(totalMargin) : 'Not yet', 'Total margin', 'var(--accent-600)')}
+      ${marginHero()}
+
+      ${trackingNote()}
+
+      ${decisionsHtml()}
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0">
+        ${tiles}
       </div>
-
-      ${withMargin.length === 0 ? `
-        <div class="msg msg--info is-shown" style="margin-bottom:14px">
-          Add what you paid and your prep costs when you enter a car, and this
-          will show you real margin per car.
-        </div>` : ''}
-
-      ${advice.map(a => `<div class="msg msg--warn is-shown" style="margin-bottom:10px">${a}</div>`).join('')}
 
       <div class="section-card">
         <h2>In stock, most interest first</h2>
@@ -2103,6 +2262,306 @@
       <button class="btn btn--outline btn--block" id="exportCars" style="margin-top:14px">
         Export all car figures (CSV)
       </button>`;
+  }
+
+  /* ---- Margin: the number that matters, with last month beside it --------
+     "This month so far" is compared with the SAME POINT last month, not the
+     whole of it, because a half-finished month against a full one always
+     looks like a drop. Last month's full total sits underneath.
+
+     Worked out from the cars themselves (sale price − paid − prep), so it is
+     the same figure the Sold tab and the weekly email use. A sale with a
+     figure missing is left out and counted, never guessed.
+     ------------------------------------------------------------------------ */
+  function carMargin(c) {
+    return c.sale_price != null && c.purchase_price != null
+      ? c.sale_price - c.purchase_price - (c.prep_cost || 0) : null;
+  }
+
+  function marginFigures(now) {
+    const y = now.getFullYear(), m = now.getMonth();
+    const startThis = new Date(y, m, 1);
+    const startPrev = new Date(y, m - 1, 1);
+    const prevDays = new Date(y, m, 0).getDate();
+    const samePointPrev = new Date(y, m - 1, Math.min(now.getDate(), prevDays),
+      now.getHours(), now.getMinutes(), now.getSeconds());
+
+    const soldCars = state.cars.filter(c => c.status === 'sold' && c.sold_at);
+    const between = (a, b) => soldCars.filter(c => {
+      const t = new Date(c.sold_at);
+      return t >= a && t < b;
+    });
+    const sum = list => {
+      const counted = list.filter(c => carMargin(c) != null);
+      return {
+        cars: list,
+        total: counted.reduce((n, c) => n + carMargin(c), 0),
+        counted: counted.length,
+        missing: list.length - counted.length
+      };
+    };
+    const name = d => d.toLocaleDateString('en-GB', { month: 'long' });
+
+    return {
+      thisName: name(startThis),
+      prevName: name(startPrev),
+      thisMonth: sum(between(startThis, new Date(8.64e15))),
+      prevToDate: sum(between(startPrev, samePointPrev)),
+      prevFull: sum(between(startPrev, startThis)),
+      allTime: sum(soldCars)
+    };
+  }
+
+  function marginHero() {
+    const f = marginFigures(new Date());
+    const t = f.thisMonth;
+
+    if (!f.allTime.cars.length) {
+      return `<div class="margin-hero">
+        <div class="mh-label">Margin</div>
+        <div class="mh-compare" style="margin-top:6px">Nothing sold yet. Mark a car sold with what it went for,
+          and fill in what you paid and the prep, and your margin shows here.</div>
+      </div>`;
+    }
+
+    let compare;
+    if (!t.cars.length) {
+      compare = `Nothing sold yet in ${esc(f.thisName)}.`;
+    } else if (!f.prevToDate.counted) {
+      compare = `Nothing counted by this point in ${esc(f.prevName)} to compare with.`;
+    } else {
+      const diff = t.total - f.prevToDate.total;
+      compare = diff === 0
+        ? `Level with this point in ${esc(f.prevName)} (${signed(f.prevToDate.total)}).`
+        : `${diff > 0 ? 'Up' : 'Down'} <b class="${diff > 0 ? 'up' : 'down'}">£${Math.abs(diff).toLocaleString('en-GB')}</b>
+           on this point in ${esc(f.prevName)} (${signed(f.prevToDate.total)}).`;
+    }
+
+    // Break down this month's cars, or last month's if nothing has sold yet
+    const showing = t.cars.length ? t : f.prevFull;
+    const showingName = t.cars.length ? f.thisName : f.prevName;
+    const list = showing.cars.slice().sort((a, b) => new Date(b.sold_at) - new Date(a.sold_at));
+
+    const carRows = list.map(c => {
+      const mg = carMargin(c);
+      const title = [c.year, c.make, c.model].filter(Boolean).join(' ') || 'Untitled';
+      const haggle = c.price != null && c.sale_price != null && c.price > c.sale_price
+        ? ` (${money(c.price - c.sale_price)} off asking)` : '';
+      const days = c.sold_at && (c.listed_at || c.created_at)
+        ? Math.max(0, Math.round((new Date(c.sold_at) - new Date(c.listed_at || c.created_at)) / 86400000)) : null;
+      const bits = [
+        'Sold ' + shortDay(c.sold_at),
+        c.sale_price != null ? 'for ' + money(c.sale_price) + haggle : null,
+        c.purchase_price != null ? 'paid ' + money(c.purchase_price) + (c.prep_cost ? ' + ' + money(c.prep_cost) + ' prep' : '') : null,
+        days != null ? days + ' days' : null
+      ].filter(Boolean).join(' · ');
+      const missing = [c.sale_price == null ? 'what it sold for' : null, c.purchase_price == null ? 'what you paid' : null]
+        .filter(Boolean).join(' and ');
+
+      return `<div class="margin-car">
+        <strong>${esc(title)}</strong>
+        <span class="mc-margin ${mg == null ? 'is-missing' : mg < 0 ? 'is-loss' : ''}">${mg == null ? 'Not counted' : signed(mg)}</span>
+        <span class="mc-meta">${esc(bits)}</span>
+        ${mg == null ? `<button class="mc-fix" type="button" data-fixcar="${esc(c.id)}">Add ${esc(missing)}</button>` : ''}
+      </div>`;
+    }).join('');
+
+    return `<div class="margin-hero">
+      <div class="mh-label">Margin in ${esc(f.thisName)} so far</div>
+      <div class="mh-figure ${t.total < 0 ? 'is-loss' : ''}">${t.counted ? signed(t.total) : '£0'}</div>
+      <div class="mh-compare">${compare}</div>
+      ${t.missing ? `<div class="mh-compare" style="margin-top:4px">${t.missing} of ${t.cars.length} sale${t.cars.length === 1 ? '' : 's'} this month ${t.missing === 1 ? 'has' : 'have'} a figure missing, so ${t.missing === 1 ? 'isn’t' : 'aren’t'} counted.</div>` : ''}
+      <div class="mh-row">
+        <span>${esc(f.prevName)} <b>${f.prevFull.counted ? signed(f.prevFull.total) : '£0'}</b> (${f.prevFull.cars.length} sold)</span>
+        <span>All time <b>${signed(f.allTime.total)}</b></span>
+      </div>
+      ${list.length ? `
+        <button class="mh-toggle" type="button" id="marginToggle" aria-expanded="${state.marginOpen}">
+          ${state.marginOpen ? 'Hide' : 'See'} each car in ${esc(showingName)} ${icon('right')}
+        </button>
+        <div class="margin-cars" id="marginCars" ${state.marginOpen ? '' : 'hidden'}>${carRows}</div>` : ''}
+    </div>`;
+  }
+
+  /* ---- Is the new tracking actually counting? ----------------------------- */
+  function trackingNote() {
+    if (countingPeople()) {
+      const bots = trackStatus.v2_bot_events || 0;
+      return `<p class="note" style="margin:0 0 12px">
+        Counting people since ${esc(shortDay(trackStatus.v2_since))}${bots ? `, with ${nf(bots)} bot visit${bots === 1 ? '' : 's'} left out` : ''}.
+      </p>`;
+    }
+    if (interest !== null) {
+      return `<p class="note" style="margin:0 0 12px">
+        The new tracking is installed but hasn’t counted anyone yet. Until it does, figures below are page views.
+      </p>`;
+    }
+    return '';
+  }
+
+  /* ---- Needs a decision: the insight engine ------------------------------- */
+  function decisionsHtml() {
+    if (!analysis) return '';
+    const list = analysis.findings;
+    const snoozed = analysis.snoozed
+      ? `<p class="note" style="margin-top:8px">${analysis.snoozed} snoozed for now.</p>` : '';
+
+    if (!list.length) {
+      return `<div class="msg msg--ok is-shown">Nothing needs a decision right now.</div>${snoozed}`;
+    }
+    const needing = list.filter(f => f.severity !== 'good').length;
+
+    return `
+      <div style="font-size:13px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin:4px 2px 10px">
+        ${needing ? `Needs a decision · ${needing}` : 'Worth knowing'}
+      </div>
+      ${list.map((f, n) => insightCard(f, n)).join('')}
+      ${snoozed}`;
+  }
+
+  const SOURCE_NOTE = {
+    autotrader: 'Market figure from Auto Trader',
+    price_book: 'Market figure from your price book',
+    own_sales: 'Market figure from what you’ve sold these for'
+  };
+
+  function insightCard(f, n) {
+    const car = state.cars.find(c => String(c.id) === String(f.carId));
+    const canRemember = insightActs !== null;
+    const buttons = [];
+
+    for (const a of f.actions || []) {
+      if (a === 'reprice') {
+        buttons.push(`<button class="btn btn--primary btn--sm" data-ins="${n}" data-do="reprice">
+          ${f.suggestion ? esc(f.suggestion.label) : 'Change the price'}</button>`);
+      } else if (a === 'priced_ok' && canRemember) {
+        buttons.push(`<button class="btn btn--outline btn--sm" data-ins="${n}" data-do="priced_ok">Price is right</button>`);
+      } else if (a === 'snooze' && canRemember) {
+        buttons.push(`<button class="btn btn--ghost btn--sm" data-ins="${n}" data-do="snooze">Remind me in 7 days</button>`);
+      } else if (a === 'check_market') {
+        buttons.push(`<button class="btn btn--primary btn--sm" data-ins="${n}" data-do="check_market">Check the market</button>`);
+      } else if (a === 'add_photos') {
+        buttons.push(`<button class="btn btn--primary btn--sm" data-ins="${n}" data-do="edit">Add photos</button>`);
+      } else if (a === 'edit') {
+        buttons.push(`<button class="btn btn--outline btn--sm" data-ins="${n}" data-do="edit">Edit the listing</button>`);
+      } else if (a === 'feature' && car && !car.featured) {
+        buttons.push(`<button class="btn btn--outline btn--sm" data-ins="${n}" data-do="feature">Feature it</button>`);
+      } else if (a === 'autotrader' && car && !car.at_published && advertAllowance().remaining > 0) {
+        buttons.push(`<button class="btn btn--outline btn--sm" data-ins="${n}" data-do="autotrader">Use an Auto Trader slot</button>`);
+      } else if (a === 'listing_pack') {
+        buttons.push(`<button class="btn btn--outline btn--sm" data-ins="${n}" data-do="listing_pack">Listing pack</button>`);
+      }
+    }
+
+    return `<div class="insight insight--${f.severity}">
+      <h3>${esc(f.title)}</h3>
+      <div class="in-facts">${esc(f.facts)}</div>
+      <div class="in-lines">${f.lines.map(l => `<p>${esc(l)}</p>`).join('')}</div>
+      ${f.advice ? `<div class="in-advice">${esc(f.advice)}</div>` : ''}
+      ${buttons.length ? `<div class="in-actions">${buttons.join('')}</div>` : ''}
+      ${f.market && /price|interest_falling|ageing|unclear/.test(f.cause) ? `<div class="in-source">${SOURCE_NOTE[f.market.source]}</div>` : ''}
+    </div>`;
+  }
+
+  async function onInsightAction(n, what) {
+    const f = analysis && analysis.findings[n];
+    if (!f) return;
+    const car = state.cars.find(c => String(c.id) === String(f.carId));
+    if (!car) return toast('Couldn’t find that car');
+
+    if (what === 'reprice') return repriceCar(car.id, f.suggestion && f.suggestion.price, f);
+    if (what === 'edit') return openForm(car);
+    if (what === 'feature') { await toggleFeatured(car); return renderInsights(); }
+    if (what === 'autotrader') { await toggleAutoTrader(car); return renderInsights(); }
+    if (what === 'listing_pack') return showListingPack(car);
+    if (what === 'check_market') return checkMarket(car, () => loadInsights());
+
+    if (what === 'priced_ok' || what === 'snooze') {
+      const days = what === 'snooze' ? 7 : 21;
+      const row = {
+        car_id: car.id, rule: f.rule, cause: f.cause,
+        action: what === 'snooze' ? 'snoozed' : 'priced_ok',
+        until: new Date(Date.now() + days * 86400000).toISOString(),
+        price_at_action: car.price
+      };
+      const { data, error } = await sb.from('insight_actions').insert(row).select().single();
+      if (error) return toast('Couldn’t save that: ' + error.message);
+      insightActs.unshift(data);
+      renderInsights();
+      toast(what === 'snooze'
+        ? 'Hidden for 7 days'
+        : 'Got it. It won’t mention the price again unless it changes', 'ok');
+    }
+  }
+
+  /* ---- One car's interest, counted in people ------------------------------ */
+  function interestRow(c, i, legacyById) {
+    const title = [c.year, c.make, c.model].filter(Boolean).join(' ') || 'Untitled';
+    const got = Math.max(i.contacted || 0, i.enquiries_since_tracking || 0);
+    const car = state.cars.find(x => String(x.id) === String(c.car_id));
+    const photoCount = car && Array.isArray(car.images) ? car.images.length : null;
+    const f = analysis && analysis.findings.find(x => String(x.carId) === String(c.car_id));
+
+    const pill = f && f.severity === 'good' ? '<span class="pill pill--green">Hot</span>'
+      : f && f.rule === 'no_contact' ? '<span class="pill pill--red">No contact</span>'
+      : c.days_in_stock >= 60 ? '<span class="pill pill--amber">Sitting</span>' : '';
+
+    const time = i.median_seconds == null ? 'n/a'
+      : i.median_seconds < 60 ? i.median_seconds + 's' : Math.round(i.median_seconds / 60) + 'm';
+    const rate = i.visitors ? Math.round(100 * Math.min(got, i.visitors) / i.visitors) + '%' : 'n/a';
+
+    const extra = [
+      i.avg_photos_seen != null && photoCount ? `Saw ${Math.round(i.avg_photos_seen)} of ${photoCount} photos on average` : null,
+      i.enquiries_total ? `${i.enquiries_total} enquir${i.enquiries_total === 1 ? 'y' : 'ies'} received` : null,
+      i.played_video ? `${i.played_video} watched the video` : null
+    ].filter(Boolean).join(' · ');
+    const legacy = legacyById[String(c.car_id)];
+    const before = legacy && legacy.views ? ` (${nf(legacy.views)} page views before ${shortDay(i.tracking_since)})` : '';
+
+    return `<div class="card" style="margin-bottom:10px"><div style="padding:14px">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+        <div style="min-width:0;flex:1">
+          <h3 style="font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title)}</h3>
+          <div style="font-size:13px;color:var(--ink-3);margin-top:2px">
+            ${money(c.price)} · ${nf(c.days_in_stock)} days in stock
+          </div>
+        </div>
+        ${pill}
+      </div>
+      <div class="interest-grid">
+        <div><b>${nf(i.visitors)}</b><span>people</span></div>
+        <div><b>${nf(got)}</b><span>got in touch</span></div>
+        <div><b>${rate}</b><span>rate</span></div>
+        <div><b>${time}</b><span>typical visit</span></div>
+      </div>
+      ${extra || before ? `<div class="interest-extra">${esc(extra)}${esc(before)}</div>` : ''}
+    </div></div>`;
+  }
+
+  /* ---- Before the tracking upgrade: page views, as it always was ---------- */
+  function legacyRow(c) {
+    const title = [c.year, c.make, c.model].filter(Boolean).join(' ') || 'Untitled';
+    const contacts = (c.whatsapp_clicks || 0) + (c.phone_clicks || 0) + (c.enquiries || 0);
+    const stale = c.days_in_stock >= 60;
+
+    return `<div class="card" style="margin-bottom:10px"><div style="padding:14px">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+        <div style="min-width:0;flex:1">
+          <h3 style="font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title)}</h3>
+          <div style="font-size:13px;color:var(--ink-3);margin-top:2px">
+            ${money(c.price)} · ${nf(c.days_in_stock)} days in stock
+          </div>
+        </div>
+        ${stale ? '<span class="pill pill--amber">Sitting</span>'
+          : contacts >= 3 ? '<span class="pill pill--green">Hot</span>' : ''}
+      </div>
+      <div class="interest-grid">
+        <div><b>${nf(c.views)}</b><span>page views</span></div>
+        <div><b>${nf(c.gallery_opens)}</b><span>photo opens</span></div>
+        <div><b>${nf(contacts)}</b><span>taps</span></div>
+        <div><b>${c.contact_rate_pct != null ? c.contact_rate_pct + '%' : 'n/a'}</b><span>rate</span></div>
+      </div>
+    </div></div>`;
   }
 
   /* ---- Sold: what actually got made ---------------------------------------
@@ -2120,7 +2579,11 @@
   const signed = n => n == null ? '—'
     : (n < 0 ? '\u2212£' : '£') + Math.abs(n).toLocaleString('en-GB');
 
-  const monthKey  = d => new Date(d).toISOString().slice(0, 7);          // YYYY-MM
+  // Local time, not UTC: a sale at 00:30 BST on the 1st belongs to that month
+  const monthKey  = d => {
+    const t = new Date(d);
+    return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0');   // YYYY-MM
+  };
   const monthName = k => {
     const [y, m] = k.split('-');
     return new Date(+y, +m - 1, 1)
@@ -2330,6 +2793,23 @@
     };
     $$('#dataBody [data-reprice]').forEach(b => {
       b.onclick = () => repriceCar(b.dataset.reprice);
+    });
+
+    /* Cars tab: margin breakdown, missing figures, insight buttons */
+    const mt = $('#marginToggle');
+    if (mt) mt.onclick = () => { state.marginOpen = !state.marginOpen; renderInsights(); };
+    $$('#dataBody [data-fixcar]').forEach(b => {
+      b.onclick = () => {
+        const car = state.cars.find(c => String(c.id) === b.dataset.fixcar);
+        if (car) openForm(car);
+      };
+    });
+    $$('#dataBody [data-ins]').forEach(b => {
+      b.onclick = async () => {
+        b.disabled = true;
+        try { await onInsightAction(+b.dataset.ins, b.dataset.do); }
+        finally { b.disabled = false; }
+      };
     });
   }
 
@@ -2582,6 +3062,9 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
   let vehicle = null;    // last lookup result
 
   $('#vLookup').onclick = runValuation;
+  if (AT && AT.isEnabled()) {
+    $('#vHint').textContent = 'Asks Auto Trader: the exact car, its MOT history, what it’s worth and what similar cars are up for.';
+  }
   $('#vReg').addEventListener('input', e => {
     e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9 ]/g, '');
   });
@@ -2598,6 +3081,23 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       `<div class="section-card"><div class="skel" style="height:150px"></div></div>`.repeat(2);
 
     try {
+      // Auto Trader first when it's switched on: it knows the exact car, the
+      // MOT history AND what it's worth, in one go.
+      if (AT && AT.isEnabled()) {
+        try {
+          const r = await AT.lookup(reg, null);
+          vehicle = vehicleFromAutoTrader(r);
+          renderValuation();
+          rememberAutoTraderCheck(r, null);
+          return;
+        } catch (err) {
+          // Not set up properly: quietly fall back to the DVLA/MOT lookup.
+          // A real answer from Auto Trader (no such plate) is shown as it is.
+          if (!['not_configured', 'not_deployed', 'auth', 'forbidden', 'network'].includes(err.code)) throw err;
+          console.warn('Auto Trader lookup unavailable, falling back', err);
+        }
+      }
+
       // As in vehicleLookup: the admin's own token, never the publishable key.
       const { data: { session } } = await sb.auth.getSession();
       if (!session) throw new Error('Your session has expired. Sign in again to look up a plate.');
@@ -2655,9 +3155,104 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       console.error(err);
       $('#vResult').innerHTML = '';
       msg('#vMsg', esc(err.message || 'Lookup failed') +
-        '<br><br>You can still add the car by hand from the Stock tab.', 'err');
+        '<br><br>You can still work it out by typing the car in: tap “No plate lookup?” above.', 'err');
     } finally {
       btn.disabled = false; btn.textContent = 'Check';
+    }
+  }
+
+  /* ---- No lookup available: type the car in ------------------------------
+     The bidding calculation, your own history, the price book and the Auto
+     Trader search all work from make, model, year and mileage. None of them
+     actually need the plate, so the Value tab still works without a lookup. */
+  $('#vManualBtn').onclick = () => {
+    const box = $('#vManual');
+    box.hidden = !box.hidden;
+    if (!box.hidden) $('#vMake').focus();
+  };
+
+  $('#vManualGo').onclick = () => {
+    const make = $('#vMake').value.trim();
+    const model = $('#vModel').value.trim();
+    if (!make) { msg('#vMsg', 'Put in the make at least.', 'warn'); return; }
+    msg('#vMsg', '');
+    vehicle = {
+      manual: true,
+      registration: $('#vReg').value.replace(/\s+/g, '').toUpperCase() || null,
+      found: { manual: true },
+      make,                 // as typed: "BMW" shouldn't become "Bmw"
+      model: model || null,
+      year: int($('#vYear').value),
+      manualMileage: int($('#vMiles').value),
+      mot: null,
+      flags: []
+    };
+    renderValuation();
+  };
+
+  /** The Auto Trader answer in the shape the Value tab already draws. */
+  function vehicleFromAutoTrader(r) {
+    return {
+      registration: r.registration,
+      found: { at: true, mot: !!r.mot },
+      make: r.make, model: r.model, year: r.year,
+      colour: r.colour, fuelType: r.fuelType, engineLitres: r.engineLitres,
+      motExpiryDate: r.motExpiryDate,
+      manualMileage: r.mot ? null : r.mileageUsed,
+      mot: r.mot,
+      flags: r.flags || [],
+      at: r
+    };
+  }
+
+  /** Every Auto Trader look-up feeds the price book, so it fills itself. */
+  function rememberAutoTraderCheck(r, carId) {
+    if (!AT) return;
+    const row = AT.priceCheckRow(r, carId);
+    if (!row) return;
+    sb.from('price_checks').insert(row).then(({ error }) => {
+      // Before schema-v7 the price book doesn't accept this source. Not worth bothering anyone about.
+      if (error) console.warn('Auto Trader check not saved to the price book', error.message);
+    });
+  }
+
+  /**
+   * "What's this car worth right now?" for a car in stock.
+   * With Auto Trader: asks it, saves the figures on the car, logs a price
+   * check. Without: opens the Auto Trader search for that spec and asks what
+   * was on screen, which is what the insight engine then compares against.
+   */
+  async function checkMarket(car, after) {
+    const manual = () => {
+      const v = { make: car.make, model: car.model, year: car.year };
+      window.open(autoTraderSearchUrl(v, car.mileage), '_blank', 'noopener');
+      recordPriceCheck(v, car.mileage, { carId: car.id, after });
+    };
+
+    if (!(AT && AT.isEnabled() && car.registration)) return manual();
+
+    toast('Asking Auto Trader…');
+    try {
+      const r = await AT.market(car);
+      const patch = AT.carPatch(r);
+      let { error } = await sb.from('cars').update(patch).eq('id', car.id);
+      if (error && /at_market|at_price_indicator|column/i.test(error.message)) {
+        // schema-v7 not run: keep the valuation columns that already exist
+        delete patch.at_market; delete patch.at_price_indicator;
+        ({ error } = await sb.from('cars').update(patch).eq('id', car.id));
+      }
+      if (error) throw error;
+      Object.assign(car, patch);
+      rememberAutoTraderCheck(r, car.id);
+
+      const rating = r.priceIndicator && r.priceIndicator.rating;
+      toast(rating ? `Auto Trader rates the price ${rating}` : 'Market figures updated', 'ok');
+      if (r.env === 'sandbox') setTimeout(() => toast('Sandbox data: not real prices'), 2900);
+      if (after) after();
+    } catch (err) {
+      console.warn(err);
+      if (['not_configured', 'not_deployed'].includes(err.code)) return manual();
+      toast(err.message || 'Couldn’t reach Auto Trader');
     }
   }
 
@@ -2742,8 +3337,12 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     return data || [];
   }
 
-  /** Record what was on screen. Deliberately three quick numbers, no essay. */
-  function recordPriceCheck(v, mileage) {
+  /**
+   * Record what was on screen. Deliberately three quick numbers, no essay.
+   * @param {object} [opts]  { carId, after } when checking a car already in stock
+   */
+  function recordPriceCheck(v, mileage, opts) {
+    opts = opts || {};
     const title = [v.make, v.model].filter(Boolean).join(' ') || 'this car';
 
     sheet('What were they up for?', `Similar ${title}s on Auto Trader`, []);
@@ -2786,7 +3385,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         high: int($('#pcHigh').value),
         typical,
         source: 'autotrader',
-        notes: $('#pcNotes').value.trim() || null
+        notes: $('#pcNotes').value.trim() || null,
+        car_id: opts.carId || null
       };
 
       const { error } = await sb.from('price_checks').insert(row);
@@ -2797,6 +3397,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         toast('Couldn’t save it, but the price is in');
       } else {
         toast('Saved to your price book', 'ok');
+        if (opts.after) opts.after();
       }
 
       // Feed it straight into the calculator, which is the whole point
@@ -2924,30 +3525,80 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       <div class="msg msg--${f.level === 'bad' ? 'err' : f.level === 'warn' ? 'warn' : 'ok'} is-shown"
            style="margin-bottom:8px">${esc(f.text)}</div>`).join('');
 
+    const mileage = mot && mot.latestMileage != null ? mot.latestMileage : (v.manualMileage || null);
     const spec = [
-      v.engineLitres ? v.engineLitres.toFixed(1) + 'L' : null,
+      v.engineLitres ? Number(v.engineLitres).toFixed(1) + 'L' : null,
       v.fuelType ? titleCase(v.fuelType) : null,
       v.colour,
-      mot && mot.latestMileage != null ? nf(mot.latestMileage) + ' mi' : null
+      mileage != null ? nf(mileage) + ' mi' : null
     ].filter(Boolean).join(' · ');
 
+    const at = v.at || null;
+    const atVal = at && at.valuations;
+    const atMet = at && at.metrics;
+    const atComp = at && at.competitors;
+
     $('#vResult').innerHTML = `
+      ${at && at.env === 'sandbox' ? `<div class="msg msg--warn is-shown" style="margin-bottom:14px">
+        <strong>Auto Trader sandbox.</strong> These are test figures, not real prices.</div>` : ''}
+
       <!-- What it is -->
       <div class="section-card">
         <h2>The car</h2>
         <h3 style="font-size:21px;margin-bottom:4px">${esc(title)}</h3>
+        ${at && at.derivative ? `<div style="font-size:14.5px;color:var(--ink-2);margin-bottom:2px">${esc(at.derivative)}</div>` : ''}
         <div style="font-size:14.5px;color:var(--ink-3)">${esc(spec || 'No details returned')}</div>
-        ${!v.found?.mot ? `<p class="hint" style="margin-top:10px">
+        ${v.manual ? `<p class="hint" style="margin-top:10px">
+          Typed in by hand, so there's no MOT history here. The free government
+          <a href="https://www.check-mot.service.gov.uk/" target="_blank" rel="noopener" style="text-decoration:underline">MOT history check</a>
+          shows every mileage reading and advisory from the plate.
+        </p>`
+        : !v.found?.mot ? `<p class="hint" style="margin-top:10px">
           MOT history unavailable${v.motUnavailableReason === 'no_key'
             ? '. Add the free MOT API keys to see mileage history and advisories.' : '.'}
         </p>` : ''}
       </div>
 
+      ${flagHtml ? `
       <!-- Warnings -->
       <div class="section-card">
         <h2>What to watch for</h2>
         ${flagHtml}
-      </div>
+      </div>` : ''}
+
+      ${atVal || atMet || atComp ? `
+      <!-- Auto Trader's view of the market -->
+      <div class="section-card">
+        <h2>Auto Trader says</h2>
+        ${atVal ? `
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;text-align:center">
+            ${[['Retail', atVal.retail, 'var(--green-600)'], ['Trade', atVal.trade], ['Part exchange', atVal.partExchange], ['Private sale', atVal.private]]
+              .filter(([, n]) => n != null).map(([label, n, tone]) => `
+              <div class="card" style="padding:12px 6px;margin:0">
+                <b style="font-size:19px;${tone ? 'color:' + tone : ''}">${money(n)}</b>
+                <br><span style="font-size:11.5px;color:var(--ink-3);text-transform:uppercase">${label}</span></div>`).join('')}
+          </div>
+          <p class="hint" style="margin-top:8px">At ${nf(at.mileageUsed)} miles.</p>` : ''}
+        ${atMet && (atMet.rating != null || atMet.daysToSell != null) ? `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;text-align:center">
+            <div><b style="font-size:19px">${atMet.rating != null ? Math.round(atMet.rating) + '/100' : 'n/a'}</b>
+              <br><span style="font-size:11.5px;color:var(--ink-3)">RETAIL RATING</span></div>
+            <div><b style="font-size:19px">${atMet.daysToSell != null ? Math.round(atMet.daysToSell) + ' days' : 'n/a'}</b>
+              <br><span style="font-size:11.5px;color:var(--ink-3)">TYPICAL TIME TO SELL</span></div>
+          </div>` : ''}
+        ${atComp && atComp.sampled ? `
+          <p style="font-size:15px;color:var(--ink-2);margin-top:14px;line-height:1.5">
+            <strong>${nf(atComp.count)} similar</strong> on Auto Trader, advertised between
+            <strong>${money(atComp.low)}</strong> and <strong>${money(atComp.high)}</strong>
+            (middle ${money(atComp.median)}).
+          </p>` : ''}
+        ${at.unavailable && at.unavailable.length ? `<p class="hint" style="margin-top:10px">
+          Not included on your Auto Trader account: ${esc(at.unavailable.join(', '))}.</p>` : ''}
+        ${atVal && atVal.retail != null ? `
+          <button class="btn btn--accent btn--block btn--sm" id="atUseRetail" style="margin-top:12px">
+            Use ${money(atVal.retail)} as the sell price
+          </button>` : ''}
+      </div>` : ''}
 
       ${mot && mot.readings.length >= 2 ? `
       <div class="section-card">
@@ -3028,8 +3679,10 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         <div class="f">
           <label for="bSale">What you'd realistically sell it for</label>
           <div class="money"><input class="in" id="bSale" type="number" inputmode="numeric"
-            value="${hist && hist.avgSold != null ? hist.avgSold : ''}" placeholder="0"></div>
-          ${hist && hist.avgSold != null
+            value="${atVal && atVal.retail != null ? atVal.retail : hist && hist.avgSold != null ? hist.avgSold : ''}" placeholder="0"></div>
+          ${atVal && atVal.retail != null
+            ? `<span class="hint">Filled in from Auto Trader's retail valuation. Knock off what you usually lose to haggling.</span>`
+            : hist && hist.avgSold != null
             ? `<span class="hint">Filled in from what you've actually achieved on these. Check Auto Trader above if you want to double-check it.</span>`
             : `<span class="hint">Use the Auto Trader check above rather than guessing. The whole calculation rests on this number.</span>`}
         </div>
@@ -3068,7 +3721,14 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       <div style="height:10px"></div>`;
 
     wireBidCalc();
-    refreshPriceBlock(v, mot && mot.latestMileage != null ? mot.latestMileage : null);
+    refreshPriceBlock(v, mileage);
+    const useRetail = $('#atUseRetail');
+    if (useRetail) useRetail.onclick = () => {
+      const sale = $('#bSale');
+      sale.value = atVal.retail; calcBid();
+      sale.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      toast('Sell price set', 'ok');
+    };
     $('#vAddCar').onclick = createFromLookup;
     $('#vClear').onclick = () => {
       vehicle = null; $('#vResult').innerHTML = '';
@@ -3172,7 +3832,18 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     if (v.engineLitres) $('#fEngine').value = v.engineLitres;
     if (v.motExpiryDate) $('#fMot').value = String(v.motExpiryDate).slice(0, 10);
     if (v.mot && v.mot.latestMileage != null) $('#fMileage').value = v.mot.latestMileage;
+    else if (v.manualMileage) $('#fMileage').value = v.manualMileage;
     if (!isNaN(paidNum)) { $('#fPurchase').value = paidNum; renderCostSummary(); }
+
+    // Auto Trader knows the trim, gearbox and body, which the DVLA never did
+    if (v.at) {
+      if (v.at.trim) $('#fVariant').value = v.at.trim;
+      if (v.at.doors) $('#fDoors').value = v.at.doors;
+      const gear = String(v.at.transmissionType || '').toLowerCase();
+      if (gear === 'manual' || gear === 'automatic') setChip('#fTrans', gear);
+      const body = String(v.at.bodyType || '').toLowerCase();
+      if (BODIES.some(([k]) => k === body)) setChip('#fBody', body);
+    }
 
     const fuelMap = { PETROL:'petrol', DIESEL:'diesel', HYBRID:'hybrid',
                       'HYBRID ELECTRIC':'hybrid', ELECTRICITY:'electric', ELECTRIC:'electric' };

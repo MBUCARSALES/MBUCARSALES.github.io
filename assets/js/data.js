@@ -495,17 +495,29 @@
      --------------------------------------------------------------------------
      What this does NOT do, deliberately:
        · no cookies
-       · no localStorage
+       · no localStorage or sessionStorage
        · no device fingerprint
-       · no IP logging
-       · nothing that survives closing the tab
+       · nothing stored on the visitor's device at all
 
-     `sessionKey` is a random string held in memory for this tab only. Its sole
-     job is to stop one person's page refreshes being counted ten times. It
-     cannot be tied to a person, a device, or a previous visit, which is why
-     this sits outside PECR's cookie rules and needs no banner.
+     TWO WAYS IN, chosen by `tracking.via` in config.js:
+
+       'function'  Events go to the `track` Edge Function. It works out a
+                   daily-changing visitor code from IP + browser + a secret,
+                   keeps only that code (never the IP), flags bots, and writes
+                   the event. This is what lets Insights count PEOPLE rather
+                   than page loads. See supabase/functions/track/index.ts.
+
+       'rest'      The original route, straight into the table. Every page
+                   load looks like a new person. Kept so the website carries on
+                   counting until the function is deployed.
+
+     `pageId` is a random string for this page load only. It lets the running
+     totals for time-on-page be matched up with each other. It dies with the
+     page and identifies nobody.
      ========================================================================== */
-  const sessionKey = (() => {
+  const TRACK = Object.assign({ via: 'rest' }, CFG.tracking || {});
+
+  const pageId = (() => {
     try {
       const a = new Uint8Array(8);
       crypto.getRandomValues(a);
@@ -515,52 +527,157 @@
     }
   })();
 
-  const sent = new Set();   // de-dupe within this tab
+  const sent = new Set();   // don't fire the same view twice from one page load
+
+  /* Opening the site from your own machine (or Claude testing it) must not
+     book fake views against real cars. On localhost events are logged to the
+     console and kept in MBU.trackLog instead of being sent. */
+  const trackingOff = location.protocol === 'file:' ||
+    /^(localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|\[::1\]|)$/.test(location.hostname);
+  MBU.trackLog = [];
+
+  const trackEndpoint = () => `${CFG.supabase.url.replace(/\/$/, '')}/functions/v1/track`;
+
+  function sendEvent(event, beacon) {
+    if (trackingOff) {
+      MBU.trackLog.push(event);
+      console.debug('[MBU track, not sent from localhost]', event.event_type, event);
+      return;
+    }
+
+    if (TRACK.via === 'function') {
+      // text/plain with no custom headers is a "simple" request: no CORS
+      // preflight, so it survives the page closing and works with sendBeacon.
+      const body = JSON.stringify({ events: [event], wd: navigator.webdriver === true });
+      if (beacon && navigator.sendBeacon) {
+        try {
+          if (navigator.sendBeacon(trackEndpoint(), new Blob([body], { type: 'text/plain' }))) return;
+        } catch { /* fall through to fetch */ }
+      }
+      try {
+        fetch(trackEndpoint(), {
+          method: 'POST', body, keepalive: true,
+          headers: { 'Content-Type': 'text/plain' }
+        }).catch(() => {});
+      } catch { /* tracking must never break the page */ }
+      return;
+    }
+
+    // 'rest': the original shape only, because new columns would be refused
+    // by a database that hasn't had schema-v6 yet. Time-on-page is skipped:
+    // without a visitor code it can't be counted per person, so it would only
+    // be rows nobody can use.
+    if (event.event_type === 'engagement') return;
+    const meta = event.meta;
+    try {
+      fetch(restUrl('car_events'), {
+        method: 'POST',
+        headers: Object.assign(restHeaders(), { Prefer: 'return=minimal' }),
+        body: JSON.stringify({
+          car_id: event.car_id,
+          event_type: event.event_type,
+          session_key: pageId,
+          source: event.source,
+          meta: meta || null
+        }),
+        keepalive: true
+      }).catch(() => {});
+    } catch { /* tracking must never break the page */ }
+  }
 
   /**
    * Record an anonymous interest event.
    * @param {string} eventType  view | card_click | gallery_open |
-   *                            whatsapp_click | phone_click |
-   *                            enquiry_start | enquiry_sent |
-   *                            interest_sent | share
+   *                            whatsapp_click | phone_click | email_click |
+   *                            enquire_click | enquiry_start | enquiry_sent |
+   *                            interest_sent | share | video_play | engagement
    * @param {string} carId
    * @param {object} [meta]     small, non-personal extras only
+   * @param {object} [extra]    { duration_ms, photos_seen, photo_count, beacon }
    */
-  MBU.track = function (eventType, carId, meta) {
+  MBU.track = function (eventType, carId, meta, extra) {
     if (!hasBackend || !carId) return;                 // demo mode: nothing to record
     if (!/^[0-9a-f-]{36}$/i.test(String(carId))) return; // ignore demo ids
 
-    // Count these once per car per tab; the rest are genuine repeat actions
-    const once = ['view', 'card_click', 'gallery_open'];
+    // One of these per car per page load. Everything else is a genuine repeat
+    // action, and the database counts each person once however many times
+    // they tap.
+    const once = ['view', 'card_click', 'gallery_open', 'enquiry_start', 'video_play'];
     const key = eventType + ':' + carId;
     if (once.includes(eventType)) {
       if (sent.has(key)) return;
       sent.add(key);
     }
 
-    const body = JSON.stringify({
-      car_id: carId,
+    const x = extra || {};
+    sendEvent({
+      car_id: String(carId),
       event_type: eventType,
-      session_key: sessionKey,
+      page_id: pageId,
       source: MBU.trackSource || 'direct',
+      duration_ms: x.duration_ms,
+      photos_seen: x.photos_seen,
+      photo_count: x.photo_count,
       meta: meta || null
-    });
+    }, !!x.beacon);
+  };
 
-    // `keepalive` lets the request finish even though tapping WhatsApp or
-    // Call navigates away from the page immediately.
-    //
-    // (sendBeacon looks like the obvious tool here, but a JSON blob isn't a
-    // CORS-safelisted content type, so it would need a preflight it can't do.
-    // fetch + keepalive handles CORS properly and is supported everywhere
-    // that matters, Safari included.)
-    try {
-      fetch(restUrl('car_events'), {
-        method: 'POST',
-        headers: Object.assign(restHeaders(), { Prefer: 'return=minimal' }),
-        body,
-        keepalive: true
-      }).catch(() => {});
-    } catch { /* tracking must never break the page */ }
+  /**
+   * How long someone actually spent on a car, and how many of its photos they
+   * saw. A 90-second read through twelve photos and a three-second bounce are
+   * completely different signals, and the old tracking recorded them the same.
+   *
+   * Time only counts while the page is on screen: switching to WhatsApp and
+   * coming back doesn't rack up minutes. Running totals are sent each time the
+   * page is hidden (the last moment a phone reliably lets a page say anything),
+   * and the database keeps the biggest figure for each page load.
+   *
+   * @returns {{ photo(index: number): void }}  call photo(i) whenever photo i is shown
+   */
+  MBU.watchEngagement = function (carId, photoCount) {
+    const seen = new Set();
+    if (photoCount > 0) seen.add(0);          // the first photo is on screen at load
+
+    let onScreen = 0;
+    let since = document.visibilityState === 'visible' ? performance.now() : null;
+    let scrollPct = 0;
+    let lastSent = -1;
+    const CAP = 30 * 60 * 1000;
+
+    const total = () => onScreen + (since != null ? performance.now() - since : 0);
+
+    function flush() {
+      const ms = Math.min(CAP, Math.round(total()));
+      if (ms - lastSent < 1000 && lastSent >= 0) return;   // nothing new worth sending
+      lastSent = ms;
+      MBU.track('engagement', carId, { scroll_pct: scrollPct }, {
+        duration_ms: ms, photos_seen: seen.size, photo_count: photoCount || 0, beacon: true
+      });
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        if (since != null) { onScreen += performance.now() - since; since = null; }
+        flush();
+      } else {
+        since = performance.now();
+      }
+    });
+    window.addEventListener('pagehide', flush);
+
+    let ticking = false;
+    window.addEventListener('scroll', () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const doc = document.documentElement;
+        const pct = Math.round(100 * (window.scrollY + window.innerHeight) / Math.max(1, doc.scrollHeight));
+        scrollPct = Math.max(scrollPct, Math.min(100, pct));
+        ticking = false;
+      });
+    }, { passive: true });
+
+    return { photo: i => { if (i >= 0 && i < photoCount) seen.add(i); } };
   };
 
   /** Where the visitor came from, for the source column. */
@@ -583,14 +700,20 @@
     } catch { return 'direct'; }
   })();
 
-  /** Wire up whatsapp/phone links so taps are counted automatically. */
-  MBU.autoTrackLinks = function (carId, root) {
+  /**
+   * Wire up WhatsApp, phone and email links so taps are counted automatically.
+   * @param {string} carId
+   * @param {Element} [root]
+   * @param {object} [meta]  e.g. { from: 'contact' } to say which page it was
+   */
+  MBU.autoTrackLinks = function (carId, root, meta) {
     (root || document).addEventListener('click', e => {
       const a = e.target.closest('a[href]');
       if (!a) return;
       const href = a.getAttribute('href') || '';
-      if (href.startsWith('https://wa.me/')) MBU.track('whatsapp_click', carId);
-      else if (href.startsWith('tel:'))      MBU.track('phone_click', carId);
+      if (href.startsWith('https://wa.me/'))  MBU.track('whatsapp_click', carId, meta);
+      else if (href.startsWith('tel:'))       MBU.track('phone_click', carId, meta);
+      else if (href.startsWith('mailto:'))    MBU.track('email_click', carId, meta);
     }, { capture: true });
   };
 

@@ -173,6 +173,25 @@ window.MBU_CONFIG = {
   },
 
   /* ---------------------------------------------------------------------
+     4d. INTEREST TRACKING
+     ---------------------------------------------------------------------
+     'rest'      the original tracking. Works today, but every page load
+                 counts as a new person and bots are counted too.
+     'function'  through the `track` Edge Function, which counts each
+                 person once a day, leaves bots out and records how long
+                 people spend on a car and how many photos they look at.
+
+     Switch to 'function' ONLY after BOTH of these are done, in this order:
+       1. schema-v6-tracking.sql has been run in Supabase
+       2. the `track` function is deployed with JWT verification OFF
+     If you switch early, tracking stops until both are done. Nothing
+     else on the website is affected. HANDOVER section 9f has the steps.
+     ------------------------------------------------------------------- */
+  tracking: {
+    via: 'rest'
+  },
+
+  /* ---------------------------------------------------------------------
      5. SITE BEHAVIOUR
      ------------------------------------------------------------------- */
   options: {

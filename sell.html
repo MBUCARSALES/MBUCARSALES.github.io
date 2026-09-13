@@ -373,6 +373,9 @@
         })
       });
 
+      // A part exchange against one of our cars is a buyer for that car.
+      if (pxCar) MBU.track('enquiry_sent', pxCar.id, { from: 'part_exchange' });
+
       form.innerHTML = `
         <div style="text-align:center;padding:34px 12px">
           <div class="info-card-icon" style="margin:0 auto 18px;background:var(--green-100);color:var(--green-600)">${MBU.icon('checkCirc')}</div>

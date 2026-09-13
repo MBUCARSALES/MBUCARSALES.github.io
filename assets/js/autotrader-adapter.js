@@ -1,21 +1,25 @@
 /* ============================================================================
-   AUTO TRADER CONNECT — ADAPTER (not wired up yet)
+   AUTO TRADER CONNECT — ADAPTER (admin app only)
    ----------------------------------------------------------------------------
-   Nothing here calls Auto Trader. This file exists so that when API access is
-   switched on, the integration drops in without touching the rest of the app.
+   Everything the admin app knows about Auto Trader goes through here, and
+   everything here goes through the `autotrader` Edge Function, which holds
+   the key and secret. Nothing secret is ever in this file: it's public.
 
-   Auto Trader Connect is included as standard in all packages, but direct API
-   access has to be enabled by your Account Manager, and an Integration Manager
-   walks you through "Go Live checks" first. See ROADMAP.md section 4.
+   SWITCHING IT ON, once Auto Trader have approved access:
+     1. Run supabase/schema-v7-insights.sql (if not already)
+     2. Deploy supabase/functions/autotrader and add its four secrets
+        (AT_KEY, AT_SECRET, AT_ADVERTISER_ID, AT_ENV)
+     3. In config.js set  autotrader: { enabled: true, ... }
+     4. Admin app → More → Auto Trader → Test the connection
+   HANDOVER section 9f has the detail.
 
-   WHEN ACCESS IS GRANTED:
-     1. Create a Supabase Edge Function `autotrader-proxy` holding the
-        credentials (same pattern as dvla-lookup — the key must never sit in
-        this file, which is public).
-     2. Fill in the three functions marked TODO below.
-     3. Set enabled: true in config.js.
+   With enabled: false (today) the app works exactly as before: plate lookups
+   use the DVLA/MOT function if deployed, the market price comes from your own
+   price book, and nothing calls Auto Trader.
 
-   Everything else already speaks this interface.
+   READ-ONLY. Valuations, metrics, similar adverts and your advert list.
+   Pushing adverts to Auto Trader is deliberately not built yet: it should be
+   written and tested against their sandbox, not blind. ROADMAP §4a.
    ========================================================================== */
 (function () {
   'use strict';
@@ -25,17 +29,122 @@
 
   AT.config = Object.assign({
     enabled: false,
-    advertiserId: '',
-    proxyPath: '/functions/v1/autotrader-proxy',
+    advertiserId: '',        // informational only; the function uses its own secret
+    functionName: 'autotrader',
     maxAdverts: 8            // your current package allowance
   }, CFG.autotrader || {});
 
-  AT.isEnabled = () => !!(AT.config.enabled && AT.config.advertiserId);
+  AT.isEnabled = () => !!AT.config.enabled;
+
+  /* The admin app hands over a way to get the signed-in admin's token, so
+     this file never touches the Supabase client itself. */
+  let getToken = async () => null;
+  AT.init = function (opts) {
+    if (opts && typeof opts.getToken === 'function') getToken = opts.getToken;
+  };
+
+  async function call(action, payload) {
+    const token = await getToken();
+    if (!token) throw Object.assign(new Error('Your session has expired. Sign in again.'), { code: 'auth' });
+
+    const url = `${(CFG.supabase && CFG.supabase.url || '').replace(/\/$/, '')}/functions/v1/${AT.config.functionName}`;
+    let res;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify(Object.assign({ action }, payload || {}))
+      });
+    } catch {
+      throw Object.assign(new Error('Couldn’t reach Auto Trader. Check your signal.'), { code: 'network' });
+    }
+
+    let body = null;
+    try { body = await res.json(); } catch { /* not JSON */ }
+
+    // A 404 without our own error message means the function isn't deployed
+    if (res.status === 404 && !(body && body.error)) {
+      throw Object.assign(new Error('The Auto Trader connection hasn’t been deployed to Supabase yet.'), { code: 'not_deployed' });
+    }
+    if (!res.ok) {
+      throw Object.assign(new Error((body && body.error) || 'Auto Trader lookup failed.'), { code: body && body.code, status: res.status });
+    }
+    return body;
+  }
+
+  /** Are the credentials in, and do they work? Never throws. */
+  AT.status = async function () {
+    try { return await call('status'); }
+    catch (err) { return { configured: false, connected: false, error: err.message, code: err.code }; }
+  };
+
+  /** Plate (+ mileage) → the car, MOT, valuations, metrics, similar adverts. */
+  AT.lookup = (registration, mileage) =>
+    call('lookup', { registration, mileage: mileage == null ? null : mileage });
+
+  /** The same for a car in stock, plus where its asking price sits. */
+  AT.market = car =>
+    call('market', { registration: car.registration, mileage: car.mileage, price: car.price });
+
+  /** What's live on the Auto Trader account, with price indicator and views. */
+  AT.stock = () => call('stock');
+
+  /**
+   * A market result → the columns it updates on the car (schema-v7), and the
+   * price book row it records. Kept here so the shape lives in one place.
+   */
+  AT.carPatch = function (result) {
+    const v = result.valuations || {};
+    const m = result.metrics || {};
+    const now = new Date().toISOString();
+    return {
+      at_derivative_id: result.derivativeId || null,
+      val_retail: v.retail != null ? v.retail : null,
+      val_trade: v.trade != null ? v.trade : null,
+      val_partex: v.partExchange != null ? v.partExchange : null,
+      retail_rating: m.rating != null ? m.rating : null,
+      days_to_sell: m.daysToSell != null ? Math.round(m.daysToSell) : null,
+      val_updated_at: now,
+      at_price_indicator: result.priceIndicator ? result.priceIndicator.rating : null,
+      at_market: {
+        checked_at: now,
+        env: result.env,
+        retail: v.retail != null ? v.retail : null,
+        indicator: result.priceIndicator ? result.priceIndicator.rating : null,
+        bands: result.priceIndicator ? result.priceIndicator.bands : null,
+        competitors: result.competitors ? {
+          count: result.competitors.count, low: result.competitors.low,
+          median: result.competitors.median, high: result.competitors.high
+        } : null,
+        metrics: result.metrics || null
+      }
+    };
+  };
+
+  AT.priceCheckRow = function (result, carId) {
+    const c = result.competitors;
+    const typical = c && c.median != null ? c.median : (result.valuations && result.valuations.retail);
+    if (!typical) return null;
+    return {
+      make: result.make || 'Unknown',
+      model: result.model || null,
+      year: result.year || null,
+      mileage: result.mileageUsed || null,
+      low: c ? c.low : null,
+      typical,
+      high: c ? c.high : null,
+      sample_size: c ? c.sampled : null,
+      source: 'autotrader_api',
+      car_id: carId || null,
+      notes: result.env === 'sandbox' ? 'Auto Trader SANDBOX data, not real prices' : null,
+      detail: { valuations: result.valuations, metrics: result.metrics, derivative: result.derivative }
+    };
+  };
 
   /* --------------------------------------------------------------------------
-     FIELD MAPPING
-     Our database columns ⇄ Auto Trader's field names. Keeping this in one
-     place means their naming never leaks into the rest of the app.
+     STOCK SYNC — NOT BUILT (on purpose)
+     The payload mapping below is kept ready. Writing to live adverts should
+     be built against the sandbox once access exists.
      -------------------------------------------------------------------------- */
   AT.FIELD_MAP = {
     at_derivative_id:   'vehicle.derivativeId',
@@ -56,10 +165,6 @@
     sold:      'SOLD'
   };
 
-  /**
-   * Shape one of our car records into an Auto Trader stock payload.
-   * Pure data transformation — safe to build and test with no API access.
-   */
   AT.toStockPayload = function (car) {
     return {
       vehicle: {
@@ -86,36 +191,11 @@
     };
   };
 
-  /* --------------------------------------------------------------------------
-     THE THREE CALLS WE'D ACTUALLY MAKE — all TODO
-     -------------------------------------------------------------------------- */
+  /** Stock sync is switched off separately from the read-only connection. */
+  AT.syncEnabled = () => !!(AT.config.enabled && AT.config.stockSync);
 
-  /**
-   * Reg → exact make/model/derivative. This is the one that finishes the job
-   * the DVLA can't: the DVLA gives make, year, colour, fuel and engine size,
-   * but never the model or trim.
-   * TODO: POST through the Edge Function to the Taxonomy / Vehicles API.
-   */
-  AT.lookupDerivative = async function (/* registration */) {
-    throw new Error('Auto Trader access not set up yet — see ROADMAP.md section 4.');
-  };
-
-  /**
-   * Reg + mileage → retail, trade and part-exchange values, retail rating and
-   * average days to sell. The auction bidding tool.
-   * TODO: POST through the Edge Function to Valuations + Vehicle Metrics.
-   */
-  AT.getValuation = async function (/* registration, mileage */) {
-    throw new Error('Auto Trader access not set up yet — see ROADMAP.md section 4.');
-  };
-
-  /**
-   * Push a car to Auto Trader, or pull the advert down when it sells.
-   * Must respect AT.config.maxAdverts — the package allows 8 live at once.
-   * TODO: POST/PATCH through the Edge Function to the Stock API.
-   */
   AT.syncStock = async function (/* car, { publish } */) {
-    throw new Error('Auto Trader access not set up yet — see ROADMAP.md section 4.');
+    throw new Error('Pushing adverts to Auto Trader isn’t built yet. Build it against the sandbox first, see ROADMAP.md §4a.');
   };
 
   /** How many adverts we're allowed to have live, and how many are left. */

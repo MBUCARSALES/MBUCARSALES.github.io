@@ -14,14 +14,17 @@
    makes phones throw the old files away.
    ========================================================================== */
 
-const CACHE = 'mbu-admin-v4';
+const CACHE = 'mbu-admin-v5';
 const SHELL = [
   './',
   './index.html',
   './admin.css',
   './app.js',
+  './insights-engine.js',
   './manifest.json',
   '../assets/js/config.js',
+  '../assets/js/features.js',
+  '../assets/js/autotrader-adapter.js',
   '../assets/img/favicon.svg'
 ];
 

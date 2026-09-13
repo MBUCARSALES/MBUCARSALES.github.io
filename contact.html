@@ -394,11 +394,22 @@
       </div>`;
   }
 
+  /* Everything on this page used to go uncounted, so a car could show "no
+     contact" in the admin app while enquiries about it were arriving. Now a
+     WhatsApp, email or call tap here counts against the car, the same as it
+     does on the car page itself. */
+  function trackForCar(c) {
+    MBU.autoTrackLinks(c.id, document, { from: 'contact' });
+    document.getElementById('contactForm').addEventListener('input', () => {
+      MBU.track('enquiry_start', c.id, { from: 'contact' });
+    }, { once: true });
+  }
+
   if (carId) {
     MBU.getCar(carId).then(c => {
       // A sold car, or an id that no longer exists, falls back to the general
       // list. Never set someone up to enquire about a car they cannot buy.
-      if (c && c.status !== 'sold') { car = c; showCarNotice(c); buildReasons(CAR_REASONS); return; }
+      if (c && c.status !== 'sold') { car = c; showCarNotice(c); buildReasons(CAR_REASONS); trackForCar(c); return; }
       if (c) showSoldNotice(c);
       buildReasons(GENERAL_REASONS);
     }).catch(() => buildReasons(GENERAL_REASONS));
@@ -435,6 +446,7 @@
         message: v('ctMsg'),
         details: { subject: reason }
       });
+      if (car) MBU.track('enquiry_sent', car.id, { from: 'contact', subject: reason });
       form.innerHTML = `
         <div style="text-align:center;padding:34px 12px">
           <div class="info-card-icon" style="margin:0 auto 18px;background:var(--green-100);color:var(--green-600)">${MBU.icon('checkCirc')}</div>

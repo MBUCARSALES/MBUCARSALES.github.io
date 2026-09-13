@@ -536,7 +536,13 @@
       </div>
     </section>`;
 
-    wireGallery(images, title);
+    /* --- anonymous interest tracking (no cookies, see data.js) --- */
+    MBU.track('view', car.id, { status: car.status });
+    // Time on the page and how many photos were seen. Started before the
+    // gallery is wired so every photo change can be counted.
+    const engagement = MBU.watchEngagement(car.id, (car.images || []).length);
+
+    wireGallery(images, title, engagement);
     wireFeatures();
     wireShare(car, title);
     wireForm(car, title);
@@ -544,14 +550,21 @@
     showSimilar(car);
     MBU.reveal();
 
-    /* --- anonymous interest tracking (no cookies, see data.js) --- */
-    MBU.track('view', car.id, { status: car.status });
-    MBU.autoTrackLinks(car.id);          // counts WhatsApp and phone taps
+    MBU.autoTrackLinks(car.id);          // counts WhatsApp, phone and email taps
     MBU.trackGrid(document);             // counts clicks on "similar cars"
+
+    // "Enquire now" goes to the contact page, so the tap is the only moment
+    // this page knows about it.
+    root.addEventListener('click', e => {
+      if (e.target.closest('a[href*="contact.html?car="]')) MBU.track('enquire_click', car.id);
+    }, { capture: true });
+
+    const video = document.getElementById('carVideo');
+    if (video) video.addEventListener('play', () => MBU.track('video_play', car.id));
   }
 
   /* ------------------------------------------------------- GALLERY */
-  function wireGallery(images, title) {
+  function wireGallery(images, title, engagement) {
     let i = 0;
     const img = document.getElementById('galImg');
     const count = document.getElementById('galCount');
@@ -559,6 +572,7 @@
 
     function show(n) {
       i = (n + images.length) % images.length;
+      engagement.photo(i);
       img.src = MBU.img(images[i], 'hero');
       img.alt = `${title}, photo ${i + 1}`;
       if (count) count.textContent = `${i + 1} / ${images.length}`;
@@ -591,6 +605,7 @@
 
     function lbShow(n) {
       j = (n + images.length) % images.length;
+      engagement.photo(j);
       lbImg.src = MBU.img(images[j], 'full');
       lbImg.alt = `${title}, photo ${j + 1}`;
       lbCount.textContent = `${j + 1} / ${images.length}`;

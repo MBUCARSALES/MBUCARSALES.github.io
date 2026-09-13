@@ -264,6 +264,11 @@
           <div class="money"><input class="in" id="fPrep" type="number" inputmode="numeric" placeholder="0"></div>
         </div>
       </div>
+      <div class="f" id="fSaleWrap" hidden style="margin-top:16px;margin-bottom:0">
+        <label for="fSale">What it actually sold for</label>
+        <div class="money"><input class="in" id="fSale" type="number" inputmode="numeric" placeholder="0"></div>
+        <span class="hint">After any haggling. This is the figure your margin is worked out from.</span>
+      </div>
       <div class="moneyline" id="costSummary" hidden></div>
       <div class="f" style="margin-top:16px;margin-bottom:0">
         <label for="fPrivateNotes">Private notes</label>
@@ -383,9 +388,37 @@
         <button class="btn btn--primary" id="vLookup" type="button" style="min-width:96px">Check</button>
       </div>
       <p class="hint" id="vHint" style="margin-top:10px">
-        Pulls the DVLA record and the full MOT history, so you get the mileage
-        at every MOT and every advisory it has ever had.
+        Pulls the full MOT history, so you get the mileage at every MOT and
+        every advisory it has ever had.
       </p>
+      <button class="btn btn--ghost btn--sm btn--block" id="vManualBtn" type="button" style="margin-top:6px">
+        No plate lookup? Type the car in instead
+      </button>
+      <div id="vManual" hidden style="margin-top:12px">
+        <div class="row-2">
+          <div class="f">
+            <label for="vMake">Make</label>
+            <input class="in" id="vMake" autocomplete="off" placeholder="e.g. Audi">
+          </div>
+          <div class="f">
+            <label for="vModel">Model</label>
+            <input class="in" id="vModel" autocomplete="off" placeholder="e.g. A3">
+          </div>
+        </div>
+        <div class="row-2" style="margin-top:12px">
+          <div class="f">
+            <label for="vYear">Year</label>
+            <input class="in" id="vYear" type="number" inputmode="numeric" placeholder="2016">
+          </div>
+          <div class="f">
+            <label for="vMiles">Mileage</label>
+            <input class="in" id="vMiles" type="number" inputmode="numeric" placeholder="72000">
+          </div>
+        </div>
+        <button class="btn btn--primary btn--block" id="vManualGo" type="button" style="margin-top:12px">
+          Work it out
+        </button>
+      </div>
     </div>
 
     <div class="msg" id="vMsg" role="status"></div>
@@ -447,6 +480,17 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <div class="section-card" id="upgradesCard" hidden>
+      <h2>Ready to switch on</h2>
+      <div id="upgradesBody"></div>
+    </div>
+
+    <div class="section-card" id="atCard">
+      <h2>Auto Trader</h2>
+      <div id="atStatus" class="note" style="margin:-6px 0 12px;font-size:14.5px">Not switched on yet.</div>
+      <button class="btn btn--outline btn--block" id="atTest" type="button">Test the connection</button>
     </div>
 
     <div class="section-card">
@@ -541,6 +585,7 @@
 <script src="../assets/js/config.js"></script>
 <script src="../assets/js/features.js"></script>
 <script src="../assets/js/autotrader-adapter.js"></script>
+<script src="insights-engine.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
