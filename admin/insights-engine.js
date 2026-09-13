@@ -86,7 +86,13 @@
        is only called "above the market" when it's above clean cars too,
        which can't be wrong, and priced-like-clean is flagged without a
        suggested figure. */
-    CAT_DISCOUNT_PCT: { cat_n: null, cat_s: null, cat_d: null, cat_c: null },
+    CAT_DISCOUNT_PCT: { cat_n: null, cat_s: 14, cat_d: null, cat_c: null },
+    // cat_s 14: the dealer's own example, 13 Sept 2026. The Cat S Jeep Avenger at
+    // £11,999 would be about £14,000 clean. One car, so treat as rough. Cat N not
+    // given yet. Once Auto Trader is connected its figures are the guide instead,
+    // and if its valuation for a Cat car already allows for the category, set
+    // CAT_DISCOUNT_ON_AUTOTRADER to false so it isn't knocked off twice.
+    CAT_DISCOUNT_ON_AUTOTRADER: true,
 
     /* ---- traffic -------------------------------------------------------- */
     LOW_TRAFFIC_SHARE: 0.4,     // under 40% of the typical car's people a week
@@ -248,7 +254,9 @@
   function positionFor(car, market) {
     if (!market || car.price == null) return null;
     const cat = HPI_NAMES[car.hpi_status] ? car.hpi_status : null;
-    const discount = cat && market.source !== 'own_sales' ? THRESHOLDS.CAT_DISCOUNT_PCT[cat] : null;
+    const discount = cat && market.source !== 'own_sales'
+      && (market.source !== 'autotrader' || THRESHOLDS.CAT_DISCOUNT_ON_AUTOTRADER)
+      ? THRESHOLDS.CAT_DISCOUNT_PCT[cat] : null;
     const factor = discount != null ? 1 - discount / 100 : 1;
     const info = { cat, catDiscount: discount };
 
@@ -450,7 +458,7 @@
           presentation,
           `It's priced in line with ${MARKET_LABEL[market.source]} (${money(pos.target)} at the top), so it isn't obviously the price either.`,
           `Check the description answers what buyers ask first: MOT, service history and owners.`
-        ], { actions: ['edit', 'autotrader', 'snooze'] });
+        ], { actions: ctx.atSlotsKnown ? ['edit', 'autotrader', 'snooze'] : ['edit', 'snooze'] });
       }
 
       return finding('no_contact', 'price_unchecked', 'act', [
@@ -481,7 +489,7 @@
       if (perWeek < baseRate * T.LOW_TRAFFIC_SHARE) {
         const acts = [];
         if (!car.featured) acts.push('feature');
-        if (!car.at_published) acts.push('autotrader');
+        if (!car.at_published && ctx.atSlotsKnown) acts.push('autotrader');
         acts.push('listing_pack', 'snooze');
         return finding('low_traffic', 'visibility', days >= speed.actDays ? 'act' : 'watch', [
           `Only ${plural(people, 'person', 'people')} in ${plural(trackedDays, 'day')}, against about ${Math.round(baseRate)} a week for your other cars.`,
@@ -490,7 +498,7 @@
           `People aren't turning it down, they aren't finding it.`
         ], {
           advice: [!car.featured ? 'feature it on the homepage' : null,
-                   !car.at_published ? 'give it an Auto Trader slot' : null,
+                   !car.at_published && ctx.atSlotsKnown ? 'give it an Auto Trader slot' : null,
                    'post it on Facebook'].filter(Boolean).join(', ').replace(/^./, c => c.toUpperCase()) + '.',
           actions: acts
         });
@@ -691,12 +699,14 @@
     const pcts = cars
       .filter(c => c.status === 'sold' && c.price > 0 && c.sale_price != null)
       .map(c => 100 * (c.price - c.sale_price) / c.price)
-      .filter(p => p >= 0 && p < 40);
+      // Negative is real: a popular car can go for MORE than asking to secure it
+      .filter(p => p > -25 && p < 40);
     if (pcts.length < THRESHOLDS.HAGGLE_MIN_SALES) return null;
     return {
       pct: Math.round(median(pcts)),
       sales: pcts.length,
-      atAsking: pcts.filter(p => p === 0).length
+      atAsking: pcts.filter(p => p === 0).length,
+      aboveAsking: pcts.filter(p => p < 0).length
     };
   }
 
@@ -708,6 +718,7 @@
    * @param {object[]} [input.ageing]       rows from `stock_ageing`
    * @param {object[]} [input.checks]       rows from `price_checks`
    * @param {object[]} [input.actions]      rows from `insight_actions` (schema v7)
+   * @param {boolean}  [input.atSlotsKnown] true only when at_published reflects Auto Trader
    */
   function analyse(input) {
     const now = toTime(input.now) || Date.now();
@@ -721,7 +732,11 @@
       ageing: byId(input.ageing),
       checks: input.checks || [],
       actions: input.actions || [],
-      trackingSince: since
+      trackingSince: since,
+      // Whether "on Auto Trader" on each car can be trusted. The dealer lists cars
+      // on Auto Trader without ticking it in the app, so false until the app reads
+      // the real advert list from Auto Trader's Stock API.
+      atSlotsKnown: !!input.atSlotsKnown
     };
     const cars = input.cars || [];
     ctx.cars = cars;

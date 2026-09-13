@@ -121,25 +121,11 @@
     };
   };
 
-  AT.priceCheckRow = function (result, carId) {
-    const c = result.competitors;
-    const typical = c && c.median != null ? c.median : (result.valuations && result.valuations.retail);
-    if (!typical) return null;
-    return {
-      make: result.make || 'Unknown',
-      model: result.model || null,
-      year: result.year || null,
-      mileage: result.mileageUsed || null,
-      low: c ? c.low : null,
-      typical,
-      high: c ? c.high : null,
-      sample_size: c ? c.sampled : null,
-      source: 'autotrader_api',
-      car_id: carId || null,
-      notes: result.env === 'sandbox' ? 'Auto Trader SANDBOX data, not real prices' : null,
-      detail: { valuations: result.valuations, metrics: result.metrics, derivative: result.derivative }
-    };
-  };
+  /* No priceCheckRow: Auto Trader data is never copied into the price book.
+     Their terms: display inside the dealer's own software only, no sharing
+     valuations or metrics, erase everything if the account ends, and (Vehicle
+     Check terms) no building a database from it. The latest snapshot lives on
+     the car itself (carPatch above) and is overwritten each check. */
 
   /* --------------------------------------------------------------------------
      STOCK SYNC — NOT BUILT (on purpose)

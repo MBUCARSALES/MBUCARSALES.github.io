@@ -736,13 +736,13 @@
       patch.sold_at = new Date().toISOString();
       // Optional, but it's the one number that makes the margin figures real,
       // and now is the only moment you'll reliably remember it.
-      // The box starts at the advertised price for speed. Say so, because an OK
-      // pressed on it records "no haggling", and in the 13 Sept 2026 figures 6 of
-      // 14 sales were exactly the asking price.
+      // The box starts at the advertised price for speed, and most cars do sell
+      // at asking (the dealer confirmed, 13 Sept 2026). Say so anyway, because
+      // some go for less and a popular one can go for more.
       const asked = prompt(
         'What did it actually sell for?\n\n' +
         (car.price != null
-          ? `The box shows the advertised price (${money(car.price)}). If you took less, change it.\n`
+          ? `The box shows the advertised price (${money(car.price)}). If it went for less, or more, change it.\n`
           : '') +
         'Just for your own figures. Never shown on the website.\n' +
         'Leave blank to skip.',
@@ -2034,7 +2034,8 @@
       interest: countingPeople() ? interest : [],
       ageing: ageing || [],
       checks: priceChecks,
-      actions: insightActs || []
+      actions: insightActs || [],
+      atSlotsKnown: false      // the app's "on Auto Trader" tick isn't kept up to date
     });
   }
 
@@ -2524,7 +2525,7 @@
         buttons.push(`<button class="btn btn--outline btn--sm" data-ins="${n}" data-do="edit">Edit the listing</button>`);
       } else if (a === 'feature' && car && !car.featured) {
         buttons.push(`<button class="btn btn--outline btn--sm" data-ins="${n}" data-do="feature">Feature it</button>`);
-      } else if (a === 'autotrader' && car && !car.at_published && advertAllowance().remaining > 0) {
+      } else if (a === 'autotrader' && car && !car.at_published && advertAllowance().remaining > 0 && AT && AT.isEnabled()) {
         buttons.push(`<button class="btn btn--outline btn--sm" data-ins="${n}" data-do="autotrader">Use an Auto Trader slot</button>`);
       } else if (a === 'listing_pack') {
         buttons.push(`<button class="btn btn--outline btn--sm" data-ins="${n}" data-do="listing_pack">Listing pack</button>`);
@@ -3166,7 +3167,6 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
           const r = await AT.lookup(reg, null);
           vehicle = vehicleFromAutoTrader(r);
           renderValuation();
-          rememberAutoTraderCheck(r, null);
           return;
         } catch (err) {
           // Not set up properly: quietly fall back to the DVLA/MOT lookup.
@@ -3284,16 +3284,12 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     };
   }
 
-  /** Every Auto Trader look-up feeds the price book, so it fills itself. */
-  function rememberAutoTraderCheck(r, carId) {
-    if (!AT) return;
-    const row = AT.priceCheckRow(r, carId);
-    if (!row) return;
-    sb.from('price_checks').insert(row).then(({ error }) => {
-      // Before schema-v7 the price book doesn't accept this source. Not worth bothering anyone about.
-      if (error) console.warn('Auto Trader check not saved to the price book', error.message);
-    });
-  }
+  /* Auto Trader figures are NOT copied into the price book. Their terms limit
+     the data to display inside the dealer's own software, bar sharing
+     valuations and metrics with anyone, require erasing it all if the account
+     ends, and their Vehicle Check terms forbid building a database from it.
+     So a look-up is shown and gone, and a stock car keeps only its latest
+     snapshot (cars.at_market), overwritten each check. HANDOVER 9h. */
 
   /**
    * "What's this car worth right now?" for a car in stock.
@@ -3322,7 +3318,6 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       }
       if (error) throw error;
       Object.assign(car, patch);
-      rememberAutoTraderCheck(r, car.id);
 
       const rating = r.priceIndicator && r.priceIndicator.rating;
       toast(rating ? `Auto Trader rates the price ${rating}` : 'Market figures updated', 'ok');

@@ -168,9 +168,18 @@ jobs:
           echo "gzip integrity: OK"
 
           # 3. It actually contains the tables that matter, and the car rows.
-          #    Grep the decompressed stream rather than unpacking to disk.
+          #
+          #    Decompress ONCE to a scratch file and search that. Piping
+          #    `gzip -dc | grep -q` fails under `set -o pipefail`: grep -q stops
+          #    reading at the first match, gzip is killed writing to the closed
+          #    pipe ("gzip: stdout: Broken pipe"), and pipefail turns that into
+          #    a failure, so a table that IS there gets reported as missing.
+          #    Run #3 failed exactly like that. The dump is small (tens of KB).
+          SQL="$RUNNER_TEMP/verify.sql"
+          gzip -dc "$OUT" > "$SQL"
+
           for tbl in cars enquiries wanted_requests car_events; do
-            if ! gzip -dc "$OUT" | grep -q "CREATE TABLE \"public\".\"${tbl}\""; then
+            if ! grep -q "CREATE TABLE \"public\".\"${tbl}\"" "$SQL"; then
               echo "::error::Table '${tbl}' is missing from the dump."
               exit 1
             fi
@@ -178,9 +187,9 @@ jobs:
           done
 
           # 4. Count the COPY rows for `cars` so the log proves data came across.
-          CARS=$(gzip -dc "$OUT" \
-            | awk '/^COPY "public"."cars" /{f=1;next} f&&/^\\\.$/{f=0} f' \
+          CARS=$(awk '/^COPY "public"."cars" /{f=1;next} f&&/^\\\.$/{f=0} f' "$SQL" \
             | wc -l | tr -d ' ')
+          rm -f "$SQL"
           echo "Car records in this backup: $CARS"
           if [ "$CARS" -lt 1 ]; then
             echo "::error::The dump contains zero car records. Refusing to call this a backup."
