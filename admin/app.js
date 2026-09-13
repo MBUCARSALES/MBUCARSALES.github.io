@@ -736,8 +736,14 @@
       patch.sold_at = new Date().toISOString();
       // Optional, but it's the one number that makes the margin figures real,
       // and now is the only moment you'll reliably remember it.
+      // The box starts at the advertised price for speed. Say so, because an OK
+      // pressed on it records "no haggling", and in the 13 Sept 2026 figures 6 of
+      // 14 sales were exactly the asking price.
       const asked = prompt(
         'What did it actually sell for?\n\n' +
+        (car.price != null
+          ? `The box shows the advertised price (${money(car.price)}). If you took less, change it.\n`
+          : '') +
         'Just for your own figures. Never shown on the website.\n' +
         'Leave blank to skip.',
         car.price != null ? String(car.price) : '');
@@ -972,8 +978,8 @@
       const d = await vehicleLookup(plate);
       const make = d.make;
       const year = d.year ?? d.yearOfManufacture;
-      if (make) { setPicker('#qMake', '#qMakeOther', titleCase(make)); refreshQuickModels(); }
-      if (d.model) setPicker('#qModel', '#qModelOther', titleCase(d.model));
+      if (make) { setPicker('#qMake', '#qMakeOther', canonicalMake(make)); refreshQuickModels(); }
+      if (d.model) setPicker('#qModel', '#qModelOther', canonicalModel(make, d.model));
       if (year) $('#qYear').value = year;
       state.dirty = true;
       hint.innerHTML = make
@@ -1003,8 +1009,8 @@
     const record = {
       status: 'draft',
       registration: plate || null,
-      make: make || null,
-      model: model || null,
+      make: canonicalMake(make) || null,
+      model: canonicalModel(make, model) || null,
       year: int($('#qYear').value),
       purchase_price: int($('#qPaid').value),
       prep_cost: int($('#qPrep').value),
@@ -1484,10 +1490,10 @@
       const miles  = d.mot && d.mot.latestMileage != null ? d.mot.latestMileage : null;
 
       if (make) {
-        setPicker('#fMake', '#fMakeOther', titleCase(make));
+        setPicker('#fMake', '#fMakeOther', canonicalMake(make));
         refreshFormModels();
       }
-      if (model)  setPicker('#fModel', '#fModelOther', titleCase(model));
+      if (model)  setPicker('#fModel', '#fModelOther', canonicalModel(make, model));
       if (year)   force('#fYear', year);
       if (d.colour) setPicker('#fColour', '#fColourOther', titleCase(d.colour));
       if (litres) force('#fEngine', Number(litres).toFixed(1));
@@ -1519,6 +1525,34 @@
   }
 
   const titleCase = s => String(s).toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+
+  /* ---- Make and model spelling -----------------------------------------
+     Plate lookups return capitals ("BMW", "MAZDA CX-3") and title-casing them
+     blindly gave "Bmw" and "Cx-3", which then sat in the dropdowns next to the
+     proper spelling and stopped your own history and the price book matching.
+     Anything we recognise gets its proper spelling; anything we don't is
+     title-cased but keeps short and digit-bearing parts in capitals. */
+  const keyOf = window.MBU_INSIGHTS ? window.MBU_INSIGHTS.makeKey : s => String(s || '').toLowerCase();
+  const modelKeyOf = window.MBU_INSIGHTS ? window.MBU_INSIGHTS.modelKey : s => String(s || '').toLowerCase();
+
+  function smartCase(s) {
+    return String(s || '').trim().split(/(\s+|-)/).map(part =>
+      /\d/.test(part) || (/^[a-z]{2}$/i.test(part) && part === part.toUpperCase())
+        ? part.toUpperCase() : titleCase(part)).join('');
+  }
+
+  function canonicalMake(s) {
+    if (!s) return s;
+    const k = keyOf(s);
+    return Object.keys(MODELS).find(m => keyOf(m) === k) || smartCase(s);
+  }
+
+  function canonicalModel(make, s) {
+    if (!s) return s;
+    const k = modelKeyOf(s);
+    const known = MODELS[canonicalMake(make)] || [];
+    return known.find(m => modelKeyOf(m) === k) || smartCase(s);
+  }
 
   /* ================================================ DESCRIPTION HELPER */
   function draftDescription() {
@@ -1599,8 +1633,8 @@
     const record = {
       status,
       registration: g('#fReg').replace(/\s+/g, '') || null,
-      make: make || null,
-      model: model || null,
+      make: canonicalMake(make) || null,
+      model: canonicalModel(make, model) || null,
       variant: g('#fVariant') || null,
       year: int(g('#fYear')),
       price: int(g('#fPrice')),
@@ -2030,22 +2064,40 @@
         <p>No cars in stock, or none of them old enough to worry about yet.</p></div>`;
     }
 
+    /* The bands follow how fast YOUR cars sell once there's enough history
+       (the insight engine works it out, counting unsold cars too). Until
+       then, the original 45 / 60 / 90 days. */
+    const speed = (analysis && analysis.speed) || { own: false, watchDays: 45, actDays: 60 };
+    const watchD = speed.watchDays, actD = speed.actDays, critD = Math.round(actD * 1.5);
+    const bandOf = c => c.days_in_stock >= critD ? 'critical'
+      : c.days_in_stock >= actD ? 'overdue'
+      : c.days_in_stock >= watchD ? 'watch' : 'fine';
+
     const bands = [
-      ['critical', 'Over 90 days and losing you money', 'var(--red-600)'],
-      ['overdue',  '60 to 90 days, worth a price review', 'var(--amber-600)'],
-      ['watch',    '45 to 60 days, keep an eye on it', 'var(--ink-2)'],
+      ['critical', `Over ${critD} days and losing you money`, 'var(--red-600)'],
+      ['overdue',  `${actD} to ${critD} days, worth a price review`, 'var(--amber-600)'],
+      ['watch',    `${watchD} to ${actD} days, keep an eye on it`, 'var(--ink-2)'],
       ['fine',     'Fresh stock', 'var(--green-600)']
     ];
 
-    const counts = bands.map(([k]) => ageing.filter(c => c.ageing === k).length);
+    const counts = bands.map(([k]) => ageing.filter(c => bandOf(c) === k).length);
     const needsAction = counts[0] + counts[1];
+    const haggle = analysis && analysis.haggle;
 
     const row = c => {
       const title = [c.year, c.make, c.model].filter(Boolean).join(' ') || 'Untitled';
       const lastChange = c.last_price_change
         ? Math.round((Date.now() - new Date(c.last_price_change)) / 86400000) : null;
-      const gapToAvg = (c.avg_achieved != null && c.price != null)
-        ? c.price - c.avg_achieved : null;
+      // What you've sold these for, spelling ignored, from the cars themselves
+      const soldSame = state.cars.filter(s => s.status === 'sold' && String(s.id) !== String(c.id)
+        && keyOf(s.make) === keyOf(c.make) && modelKeyOf(s.model) === modelKeyOf(c.model)
+        && (s.sale_price != null || s.price != null));
+      const achieved = soldSame.length
+        ? Math.round(soldSame.reduce((n, s) => n + (s.sale_price != null ? s.sale_price : s.price), 0) / soldSame.length) : null;
+      // Sale prices have the haggle taken off; compare like with like
+      const askingEquivalent = achieved != null && haggle && haggle.pct
+        ? Math.round(achieved / (1 - haggle.pct / 100) / 10) * 10 : achieved;
+      const gapToAvg = (askingEquivalent != null && c.price != null) ? c.price - askingEquivalent : null;
 
       return `<div class="card" style="margin-bottom:10px"><div style="padding:14px">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
@@ -2056,16 +2108,16 @@
               ${c.previous_price ? ' · already reduced from ' + money(c.previous_price) : ''}
             </div>
           </div>
-          <span class="pill ${c.ageing === 'critical' ? 'pill--red'
-                            : c.ageing === 'overdue' ? 'pill--amber' : 'pill--grey'}">
+          <span class="pill ${bandOf(c) === 'critical' ? 'pill--red'
+                            : bandOf(c) === 'overdue' ? 'pill--amber' : 'pill--grey'}">
             ${c.days_in_stock}d
           </span>
         </div>
 
         <div style="font-size:14px;color:var(--ink-2);margin-top:10px;line-height:1.6">
-          ${c.avg_achieved != null
-            ? `You've averaged <strong>${money(c.avg_achieved)}</strong> on these${
-                c.avg_days_to_sell != null ? `, sold in about ${c.avg_days_to_sell} days` : ''}.
+          ${achieved != null
+            ? `You've sold ${soldSame.length === 1 ? 'one of these' : soldSame.length + ' of these'} for <strong>${money(achieved)}</strong>${soldSame.length === 1 ? '' : ' on average'}${
+                haggle && haggle.pct && askingEquivalent !== achieved ? `, about ${money(askingEquivalent)} before your usual ${haggle.pct}% haggle` : ''}.
                ${gapToAvg > 200 ? `This one is <strong style="color:var(--amber-600)">${money(gapToAvg)} above</strong> that.` : ''}`
             : `No history on this model to compare against.`}
           <br>
@@ -2080,7 +2132,7 @@
     };
 
     const sections = bands.map(([key, label, colour], i) => {
-      const list = ageing.filter(c => c.ageing === key);
+      const list = ageing.filter(c => bandOf(c) === key);
       if (!list.length || key === 'fine') return '';
       return `<div class="section-card">
         <h2 style="color:${colour}">${label} · ${list.length}</h2>
@@ -2090,10 +2142,17 @@
 
     return `
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
-        ${statTile(counts[0], 'Over 90 days', counts[0] ? 'var(--red-600)' : null)}
-        ${statTile(counts[1], '60 to 90 days', counts[1] ? 'var(--amber-600)' : null)}
+        ${statTile(counts[0], `Over ${critD} days`, counts[0] ? 'var(--red-600)' : null)}
+        ${statTile(counts[1], `${actD} to ${critD} days`, counts[1] ? 'var(--amber-600)' : null)}
         ${statTile(counts[3], 'Fresh', 'var(--green-600)')}
       </div>
+
+      <p class="note" style="margin:0 0 12px">
+        ${speed.own
+          ? `Three in four of your cars sell within ${watchD} days, so that's where "keep an eye on it" starts.`
+          : `Using 45, 60 and 90 days until there's enough selling history to use your own${
+              speed.soFar ? ` (so far, ${speed.soFar.soldPct}% of cars sell within ${speed.soFar.days} days)` : ''}.`}
+      </p>
 
       ${needsAction
         ? `<div class="msg msg--warn is-shown" style="margin-bottom:14px">
@@ -2132,6 +2191,7 @@
   const CAUSE_LABEL = {
     price: 'Priced above the market',
     price_unchecked: 'Probably the price, not checked yet',
+    price_cat: 'Priced like a clean car',
     photos: 'Needs more photos',
     first_impression: 'People leave before the photos',
     visibility: 'Not enough people finding it',
@@ -2337,6 +2397,10 @@
            on this point in ${esc(f.prevName)} (${signed(f.prevToDate.total)}).`;
     }
 
+    // Prep is optional, so a missing one doesn't stop a sale counting. But a
+    // margin before prep flatters the month, so say how many are like that.
+    const noPrep = t.cars.filter(c => carMargin(c) != null && c.prep_cost == null).length;
+
     // Break down this month's cars, or last month's if nothing has sold yet
     const showing = t.cars.length ? t : f.prevFull;
     const showingName = t.cars.length ? f.thisName : f.prevName;
@@ -2352,7 +2416,7 @@
       const bits = [
         'Sold ' + shortDay(c.sold_at),
         c.sale_price != null ? 'for ' + money(c.sale_price) + haggle : null,
-        c.purchase_price != null ? 'paid ' + money(c.purchase_price) + (c.prep_cost ? ' + ' + money(c.prep_cost) + ' prep' : '') : null,
+        c.purchase_price != null ? 'paid ' + money(c.purchase_price) + (c.prep_cost ? ' + ' + money(c.prep_cost) + ' prep' : ', no prep entered') : null,
         days != null ? days + ' days' : null
       ].filter(Boolean).join(' · ');
       const missing = [c.sale_price == null ? 'what it sold for' : null, c.purchase_price == null ? 'what you paid' : null]
@@ -2371,6 +2435,10 @@
       <div class="mh-figure ${t.total < 0 ? 'is-loss' : ''}">${t.counted ? signed(t.total) : '£0'}</div>
       <div class="mh-compare">${compare}</div>
       ${t.missing ? `<div class="mh-compare" style="margin-top:4px">${t.missing} of ${t.cars.length} sale${t.cars.length === 1 ? '' : 's'} this month ${t.missing === 1 ? 'has' : 'have'} a figure missing, so ${t.missing === 1 ? 'isn’t' : 'aren’t'} counted.</div>` : ''}
+      ${noPrep ? `<div class="mh-compare" style="margin-top:4px">${
+        noPrep < t.counted ? `${noPrep} of ${t.counted} sales ${noPrep === 1 ? 'has' : 'have'} no prep cost entered, so ${noPrep === 1 ? 'that one is' : 'those are'} counted before prep.`
+        : t.counted === 1 ? 'No prep cost entered on that sale, so it’s counted before prep.'
+        : 'No prep costs entered on any of these, so this is before prep.'}</div>` : ''}
       <div class="mh-row">
         <span>${esc(f.prevName)} <b>${f.prevFull.counted ? signed(f.prevFull.total) : '£0'}</b> (${f.prevFull.cars.length} sold)</span>
         <span>All time <b>${signed(f.allTime.total)}</b></span>
@@ -2411,11 +2479,21 @@
     }
     const needing = list.filter(f => f.severity !== 'good').length;
 
+    // Stock often goes on in batches, so a batch ages together and can raise a
+    // dozen cards on the same day. The most urgent few show; the rest fold away.
+    const SHOWN = 5;
+    const cards = list.map((f, n) => insightCard(f, n));
+    const rest = cards.length - SHOWN;
+
     return `
       <div style="font-size:13px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin:4px 2px 10px">
         ${needing ? `Needs a decision · ${needing}` : 'Worth knowing'}
       </div>
-      ${list.map((f, n) => insightCard(f, n)).join('')}
+      ${cards.slice(0, SHOWN).join('')}
+      ${rest > 0 ? `<details class="more-insights">
+        <summary>Show ${rest} more</summary>
+        ${cards.slice(SHOWN).join('')}
+      </details>` : ''}
       ${snoozed}`;
   }
 
@@ -3130,7 +3208,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
           const d = await res.json();
           vehicle = {
             registration: reg, found: { dvla: true, mot: false },
-            make: d.make ? titleCase(d.make) : null, model: null,
+            make: d.make ? canonicalMake(d.make) : null, model: null,
             year: d.yearOfManufacture, colour: d.colour ? titleCase(d.colour) : null,
             fuelType: d.fuelType, engineLitres: d.engineCapacity ? +(d.engineCapacity / 1000).toFixed(1) : null,
             motExpiryDate: d.motExpiryDate, taxStatus: d.taxStatus,
@@ -3147,7 +3225,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       if (!payload) throw new Error('The lookup service returned something unexpected.');
 
       vehicle = payload;
-      if (vehicle.make) vehicle.make = titleCase(vehicle.make);
+      if (vehicle.model) vehicle.model = canonicalModel(vehicle.make, vehicle.model);
+      if (vehicle.make) vehicle.make = canonicalMake(vehicle.make);
       if (vehicle.colour) vehicle.colour = titleCase(vehicle.colour);
       renderValuation();
 
@@ -3195,7 +3274,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     return {
       registration: r.registration,
       found: { at: true, mot: !!r.mot },
-      make: r.make, model: r.model, year: r.year,
+      make: canonicalMake(r.make), model: canonicalModel(r.make, r.model), year: r.year,
       colour: r.colour, fuelType: r.fuelType, engineLitres: r.engineLitres,
       motExpiryDate: r.motExpiryDate,
       manualMileage: r.mot ? null : r.mileageUsed,
@@ -3259,13 +3338,13 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
   /* ---- your own trading history for this make/model ---------------------- */
   function ownHistory(make, model) {
     if (!make) return null;
-    const m = String(make).toLowerCase();
-    const mod = model ? String(model).toLowerCase() : null;
+    // Spelling ignored: "Mercedes" is "Mercedes-Benz", "A-Class" is "A Class"
+    const m = keyOf(make);
+    const mod = model ? modelKeyOf(model) : null;
 
     const exact = state.cars.filter(c =>
-      String(c.make || '').toLowerCase() === m &&
-      (!mod || String(c.model || '').toLowerCase() === mod));
-    const sameMake = state.cars.filter(c => String(c.make || '').toLowerCase() === m);
+      keyOf(c.make) === m && (!mod || modelKeyOf(c.model) === mod));
+    const sameMake = state.cars.filter(c => keyOf(c.make) === m);
 
     const pool = exact.length ? exact : sameMake;
     if (!pool.length) return null;
@@ -3466,18 +3545,41 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     };
   }
 
-  /* ---- customer requests this car would satisfy -------------------------- */
-  function matchingRequests(make, model) {
-    const m = String(make || '').toLowerCase();
-    const mod = String(model || '').toLowerCase();
+  /* ---- customer requests this car would satisfy --------------------------
+     Three ways a request matches:
+       1. It names this make (and model, if it gives one). Spelling ignored.
+       2. The notes mention this model: "also after Jazzes, Fiestas, Corsas".
+       3. It names no make but asks for a gearbox, fuel or body, and this car
+          is KNOWN to be that. "Any automatic" never matches a car whose
+          gearbox the lookup didn't return, so it can't cry wolf. */
+  function matchingRequests(v) {
+    const mk = keyOf(v.make);
+    const md = v.model ? modelKeyOf(v.model) : '';
+    const word = String(v.model || '').toLowerCase().split(/\s+/)[0] || '';
+    const mentions = word.length >= 3
+      ? new RegExp('\\b' + word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
+    const gear = String((v.at && v.at.transmissionType) || '').toLowerCase();
+    const fuel = String((v.at && v.at.fuelType) || v.fuelType || '').toLowerCase();
+    const body = String((v.at && v.at.bodyType) || '').toLowerCase();
+
     return state.requests.filter(r => {
       if (r.status === 'closed' || r.archived) return false;
-      const rm = String(r.make || '').toLowerCase();
-      if (!rm) return false;
-      if (rm !== m) return false;
-      if (r.model && mod && !mod.includes(String(r.model).toLowerCase())
-          && !String(r.model).toLowerCase().includes(mod)) return false;
-      return true;
+      if (mentions && mentions.test(r.notes || '')) return true;
+
+      if (r.make) {
+        if (keyOf(r.make) !== mk) return false;
+        if (r.model && md) {
+          const rm = modelKeyOf(r.model);
+          if (!rm.includes(md) && !md.includes(rm)) return false;
+        }
+        return true;
+      }
+
+      let asked = 0;
+      if (r.transmission) { asked++; if (gear !== r.transmission) return false; }
+      if (r.fuel)         { asked++; if (!fuel.includes(r.fuel)) return false; }
+      if (r.body_type)    { asked++; if (body !== r.body_type) return false; }
+      return asked > 0;
     });
   }
 
@@ -3519,7 +3621,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     const mot = v.mot;
     const title = [v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown vehicle';
     const hist = ownHistory(v.make, v.model);
-    const reqs = matchingRequests(v.make, v.model);
+    const reqs = matchingRequests(v);
 
     const flagHtml = (v.flags || []).map(f => `
       <div class="msg msg--${f.level === 'bad' ? 'err' : f.level === 'warn' ? 'warn' : 'ok'} is-shown"
