@@ -220,7 +220,7 @@ window.MBU_CONFIG = {
     // Show a "Reserved" badge instead of hiding reserved cars
     showReserved: true,
     // Canonical site address, used for sharing links. Update if you buy a domain.
-    siteUrl: 'https://mbucarsales.github.io',
+    siteUrl: 'https://mbucarsales.co.uk',
 
     // Share car links as /c/<id>/, pre-rendered pages that show the actual
     // car when forwarded on WhatsApp or Facebook.
@@ -231,7 +231,7 @@ window.MBU_CONFIG = {
     //    the preview just shows the MBU logo instead of the car.
     //
     //    TURN IT BACK ON once the Action is green: check that
-    //    https://mbucarsales.github.io/c/ stops 404ing, then set this to true.
+    //    https://mbucarsales.co.uk/c/ stops 404ing, then set this to true.
     //    HANDOVER section 9d has the fix, it is one setting on GitHub.
     sharePages: false
   }

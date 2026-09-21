@@ -63,7 +63,7 @@ jobs:
           // Read the site's own config so the URL and cloud name stay in one place
           const cfgSrc = fs.readFileSync('assets/js/config.js', 'utf8');
           const pick = re => (cfgSrc.match(re) || [])[1] || '';
-          const SITE  = (pick(/siteUrl:\s*'([^']*)'/) || 'https://mbucarsales.github.io').replace(/\/$/, '');
+          const SITE  = (pick(/siteUrl:\s*'([^']*)'/) || 'https://mbucarsales.co.uk').replace(/\/$/, '');
           const CLOUD = pick(/cloudName:\s*'([^']*)'/);
           const BRAND = pick(/name:\s*'([^']*)'/) || 'MBU Car Sales';
 
