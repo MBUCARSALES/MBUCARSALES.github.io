@@ -679,11 +679,49 @@
     return VERSES.list[day % VERSES.list.length];
   }
 
-  function verseCard(v) {
+  /* The Islamic date, from the phone's own Umm al-Qura calendar. That's a
+     calculated calendar, so it can be a day out from a mosque that goes by
+     the moon being sighted; set this to 1 or -1 if it doesn't match yours. */
+  const HIJRI_ADJUST_DAYS = 0;
+
+  /** Today in the Islamic calendar, in Arabic and English, or null if the phone can't. */
+  function hijriToday() {
+    try {
+      const d = new Date(Date.now() + HIJRI_ADJUST_DAYS * DAY);
+      const fmt = loc => new Intl.DateTimeFormat(loc + '-u-ca-islamic-umalqura',
+        { day: 'numeric', month: 'long', year: 'numeric' });
+      const en = fmt('en-GB');
+      if (en.resolvedOptions().calendar !== 'islamic-umalqura') return null;
+      return { en: en.format(d), ar: fmt('ar-SA').format(d) };
+    } catch { return null; }
+  }
+
+  /** Today, both calendars: the top of Home. */
+  function dateHead() {
+    const now = new Date();
+    const h = hijriToday();
+    return `<div class="verse-date">
+      <div class="vd-greg">
+        <span class="vd-day">${esc(now.toLocaleDateString('en-GB', { weekday: 'long' }))}</span>
+        <span class="vd-date">${esc(now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }))}</span>
+      </div>
+      ${h ? `<div class="vd-hijri">
+        <span class="vd-hijri-ar" lang="ar" dir="rtl">${esc(h.ar)}</span>
+        <span class="vd-hijri-en">${esc(h.en)}</span>
+      </div>` : ''}
+    </div>`;
+  }
+
+  /**
+   * @param {object} [v]      a verse; today's if left out
+   * @param {object} [opts]   { dated: true } puts today's date across the top (Home)
+   */
+  function verseCard(v, opts) {
     v = v || verseOfTheDay();
-    if (!v) return '';
+    if (!v) return opts && opts.dated ? `<div class="verse verse--bare">${dateHead()}</div>` : '';
     const quran = v.kind === 'quran';
     return `<figure class="verse verse--${quran ? 'quran' : 'hadith'}">
+      ${opts && opts.dated ? dateHead() : ''}
       <figcaption class="verse-head">
         <span class="verse-tag">${quran ? 'Qur’an' : 'Hadith'}</span>
         <span>For today</span>
@@ -724,7 +762,6 @@
     homeActs = [];
     if (insightsAt) analysis = runEngine();
 
-    const now = new Date();
     const sections = homeSections();
     const SHOWN = 7;
     const act = run => homeActs.push(run) - 1;
@@ -759,7 +796,7 @@
     };
 
     body.innerHTML = `
-      <p class="home-date">${esc(now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }))}</p>
+      ${verseCard(null, { dated: true })}
 
       <div class="home-actions">
         <button class="home-action home-action--primary" type="button" id="hAdd">
@@ -781,7 +818,6 @@
       : `<div class="card alert-none alert-none--ok">${icon('checkCirc')}<span>Nothing needs you right now.</span></div>`}
       ${!insightsAt && insightsBusy ? '<p class="note home-note">Checking prices and interest…</p>' : ''}
 
-      ${verseCard()}
       ${homeMoney()}
       ${homeStock()}
       ${homeMessages()}
