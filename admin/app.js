@@ -49,6 +49,7 @@
     star:     `<path ${P} d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.5l6.1-.9Z"/>`,
     left:     `<polyline ${P} points="15 18 9 12 15 6"/>`,
     right:    `<polyline ${P} points="9 18 15 12 9 6"/>`,
+    down:     `<polyline ${P} points="6 9 12 15 18 9"/>`,
     camera:   `<path ${P} d="M3 8.5A2 2 0 0 1 5 6.5h2l1.2-2h7.6L17 6.5h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle ${P} cx="12" cy="12.8" r="3.4"/>`,
     trash:    `<polyline ${P} points="3 6 21 6"/><path ${P} d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"/><path ${P} d="M6 6v13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/>`,
     edit:     `<path ${P} d="M12 20h9"/><path ${P} d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>`,
@@ -179,6 +180,7 @@
     view: 'home',
     returnTo: 'home',    // where Back goes from a car, a message or the bid tool
     message: null,       // { kind: 'e' | 'r', id } open in the message view
+    homeOpen: new Set(), // Home "Needs you" sections dropped down, by key
     editing: null,       // car being edited (null = new)
     photos: [],          // [{public_id,url,width,height,uploading,progress,localUrl}]
     video: null,         // {public_id,duration,width,height} or null
@@ -651,6 +653,14 @@
     ageing: 'Review the price', demand: 'Lots of interest: hold the price'
   };
 
+  /* The same, two words each, for the line that sums up a section */
+  const CAUSE_SHORT = {
+    price: 'reduce price', price_unchecked: 'check price', price_cat: 'check price',
+    photos: 'more photos', first_impression: 'first photos', visibility: 'get seen',
+    unclear: 'check listing', interest_falling: 'interest dropping', ageing: 'review price',
+    demand: 'hold price'
+  };
+
   let homeActs = [];     // what each Home row does when tapped, by index
 
   function renderHome() {
@@ -663,15 +673,37 @@
     if (insightsAt) analysis = runEngine();
 
     const now = new Date();
-    const alerts = homeAlerts();
-    const SHOWN = 6;
-    const row = a => {
-      const i = homeActs.push(a.run) - 1;
-      return `<button class="alert alert--${a.level}" type="button" data-home="${i}">
-        <span class="alert-ic">${icon(a.icon)}</span>
-        <span class="alert-txt"><strong>${esc(a.title)}</strong><small>${esc(a.sub)}</small></span>
-        ${icon('right')}
-      </button>`;
+    const sections = homeSections();
+    const SHOWN = 7;
+    const act = run => homeActs.push(run) - 1;
+
+    /* One kind of thing per row. Tap it and the cars (or messages) it covers
+       drop down underneath, each one tapping through to its fix. A section
+       with only one thing in it skips the drop-down and goes straight there. */
+    const section = s => {
+      if (s.items.length === 1) {
+        const it = s.items[0];
+        const [title, sub] = s.single === 'item' ? [it.title, it.sub] : [s.title, it.title];
+        return `<button class="alert alert--${s.level}" type="button" data-home="${act(it.run)}">
+          <span class="alert-ic">${icon(s.icon)}</span>
+          <span class="alert-txt"><strong>${esc(title)}</strong><small>${esc(sub)}</small></span>
+          ${icon('right')}
+        </button>`;
+      }
+      return `<details class="alert-group" data-key="${s.key}"${state.homeOpen.has(s.key) ? ' open' : ''}>
+        <summary class="alert alert--${s.level}">
+          <span class="alert-ic">${icon(s.icon)}</span>
+          <span class="alert-txt"><strong>${esc(s.title)}</strong><small>${esc(s.sub)}</small></span>
+          <span class="alert-count">${s.items.length}</span>${icon('down')}
+        </summary>
+        <div class="alert-items">${s.items.map(it => `
+          <button class="alert-item" type="button" data-home="${act(it.run)}">
+            <i class="dot dot--${it.level || s.level}"></i>
+            <span class="alert-txt"><strong>${esc(it.title)}</strong><small>${esc(it.sub)}</small></span>
+            ${icon('right')}
+          </button>`).join('')}
+        </div>
+      </details>`;
     };
 
     body.innerHTML = `
@@ -686,12 +718,12 @@
         </button>
       </div>
 
-      <h2 class="home-h">Needs you${alerts.length ? ` <span class="home-n">${alerts.length}</span>` : ''}</h2>
-      ${alerts.length ? `<div class="card alerts">
-          ${alerts.slice(0, SHOWN).map(row).join('')}
-          ${alerts.length > SHOWN ? `<details class="alerts-more">
-            <summary>Show ${alerts.length - SHOWN} more</summary>
-            ${alerts.slice(SHOWN).map(row).join('')}
+      <h2 class="home-h">Needs you${sections.length ? ` <span class="home-n">${sections.length}</span>` : ''}</h2>
+      ${sections.length ? `<div class="card alerts">
+          ${sections.slice(0, SHOWN).map(section).join('')}
+          ${sections.length > SHOWN ? `<details class="alerts-more">
+            <summary>Show ${sections.length - SHOWN} more</summary>
+            ${sections.slice(SHOWN).map(section).join('')}
           </details>` : ''}
         </div>`
       : `<div class="card alert-none alert-none--ok">${icon('checkCirc')}<span>Nothing needs you right now.</span></div>`}
@@ -705,6 +737,11 @@
     $('#hAdd').onclick = () => openQuick();
     $('#hBid').onclick = () => go('value');
     $$('#homeBody [data-home]').forEach(b => { b.onclick = () => homeActs[+b.dataset.home](); });
+    // Remember which sections are open, so a redraw (a message read, a price
+    // changed) doesn't snap them shut
+    $$('#homeBody details.alert-group').forEach(d => {
+      d.addEventListener('toggle', () => { d.open ? state.homeOpen.add(d.dataset.key) : state.homeOpen.delete(d.dataset.key); });
+    });
     $$('#homeBody [data-go]').forEach(b => {
       b.onclick = () => {
         const [view, tab] = b.dataset.go.split(':');
@@ -718,123 +755,138 @@
   }
 
   /**
-   * Everything that wants a decision or a missing figure, most urgent first.
-   * Rank: red MOTs, new messages, insights that say act, cars with no photos,
-   * amber MOTs, insights to watch, then gaps in the admin.
+   * Everything that wants a decision or a missing figure, one section per
+   * kind, most urgent first:
+   *   MOTs (run out, due, no date) · new messages · price and interest
+   *   recommendations · no photos · then the figures and details not filled in.
+   * A section takes the colour of its most urgent item.
+   *
+   * Each section: { key, level, rank, icon, title, sub, items, single }.
+   * `single` says how to show a section with one item: 'item' uses that item's
+   * own words (an MOT, a recommendation); 'section' keeps the section's
+   * headline with the car underneath ("1 Cat car has no damage note").
    */
-  function homeAlerts() {
-    const items = [];
-    const add = o => items.push(o);
+  function homeSections() {
+    const out = [];
     const cars = state.cars;
     const held = cars.filter(c => inStock(c) || c.status === 'draft');   // cars you still own
     const live = cars.filter(inStock);
     const sold = cars.filter(c => c.status === 'sold');
+    const worst = items => ['red', 'amber', 'blue', 'green', 'grey'].find(l => items.some(it => it.level === l)) || 'grey';
+    const carSub = c => [carTitle(c), c.registration ? fmtReg(c.registration) : null,
+      c.status === 'draft' ? 'draft' : null].filter(Boolean).join(' · ');
+    const counted = (n, one, many) => n === 1 ? '1 ' + one : n + ' ' + (many || one + 's');
 
-    /* MOTs, one row per car: each one is its own job */
-    held.forEach(c => {
-      const lvl = motLevel(c);
-      if (!lvl) return;
-      add({ level: lvl, rank: lvl === 'red' ? 1 : 5, icon: 'calendar', title: motWords(c),
-        sub: [carTitle(c), c.registration ? fmtReg(c.registration) : null, c.status === 'draft' ? 'draft' : null].filter(Boolean).join(' · '),
-        run: () => sheet(motWords(c), carTitle(c) + ' · ' + new Date(c.mot_expiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), [
-          { label: 'Put in the new MOT date', icon: 'calendar', sub: 'Once it’s been tested', run: () => openForm(c, '#fMot') },
-          { label: 'See the car', icon: 'car', run: () => carActions(c) }
-        ]) });
-    });
+    /* MOTs: run out, running out, and cars with no date, in one place */
+    const mots = held.filter(c => motLevel(c) || !c.mot_expiry)
+      .sort((a, b) => (motDays(a) ?? Infinity) - (motDays(b) ?? Infinity))
+      .map(c => {
+        const lvl = motLevel(c) || 'grey';
+        return { level: lvl, days: motDays(c), title: c.mot_expiry ? motWords(c) : 'No MOT date', sub: carSub(c),
+          run: () => c.mot_expiry
+            ? sheet(motWords(c), carTitle(c) + ' · ' + new Date(c.mot_expiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), [
+                { label: 'Put in the new MOT date', icon: 'calendar', sub: 'Once it’s been tested', run: () => openForm(c, '#fMot') },
+                { label: 'See the car', icon: 'car', run: () => carActions(c) }])
+            : openForm(c, '#fMot') };
+      });
+    if (mots.length) {
+      const ran = mots.filter(m => m.days != null && m.days < 0).length;
+      const month = mots.filter(m => m.level === 'red').length - ran;
+      const soon = mots.filter(m => m.level === 'amber').length;
+      const none = mots.filter(m => m.level === 'grey').length;
+      const due = month + soon;
+      const level = worst(mots);
+      // The headline says what's urgent; the line under it says the rest
+      const title = [ran ? (ran === 1 ? '1 MOT has run out' : `${ran} MOTs have run out`) : '',
+                     due ? (ran ? `${due} due soon` : counted(due, 'MOT due soon', 'MOTs due soon')) : ''].filter(Boolean).join(', ')
+        || counted(none, 'car has no MOT date', 'cars have no MOT date');
+      out.push({ key: 'mot', level, rank: level === 'red' ? 1 : level === 'amber' ? 5 : 8, icon: 'calendar', single: 'item',
+        title,
+        sub: [month ? `${month} within a month` : '', soon ? `${soon} within 3 months` : '',
+              none && (ran || due) ? counted(none, 'car with no MOT date', 'cars with no MOT date') : ''].filter(Boolean).join(' · ')
+          || (ran ? 'Needs testing before it can go' : 'So you can’t be warned before it runs out'),
+        items: mots });
+    }
 
-    /* New messages */
+    /* New messages, oldest waiting first */
     const unread = state.enquiries.filter(e => !e.is_read).map(x => ({ k: 'e', x }))
       .concat(state.requests.filter(r => !r.is_read).map(x => ({ k: 'r', x })))
       .sort((a, b) => new Date(a.x.created_at) - new Date(b.x.created_at));
     if (unread.length) {
-      const first = unread[0];
-      add({ level: 'blue', rank: 2, icon: 'inbox',
-        title: unread.length === 1 ? '1 new message' : unread.length + ' new messages',
-        sub: unread.length === 1 ? `From ${first.x.name || 'someone'}, ${ago(first.x.created_at)}`
-          : `The oldest has waited since ${ago(first.x.created_at)}`,
-        run: () => unread.length === 1 ? openMessage(first.k, first.x.id) : (setEnqTab('new'), go('enq')) });
+      out.push({ key: 'messages', level: 'blue', rank: 2, icon: 'inbox', single: 'section',
+        title: counted(unread.length, 'new message'),
+        sub: unread.length === 1 ? '' : `The oldest has waited since ${ago(unread[0].x.created_at)}`,
+        items: unread.map(({ k, x }) => ({ level: 'blue',
+          title: x.name || 'No name given',
+          sub: [k === 'r' ? 'Car request' : x.car_title || (x.details && x.details.subject) || 'General enquiry', ago(x.created_at)].join(' · '),
+          run: () => openMessage(k, x.id) })) });
     }
 
-    /* The insight engine's recommendations, once its figures are in. Stock
-       goes on in batches and ages together, so five cars saying "review the
-       price" become one row that opens the five. */
+    /* The insight engine's recommendations, once its figures are in. Most
+       urgent first; the no-photos card is left to the photos section below. */
     if (insightsAt && analysis) {
-      const groups = new Map();
-      analysis.findings.forEach((f, i) => {
-        if (f.rule === 'no_photos') return;          // the photos row below covers it
-        const key = f.cause + '|' + f.severity;
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push({ f, i });
-      });
       const also = f => f.suggestion ? f.suggestion.label.replace(/^Drop to/, 'try')
         : f.cause !== 'demand' && CAUSE_LABEL[f.cause] ? CAUSE_LABEL[f.cause] : '';
-      groups.forEach(list => {
-        const { f, i } = list[0];
-        const good = f.severity === 'good';
-        const what = CAUSE_DO[f.cause] || CAUSE_LABEL[f.cause] || 'Worth a look';
-        const names = list.map(x => x.f.title);
-        add({ level: good ? 'green' : f.severity === 'act' ? 'red' : 'amber',
-          rank: good ? 9 : f.severity === 'act' ? 3 : 6, icon: good ? 'checkCirc' : 'tag',
-          title: list.length === 1 ? what : `${what}: ${list.length} cars`,
-          sub: list.length === 1 ? [f.title, also(f)].filter(Boolean).join(' · ')
-            : names.length > 2 ? `${names[0]}, ${names[1]} and ${names.length - 2} more` : names.join(' and '),
-          run: () => list.length === 1 ? insightSheet(i)
-            : sheet(what, 'Tap one to see why and what to do', list.map(x => ({
-                label: x.f.title, icon: 'tag', sub: [x.f.facts, also(x.f)].filter(Boolean).join(' · '),
-                run: () => insightSheet(x.i) }))) });
-      });
+      const recs = analysis.findings.map((f, i) => ({ f, i })).filter(x => x.f.rule !== 'no_photos')
+        .map(({ f, i }) => ({
+          level: f.severity === 'good' ? 'green' : f.severity === 'act' ? 'red' : 'amber',
+          short: CAUSE_SHORT[f.cause] || 'to look at',
+          title: CAUSE_DO[f.cause] || CAUSE_LABEL[f.cause] || 'Worth a look',
+          sub: [f.title, also(f)].filter(Boolean).join(' · '),
+          run: () => insightSheet(i) }));
+      if (recs.length) {
+        // "4 reduce price · 5 review price · 1 more photos": what the list is made of
+        const kinds = [];
+        recs.forEach(r => { const k = kinds.find(x => x.what === r.short); k ? k.n++ : kinds.push({ what: r.short, n: 1 }); });
+        const level = worst(recs);
+        out.push({ key: 'recs', level, rank: level === 'red' ? 3 : level === 'amber' ? 6 : 9,
+          icon: level === 'green' ? 'checkCirc' : 'tag', single: 'item',
+          title: counted(recs.length, 'car to look at', 'cars to look at'),
+          sub: kinds.map(k => `${k.n} ${k.what}`).join(' · '),
+          items: recs });
+      }
     }
 
-    /* Gaps in the admin, grouped so ten cars don't make ten rows.
-       `one` and `many` are the headline for one car and for several. */
+    /* Gaps in the admin, one section each */
     const gap = (list, o) => {
       if (!list.length) return;
-      add(Object.assign({ level: 'grey', rank: 8 }, o, {
+      out.push(Object.assign({ level: 'grey', rank: 8, single: 'section' }, o, {
         title: list.length === 1 ? o.one : `${list.length} ${o.many}`,
-        run: () => carListSheet(list.length === 1 ? o.one : `${list.length} ${o.many}`, list, o.fix, o.fixSub)
+        items: list.map(c => ({ title: carTitle(c),
+          sub: o.itemSub ? o.itemSub(c) : [c.registration ? fmtReg(c.registration) : null,
+            c.status === 'sold' ? 'sold' : c.status === 'draft' ? 'draft' : money(c.price)].filter(Boolean).join(' · '),
+          run: () => o.fix(c) }))
       }));
     };
 
     gap(live.filter(c => !(Array.isArray(c.images) && c.images.length)), {
-      level: 'red', rank: 4, icon: 'camera', one: '1 car has no photos', many: 'cars have no photos',
+      key: 'photos', level: 'red', rank: 4, icon: 'camera', one: '1 car has no photos', many: 'cars have no photos',
       sub: 'Nobody gives it a fair look without them', fix: c => openForm(c, '#photoArea') });
     gap(live.filter(c => c.hpi_status && c.hpi_status !== 'clear' && !c.condition_notes), {
-      level: 'amber', rank: 7, icon: 'note', one: '1 Cat car has no damage note', many: 'Cat cars have no damage note',
-      sub: 'Saying what was done up front sells them', fix: c => openForm(c, '#fCondition') });
+      key: 'cat', level: 'amber', rank: 7, icon: 'note', one: '1 Cat car has no damage note', many: 'Cat cars have no damage note',
+      sub: 'Saying what was done up front sells them', fix: c => openForm(c, '#fCondition'),
+      itemSub: c => [LABEL.hpi[c.hpi_status], money(c.price)].filter(Boolean).join(' · ') });
     gap(sold.filter(c => carMargin(c) == null), {
-      level: 'amber', rank: 7, icon: 'pound', one: '1 sale isn’t in your margin', many: 'sales aren’t in your margin',
-      sub: 'What you paid or what it sold for is missing', fix: c => figuresSheet(c) });
+      key: 'unmargined', level: 'amber', rank: 7, icon: 'pound', one: '1 sale isn’t in your margin', many: 'sales aren’t in your margin',
+      sub: 'What you paid or what it sold for is missing', fix: c => figuresSheet(c),
+      itemSub: c => `Sold ${c.sold_at ? shortDay(c.sold_at) : ''} · ${[c.sale_price == null ? 'no sale price' : '', c.purchase_price == null ? 'no purchase price' : ''].filter(Boolean).join(', ')}` });
     gap(sold.filter(c => carMargin(c) != null && c.prep_cost == null), {
-      icon: 'pound', one: '1 sale has no prep cost', many: 'sales have no prep cost',
+      key: 'noprep', icon: 'pound', one: '1 sale has no prep cost', many: 'sales have no prep cost',
       sub: 'Counted as £0 prep, so the margin reads high', fix: c => figuresSheet(c),
-      fixSub: c => `Sold ${c.sold_at ? shortDay(c.sold_at) : ''} · margin ${signed(carMargin(c))} before prep` });
+      itemSub: c => `Sold ${c.sold_at ? shortDay(c.sold_at) : ''} · margin ${signed(carMargin(c))} before prep` });
     gap(held.filter(c => c.purchase_price == null), {
-      icon: 'pound', one: '1 car has no purchase price', many: 'cars have no purchase price',
+      key: 'nopaid', icon: 'pound', one: '1 car has no purchase price', many: 'cars have no purchase price',
       sub: 'No margin to show when it sells', fix: c => figuresSheet(c) });
-    gap(held.filter(c => !c.mot_expiry), {
-      icon: 'calendar', one: '1 car has no MOT date', many: 'cars have no MOT date',
-      sub: 'So you can’t be warned before it runs out', fix: c => openForm(c, '#fMot') });
-    const drafts = cars.filter(c => c.status === 'draft');
-    if (drafts.length) add({ level: 'grey', rank: 8, icon: 'edit',
-      title: drafts.length === 1 ? '1 draft isn’t on the website' : drafts.length + ' drafts aren’t on the website',
-      sub: 'Bought, not listed yet', run: () => { setStockTab('draft'); go('stock'); } });
+    gap(cars.filter(c => c.status === 'draft'), {
+      key: 'drafts', icon: 'edit', one: '1 draft isn’t on the website', many: 'drafts aren’t on the website',
+      sub: 'Bought, not listed yet', fix: c => openForm(c),
+      itemSub: c => [c.registration ? fmtReg(c.registration) : null, 'added ' + shortDay(c.created_at)].filter(Boolean).join(' · ') });
     gap(live.filter(c => !c.description), {
-      rank: 9, icon: 'note', one: '1 car has no description', many: 'cars have no description',
+      key: 'nodesc', rank: 9, icon: 'note', one: '1 car has no description', many: 'cars have no description',
       sub: 'The website shows nothing under the photos', fix: c => openForm(c, '#fDescription') });
 
     const LEVEL = { red: 0, blue: 1, amber: 2, green: 3, grey: 4 };
-    return items.sort((a, b) => a.rank - b.rank || LEVEL[a.level] - LEVEL[b.level]);
-  }
-
-  /** A list of cars that share a problem. One car goes straight to the fix. */
-  function carListSheet(title, cars, fix, fixSub) {
-    if (cars.length === 1) return fix(cars[0]);
-    sheet(title, 'Tap one to sort it', cars.map(c => ({
-      label: carTitle(c), icon: 'car',
-      sub: fixSub ? fixSub(c) : [c.registration ? fmtReg(c.registration) : null,
-        c.status === 'sold' ? 'sold' : c.status === 'draft' ? 'draft' : money(c.price)].filter(Boolean).join(' · '),
-      run: () => fix(c)
-    })));
+    return out.sort((a, b) => a.rank - b.rank || LEVEL[a.level] - LEVEL[b.level]);
   }
 
   /** One insight, in full, with its buttons, from a Home row. */

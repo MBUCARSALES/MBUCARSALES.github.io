@@ -705,8 +705,35 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
   text-align: left;
 }
 .alert:active { background: var(--line-2); }
-.alert + .alert, .alerts-more .alert { border-top: 1px solid var(--line-2); }
+.alerts > * + *, .alerts-more > :not(summary) { border-top: 1px solid var(--line-2); }
 .alert > svg { width: 20px; height: 20px; flex: none; color: var(--ink-4); }
+
+/* A section that drops down to show the cars (or messages) it covers */
+.alert-group > summary { list-style: none; cursor: pointer; }
+.alert-group > summary::-webkit-details-marker { display: none; }
+.alert-group > summary > svg { transition: transform .2s var(--ease); }
+.alert-group[open] > summary > svg { transform: rotate(180deg); }
+.alert-count {
+  flex: none; min-width: 26px; padding: 2px 8px; border-radius: var(--r-full);
+  background: var(--line-2); color: var(--ink-2);
+  font-size: 13px; font-weight: 800; text-align: center;
+}
+.alert-items { background: var(--bg); border-top: 1px solid var(--line-2); padding: 4px 0; }
+.alert-item {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; min-height: 54px; padding: 8px 14px;
+  text-align: left;
+}
+.alert-item + .alert-item { border-top: 1px solid var(--line-2); }
+.alert-item:active { background: var(--line-2); }
+.alert-item > svg { width: 18px; height: 18px; flex: none; color: var(--ink-4); }
+.alert-item .alert-txt strong { font-size: 15px; }
+.dot { width: 10px; height: 10px; flex: none; border-radius: 50%; margin: 0 13px 0 13px; }
+.dot--red   { background: var(--red-600); }
+.dot--amber { background: var(--amber-600); }
+.dot--blue  { background: var(--accent-500); }
+.dot--green { background: var(--green-600); }
+.dot--grey  { background: var(--ink-4); }
 .alert-ic {
   width: 36px; height: 36px; flex: none; border-radius: 11px;
   display: grid; place-items: center;
@@ -725,7 +752,7 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
 }
 .alerts-more > summary {
   list-style: none; cursor: pointer; text-align: center;
-  padding: 13px; border-top: 1px solid var(--line-2);
+  padding: 13px;
   font-size: 14.5px; font-weight: 700; color: var(--navy-700);
 }
 .alerts-more > summary::-webkit-details-marker { display: none; }
