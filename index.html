@@ -72,7 +72,7 @@
           know the car inside out.
         </p>
         <div class="cluster hero-cta">
-          <a class="btn btn--accent btn--lg" href="stock.html">
+          <a class="btn btn--accent btn--lg" href="stock">
             View our stock
             <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><polyline points="13 6 19 12 13 18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
           </a>
@@ -89,7 +89,7 @@
 
   <!-- ================================================== QUICK SEARCH -->
   <div class="container quick-search-wrap">
-    <form class="quick-search" id="quickSearch" action="stock.html" method="get">
+    <form class="quick-search" id="quickSearch" action="stock" method="get">
       <div class="field">
         <label for="qsMake">Make</label>
         <select class="select" id="qsMake" name="make"><option value="">Any make</option></select>
@@ -153,7 +153,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 5 16 12 9 19" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           </div>
-          <a class="btn btn--outline" href="stock.html">See all stock</a>
+          <a class="btn btn--outline" href="stock">See all stock</a>
         </div>
       </div>
 
@@ -162,7 +162,7 @@
       <div class="car-rail" id="featuredGrid" tabindex="0" role="region" aria-label="Featured stock, scrollable"></div>
 
       <div class="center" style="margin-top:40px">
-        <a class="btn btn--primary btn--lg" href="stock.html">
+        <a class="btn btn--primary btn--lg" href="stock">
           Browse all our cars
           <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><polyline points="13 6 19 12 13 18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
         </a>
@@ -244,7 +244,7 @@
       </div>
 
       <div class="center">
-        <a class="btn btn--accent btn--lg" href="wanted.html">Tell us what you’re looking for</a>
+        <a class="btn btn--accent btn--lg" href="wanted">Tell us what you’re looking for</a>
       </div>
     </div>
   </section>
@@ -258,7 +258,7 @@
           <p>We buy outright. Clean cars, damaged cars, non-runners, anything. Tell us what you’ve got and we’ll come back with a no-obligation offer, usually the same day.</p>
         </div>
         <div class="cta-band-actions">
-          <a class="btn btn--accent btn--lg" href="sell.html">Get a free valuation</a>
+          <a class="btn btn--accent btn--lg" href="sell">Get a free valuation</a>
           <a class="btn btn--onDark btn--lg" id="ctaWa" href="#" target="_blank" rel="noopener">WhatsApp us</a>
         </div>
       </div>
@@ -374,18 +374,16 @@
     [...new Set(cars.map(c => c.make).filter(Boolean))].sort()
       .forEach(m => mk.add(new Option(m, m)));
 
-    /* Fuel is built from what is actually on the forecourt, the same way Make
-       is, so the list can never offer a search that comes back empty. Ordered
-       the way MBU.labels lists them (petrol, diesel, hybrid, electric...)
-       rather than alphabetically. */
+    /* Fuel always offers petrol, diesel, hybrid and electric, even when there
+       isn't one of them in today: people come looking for an electric car and
+       should be able to ask. If nothing matches, the stock page says so and
+       offers the Car Finder with their search filled in. Anything else on the
+       forecourt (LPG, say) is added on. Ordered the way MBU.labels lists them. */
     const fuelOrder = Object.keys(MBU.labels.fuel);
     const fuelRank = v => { const i = fuelOrder.indexOf(v); return i === -1 ? 999 : i; };
-    [...new Set(cars.map(c => c.fuel).filter(Boolean))]
+    [...new Set(MBU.fuelChoices.concat(cars.map(c => MBU.fuelChoice(c.fuel)).filter(Boolean)))]
       .sort((a, b) => fuelRank(a) - fuelRank(b) || String(a).localeCompare(String(b)))
       .forEach(f => fu.add(new Option(MBU.label('fuel', f), f)));
-    // Only "Any fuel" left means every car runs on the same thing, and a
-    // filter with one choice is just clutter.
-    if (fu.options.length < 2) fu.closest('.field').hidden = true;
 
     function fillModels() {
       const chosen = mk.value;

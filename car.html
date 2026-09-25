@@ -90,7 +90,7 @@
             'We can’t find that car',
             'It may have been sold and removed from the site. Have a look at what we have in stock at the moment, or ask us what is on its way in.',
             `<div class="cluster" style="justify-content:center">
-               <a class="btn btn--primary" href="${MBU.link('stock.html')}">Browse our stock</a>
+               <a class="btn btn--primary" href="${MBU.link('stock')}">Browse our stock</a>
                <a class="btn btn--wa" target="_blank" rel="noopener"
                   href="${MBU.waLink('Hi MBU Car Sales, I was looking at a car on your website that seems to have gone. What else have you got?')}">
                   Ask us what’s available</a>
@@ -159,7 +159,7 @@
        available, part exchange, more photos, more detail, a viewing) and lets
        them send it by whichever route suits: the form, WhatsApp, email or
        Instagram. The enquiry that lands is tagged with the car either way. */
-    const enquireHref = MBU.link('contact.html?car=' + encodeURIComponent(car.id));
+    const enquireHref = MBU.link('contact?car=' + encodeURIComponent(car.id));
 
     const reduced = !sold && car.previous_price && car.price != null
                     && car.previous_price > car.price;
@@ -186,7 +186,7 @@
               </div>
               <div class="cpb-actions">
                 ${sold
-                  ? `<a class="btn btn--accent" href="${MBU.link('wanted.html?car=' + encodeURIComponent(car.id))}">
+                  ? `<a class="btn btn--accent" href="${MBU.link('wanted?car=' + encodeURIComponent(car.id))}">
                        ${icon('heart')} Want one like this?
                      </a>`
                   : `<a class="btn btn--primary" href="${enquireHref}">
@@ -203,8 +203,8 @@
     <section class="page-head" style="padding-block:28px">
       <div class="container">
         <nav class="breadcrumb" aria-label="Breadcrumb">
-          <a href="${MBU.link('index.html')}">Home</a>${chev()}
-          <a href="${MBU.link('stock.html')}">${sold ? 'Stock' : 'Our stock'}</a>${chev()}
+          <a href="${MBU.link('./')}">Home</a>${chev()}
+          <a href="${MBU.link('stock')}">${sold ? 'Stock' : 'Our stock'}</a>${chev()}
           <span>${esc(title)}</span>
         </nav>
         <div class="cluster" style="gap:10px;margin-bottom:10px">${flags.join('')}</div>
@@ -358,7 +358,7 @@
                   Takes a minute. No deposit, no obligation, and we’ll send you photos
                   and a price before we commit to anything.
                 </p>
-                <a class="btn btn--accent btn--lg" href="${MBU.link('wanted.html?car=' + encodeURIComponent(car.id))}">
+                <a class="btn btn--accent btn--lg" href="${MBU.link('wanted?car=' + encodeURIComponent(car.id))}">
                   Tell us what you’re after
                 </a>
               </div>
@@ -452,13 +452,13 @@
                     This one has gone, but we buy cars like it most weeks. Register your
                     interest and we’ll look out for another for you.
                   </p>
-                  <a class="btn btn--accent btn--lg" href="${MBU.link('wanted.html?car=' + encodeURIComponent(car.id))}">
+                  <a class="btn btn--accent btn--lg" href="${MBU.link('wanted?car=' + encodeURIComponent(car.id))}">
                     ${icon('heart')} Want one like this?
                   </a>
                   <a class="btn btn--wa" href="${MBU.waLink('Hi MBU Car Sales, I saw the ' + title + ' has sold. Could you look out for another one like it?')}" target="_blank" rel="noopener">
                     ${icon('whatsapp')} Ask on WhatsApp
                   </a>
-                  <a class="btn btn--outline" href="${MBU.link('stock.html')}">See what’s in stock</a>
+                  <a class="btn btn--outline" href="${MBU.link('stock')}">See what’s in stock</a>
                   <p class="buy-note">
                     No deposit, no obligation. We’ll send you photos and a price
                     before we commit to anything.
@@ -497,7 +497,7 @@
             <div class="panel panel--flat where-panel">
               <h3 style="font-size:var(--fs-md);margin-bottom:12px">Where we are</h3>
 
-              <a class="where-map" href="${MBU.link('find-us.html')}"
+              <a class="where-map" href="${MBU.link('find-us')}"
                  aria-label="How to find us: directions and photos of the entrance">
                 <img src="${MBU.link('assets/img/find-us-map-thumb.jpg')}" loading="lazy"
                      alt="Aerial map showing MBU Car Sales behind the Gulf petrol station on Westgate Road"
@@ -556,7 +556,7 @@
     // "Enquire now" goes to the contact page, so the tap is the only moment
     // this page knows about it.
     root.addEventListener('click', e => {
-      if (e.target.closest('a[href*="contact.html?car="]')) MBU.track('enquire_click', car.id);
+      if (e.target.closest('a[href*="contact?car="]')) MBU.track('enquire_click', car.id);
     }, { capture: true });
 
     const video = document.getElementById('carVideo');

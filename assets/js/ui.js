@@ -13,12 +13,12 @@
   const esc = MBU.esc;
 
   const NAV = [
-    { href: 'index.html',   label: 'Home' },
-    { href: 'stock.html',   label: 'Our Stock' },
-    { href: 'wanted.html',  label: 'Car Finder' },
-    { href: 'sell.html',    label: 'Sell Your Car' },
-    { href: 'find-us.html', label: 'Find Us' },
-    { href: 'contact.html', label: 'Contact' }
+    { href: './',           label: 'Home' },
+    { href: 'stock',        label: 'Our Stock' },
+    { href: 'wanted',       label: 'Car Finder' },
+    { href: 'sell',         label: 'Sell Your Car' },
+    { href: 'find-us',      label: 'Find Us' },
+    { href: 'contact',      label: 'Contact' }
   ];
 
   /* Every internal link below goes through MBU.link(). On the pre-rendered
@@ -27,8 +27,19 @@
      the mobile menu and the footer list were not, so on a car link forwarded
      over WhatsApp and opened on a phone (where the hamburger IS the whole
      navigation) every menu item was dead. */
-  const page = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
-  const isActive = href => href === page || (page === '' && href === 'index.html');
+  /* Clean addresses: /stock, /car?id=…, and the bare domain for home. GitHub
+     Pages serves stock.html for /stock by itself, so no file was renamed and
+     every old .html link already out there still works. Someone arriving on
+     one gets the tidy version in the address bar, so that's what they copy
+     and share. Live site only: a plain local server can't serve /stock. */
+  const page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/, '');
+  const isActive = href => href === page || (href === './' && (page === '' || page === 'index'));
+
+  if (/\.html$/i.test(location.pathname) && !/^(localhost|127\.|\[::1\])/.test(location.hostname)
+      && location.protocol.startsWith('http') && history.replaceState) {
+    const clean = location.pathname.replace(/(^|\/)index\.html$/i, '$1').replace(/\.html$/i, '');
+    history.replaceState(history.state, '', clean + location.search + location.hash);
+  }
 
   /* -------------------------------------------------------------- BRANDING */
   /**
@@ -77,7 +88,7 @@
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header" id="siteHeader">
       <div class="container header-inner">
-        <a class="${brandClass}" href="${MBU.link('index.html')}" aria-label="${esc(B.name)} home">
+        <a class="${brandClass}" href="${MBU.link('./')}" aria-label="${esc(B.name)} home">
           ${brand('header')}
         </a>
 
@@ -149,7 +160,7 @@
     /* The address is a link, because knowing the street is not the same as
        being able to find the lane it is down. */
     const location_ =
-      `<a href="${MBU.link('find-us.html')}" class="footer-address">` +
+      `<a href="${MBU.link('find-us')}" class="footer-address">` +
       [B.addressLine, B.town, B.postcode, B.region]
         .filter(Boolean).map(l => `<span>${esc(l)}</span>`).join('<br>') +
       `</a>`;
@@ -159,7 +170,7 @@
       <div class="container">
         <div class="footer-grid">
           <div class="footer-brand">
-            <a class="${brandClass}" href="${MBU.link('index.html')}">
+            <a class="${brandClass}" href="${MBU.link('./')}">
               ${brand('footer')}
             </a>
             <p class="footer-blurb">${esc(B.strapline)}</p>
@@ -196,9 +207,9 @@
         <div class="footer-bar">
           <span>© ${new Date().getFullYear()} ${esc(B.name)}. All rights reserved.</span>
           <div class="footer-bar-links">
-            <a href="${MBU.link('privacy.html')}">Privacy</a>
-            <a href="${MBU.link('terms.html')}">Terms</a>
-            <a href="${MBU.link('contact.html')}">Contact</a>
+            <a href="${MBU.link('privacy')}">Privacy</a>
+            <a href="${MBU.link('terms')}">Terms</a>
+            <a href="${MBU.link('contact')}">Contact</a>
           </div>
         </div>
       </div>
@@ -262,7 +273,7 @@
           reduced ? `<small class="was-price">was ${MBU.fmt.price(car.previous_price)}</small>` : ''
         }</div>`;
 
-    const href = MBU.link(`car.html?id=${encodeURIComponent(car.id)}`);
+    const href = MBU.link(`car?id=${encodeURIComponent(car.id)}`);
 
     return `
     <a class="car-card${sold ? ' car-card--sold' : ''}" href="${href}"

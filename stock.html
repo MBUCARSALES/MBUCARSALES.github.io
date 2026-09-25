@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Our Stock | MBU Car Sales, Newcastle upon Tyne</title>
 <meta name="description" content="Browse every used car currently in stock at MBU Car Sales in Newcastle upon Tyne. Filter by make, price, mileage, fuel and body type.">
-<link rel="canonical" href="https://mbucarsales.co.uk/stock.html">
+<link rel="canonical" href="https://mbucarsales.co.uk/stock">
 <meta property="og:title" content="Our Stock | MBU Car Sales">
 <meta property="og:description" content="Browse every used car currently in stock at MBU Car Sales, Newcastle upon Tyne.">
 <meta property="og:image" content="https://mbucarsales.co.uk/assets/img/og-default.jpg">
@@ -26,7 +26,7 @@
   <section class="page-head">
     <div class="container">
       <nav class="breadcrumb" aria-label="Breadcrumb">
-        <a href="index.html">Home</a>
+        <a href="./">Home</a>
         <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span>Our stock</span>
       </nav>
@@ -211,7 +211,7 @@
     if (s.minYear && (c.year == null || c.year < +s.minYear)) return false;
     if (s.maxYear && (c.year == null || c.year > +s.maxYear)) return false;
     if (s.maxMiles && (c.mileage == null || c.mileage > +s.maxMiles)) return false;
-    if (s.fuel.length && !s.fuel.includes(c.fuel)) return false;
+    if (s.fuel.length && !s.fuel.some(f => MBU.fuelMatches(c.fuel, f))) return false;
     if (s.transmission.length && !s.transmission.includes(c.transmission)) return false;
     if (s.body_type.length && !s.body_type.includes(c.body_type)) return false;
 
@@ -292,13 +292,27 @@
     }
 
     if (!list.length) {
+      /* Nothing here, so hand what they searched for to the Car Finder, filled
+         in. An electric car we don't have today is a request we can act on. */
+      const brief = new URLSearchParams();
+      if (state.make) brief.set('make', state.make);
+      if (state.model) brief.set('model', state.model);
+      if (state.fuel.length === 1) brief.set('fuel', state.fuel[0]);
+      if (state.transmission.length === 1) brief.set('transmission', state.transmission[0]);
+      if (state.body_type.length === 1) brief.set('body', state.body_type[0]);
+      if (state.maxPrice) brief.set('max', state.maxPrice);
+      if (state.maxMiles) brief.set('miles', state.maxMiles);
+      const finder = MBU.link('wanted' + (brief.toString() ? '?' + brief : ''));
+      const wanted = state.fuel.length === 1 ? MBU.label('fuel', state.fuel[0]).toLowerCase() + ' ' : '';
+
       grid.style.gridTemplateColumns = '1fr';
       grid.innerHTML = MBU.emptyState(
-        ALL.length ? 'No cars match those filters' : 'No cars listed right now',
+        ALL.length ? `No ${wanted}cars match that right now` : 'No cars listed right now',
         ALL.length
-          ? 'Try widening your search, or tell us what you’re after and we’ll look out for one for you.'
+          ? 'We buy cars most weeks. Tell us what you’re after and we’ll look out for one for you, or widen the search.'
           : 'New stock lands most weeks. Message us and we will let you know what is on its way.',
         `<div class="cluster" style="justify-content:center">
+           ${ALL.length ? `<a class="btn btn--accent" href="${MBU.esc(finder)}">Ask us to find one</a>` : ''}
            ${ALL.length ? '<button class="btn btn--outline" id="emptyReset" type="button">Clear filters</button>' : ''}
            <a class="btn btn--wa" target="_blank" rel="noopener"
               href="${MBU.waLink('Hi MBU Car Sales, I am looking for a specific car. Can you keep an eye out?')}">
@@ -351,7 +365,11 @@
   }
 
   function buildChips(container, key, group) {
-    const values = [...new Set(ALL.map(c => c[key]).filter(Boolean))];
+    // Fuel always offers the main four (see MBU.fuelChoices), in stock or not;
+    // everything else only offers what's actually here
+    const values = key === 'fuel'
+      ? [...new Set(MBU.fuelChoices.concat(ALL.map(c => MBU.fuelChoice(c.fuel)).filter(Boolean)))]
+      : [...new Set(ALL.map(c => c[key]).filter(Boolean))];
     const order = Object.keys(MBU.labels[group] || {});
     const rank = v => { const i = order.indexOf(v); return i === -1 ? 999 : i; };
     values.sort((a, b) => rank(a) - rank(b) || String(a).localeCompare(String(b)));

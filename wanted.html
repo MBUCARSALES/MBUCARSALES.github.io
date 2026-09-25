@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Car Finder: Tell Us What You’re Looking For | MBU Car Sales</title>
 <meta name="description" content="Can't see what you want? Tell MBU Car Sales in Newcastle what you're after and we'll look out for one for you. No obligation, no deposit.">
-<link rel="canonical" href="https://mbucarsales.co.uk/wanted.html">
+<link rel="canonical" href="https://mbucarsales.co.uk/wanted">
 <meta property="og:title" content="Car Finder | MBU Car Sales">
 <meta property="og:description" content="Tell us what you're looking for and we'll find it for you. No obligation, no deposit.">
 <meta name="theme-color" content="#0A1830">
@@ -25,7 +25,7 @@
   <section class="page-head">
     <div class="container">
       <nav class="breadcrumb" aria-label="Breadcrumb">
-        <a href="index.html">Home</a>
+        <a href="./">Home</a>
         <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span>Car Finder</span>
       </nav>
@@ -221,7 +221,7 @@
             <p class="small muted" style="margin-bottom:16px">
               Worth a look before you wait. We might already have something.
             </p>
-            <a class="btn btn--outline btn--block" href="stock.html">See our current stock</a>
+            <a class="btn btn--outline btn--block" href="stock">See our current stock</a>
           </div>
         </aside>
 
@@ -283,6 +283,33 @@
   });
 
   /* ------------------------------------------------------------------
+     Arriving from a stock search that found nothing ("Ask us to find one"),
+     so start the brief from what they searched for. Only values the form
+     actually offers are used; anything else is ignored.
+     ------------------------------------------------------------------ */
+  if (!carId) {
+    const fill = (id, v) => {
+      const el = document.getElementById(id);
+      if (!v || !el) return;
+      if (el.tagName === 'SELECT' && ![...el.options].some(o => o.value === v)) return;
+      el.value = v;
+    };
+    fill('wMake', MBU.param('make'));
+    fill('wModel', MBU.param('model'));
+    fill('wFuel', MBU.fuelChoice(MBU.param('fuel')));
+    fill('wTrans', MBU.param('transmission'));
+    fill('wBody', MBU.param('body'));
+    fill('wBudgetMax', /^\d+$/.test(MBU.param('max') || '') ? MBU.param('max') : '');
+    const miles = +MBU.param('miles');
+    if (miles) {
+      // The mileage list is in steps: pick the first one that covers theirs
+      const step = [...document.getElementById('wMiles').options].map(o => +o.value).filter(Boolean)
+        .find(v => v >= miles);
+      fill('wMiles', step ? String(step) : '');
+    }
+  }
+
+  /* ------------------------------------------------------------------
      Arriving from a sold car, so pre-fill the brief with that car's details
      so the customer barely has to type anything.
      ------------------------------------------------------------------ */
@@ -314,7 +341,7 @@
       set('wMake', car.make);
       set('wModel', car.model);
       set('wBody', car.body_type);
-      set('wFuel', car.fuel);
+      set('wFuel', MBU.fuelChoice(car.fuel));
       set('wTrans', car.transmission);
       document.getElementById('wNotes').placeholder =
         `Anything you'd want different from the ${title}? Colour, mileage, spec…`;
@@ -378,7 +405,7 @@
             comes up. That might be this week or it might take a few. We’d rather
             wait for the right one than push you a bad car.
           </p>
-          <a class="btn btn--outline" href="stock.html">Have a look at what we’ve got now</a>
+          <a class="btn btn--outline" href="stock">Have a look at what we’ve got now</a>
         </div>`;
       form.scrollIntoView({ behavior: 'smooth', block: 'center' });
 

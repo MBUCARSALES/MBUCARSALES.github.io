@@ -64,19 +64,38 @@
       <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
     <span class="topbar-spacer" id="topbarSpacer"></span>
-    <h1 id="topTitle">Your stock</h1>
+    <h1 id="topTitle">Home</h1>
     <button class="topbar-btn topbar-btn--accent" id="topAction" hidden></button>
     <span class="topbar-spacer" id="topbarSpacer2"></span>
   </header>
 
+  <!-- ---------------------------------------------- HOME
+       The first thing you see. What needs doing (MOTs, messages, insight
+       recommendations, figures that were never filled in), then the money
+       and the stock at a glance. Everything on it opens the thing it's
+       about. -->
+  <section class="view" id="homeView">
+    <div class="msg" id="homeMsg" role="status"></div>
+    <div id="homeBody"></div>
+  </section>
+
   <!-- ---------------------------------------------- STOCK LIST -->
-  <section class="view" id="stockView">
+  <section class="view is-hidden" id="stockView">
     <div class="segment" id="stockTabs">
-      <button data-tab="available" class="is-on">In stock</button>
-      <button data-tab="sold">Sold</button>
-      <button data-tab="draft">Drafts</button>
+      <button data-tab="available" class="is-on">In stock <span class="seg-n" id="nAvailable"></span></button>
+      <button data-tab="sold">Sold <span class="seg-n" id="nSold"></span></button>
+      <button data-tab="draft">Drafts <span class="seg-n" id="nDraft"></span></button>
+    </div>
+    <div class="list-tools">
+      <label class="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" fill="none"/><line x1="20.5" y1="20.5" x2="16" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input type="search" id="stockSearch" placeholder="Search"
+               autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search your stock">
+      </label>
+      <select class="sel sel--sm" id="stockSort" aria-label="Sort by"></select>
     </div>
     <div class="msg" id="stockMsg" role="status"></div>
+    <p class="list-summary" id="stockSummary"></p>
     <div id="stockList"></div>
   </section>
 
@@ -435,6 +454,11 @@
     <div id="enqList"></div>
   </section>
 
+  <!-- ---------------------------------------------- ONE MESSAGE, IN FULL -->
+  <section class="view is-hidden" id="msgView">
+    <div id="msgBody"></div>
+  </section>
+
   <!-- ---------------------------------------------- INSIGHTS -->
   <section class="view is-hidden" id="dataView">
     <div class="segment" id="dataTabs">
@@ -456,20 +480,32 @@
     </div>
 
     <div class="section-card">
+      <h2>Tools</h2>
+      <button class="btn btn--outline btn--block" id="moreValue" type="button">Check a car before you bid</button>
+    </div>
+
+    <div class="section-card">
       <h2>Quick help</h2>
       <div class="sheet-actions">
         <div class="sheet-action" style="align-items:flex-start;padding-block:14px">
           <div>
             <strong style="display:block;margin-bottom:4px">Adding a car</strong>
-            <small>Tap the gold “Add a car” button, take or choose your photos, type the number
-            plate and hit Look up. Fill in price and mileage, then Publish.</small>
+            <small>Tap “Add a car” on Home or Stock, type the number plate and hit Look up,
+            then put in what you paid. Add the photos, price and mileage, then Publish.</small>
           </div>
         </div>
         <div class="sheet-action" style="align-items:flex-start;padding-block:14px">
           <div>
             <strong style="display:block;margin-bottom:4px">Marking a car sold</strong>
-            <small>Tap the car in your list, then “Mark as sold”. It comes off the stock page
-            straight away and shows under Recently Sold with no price.</small>
+            <small>Tap the car in your list, then “Mark as sold” and put in what it went for.
+            It comes off the stock page straight away and shows as sold with no price.</small>
+          </div>
+        </div>
+        <div class="sheet-action" style="align-items:flex-start;padding-block:14px">
+          <div>
+            <strong style="display:block;margin-bottom:4px">Fixing the money on a sold car</strong>
+            <small>Tap the car under Stock → Sold, then “Edit the figures”. What you paid, the
+            prep and what it sold for, all in one place.</small>
           </div>
         </div>
         <div class="sheet-action" style="align-items:flex-start;padding-block:14px">
@@ -495,7 +531,7 @@
 
     <div class="section-card">
       <h2>The website</h2>
-      <a class="btn btn--outline btn--block" href="../index.html" target="_blank">Open the public website</a>
+      <a class="btn btn--outline btn--block" href="../" target="_blank">Open the public website</a>
     </div>
 
     <div class="section-card">
@@ -509,19 +545,21 @@
     </div>
 
     <p style="text-align:center;color:var(--ink-4);font-size:13px;margin-top:24px">
-      MBU Admin · <span id="verLabel">v1.0</span>
+      MBU Admin · <span id="verLabel">v2.0</span>
     </p>
   </section>
 
   <!-- ---------------------------------------------- TAB BAR -->
+  <!-- Home sits bottom-left. The bid tool (Value) moved onto Home, so the bar
+       stays at five: six is cramped on a phone. -->
   <nav class="tabbar" id="tabbar">
-    <button data-view="stock" class="is-on">
+    <button data-view="home" class="is-on">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.8l8.5 6.8"/><path d="M5.5 9v10a1.5 1.5 0 0 0 1.5 1.5h3.5v-6h3v6H17a1.5 1.5 0 0 0 1.5-1.5V9"/></svg>
+      Home
+    </button>
+    <button data-view="stock">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17v-4.2a2 2 0 0 1 .2-.9l2-4A2 2 0 0 1 7 6.8h10a2 2 0 0 1 1.8 1.1l2 4a2 2 0 0 1 .2.9V17"/><line x1="3" y1="14" x2="21" y2="14"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/></svg>
       Stock
-    </button>
-    <button data-view="value">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m13.5 8.5-5 5"/><path d="m6.5 10.5 3.5 3.5-3 3a2.1 2.1 0 0 1-3-3Z"/><path d="M11 6 17 12l2.5-2.5a2.1 2.1 0 0 0 0-3l-3-3a2.1 2.1 0 0 0-3 0Z"/><line x1="3" y1="21" x2="13" y2="21"/></svg>
-      Value
     </button>
     <button data-view="enq">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M4.6 5.5 3 13v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5l-1.6-7.5A2 2 0 0 0 17.4 4H6.6a2 2 0 0 0-2 1.5Z"/></svg>

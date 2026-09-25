@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sell Your Car | MBU Car Sales, Newcastle upon Tyne</title>
 <meta name="description" content="We buy cars and vans outright in Newcastle upon Tyne. Clean, damaged, non-runners or still on finance. Free no-obligation valuation, usually the same day.">
-<link rel="canonical" href="https://mbucarsales.co.uk/sell.html">
+<link rel="canonical" href="https://mbucarsales.co.uk/sell">
 <meta property="og:title" content="Sell Your Car | MBU Car Sales">
 <meta property="og:description" content="We buy cars and vans outright. Free no-obligation valuation, usually the same day.">
 <meta name="theme-color" content="#0A1830">
@@ -25,7 +25,7 @@
   <section class="page-head">
     <div class="container">
       <nav class="breadcrumb" aria-label="Breadcrumb">
-        <a href="index.html">Home</a>
+        <a href="./">Home</a>
         <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span>Sell your car</span>
       </nav>
@@ -296,7 +296,7 @@
             Tell us what you are driving now and we will work out the difference
             between the two.${car.price != null
               ? ' The ' + esc(title) + ' is up at ' + MBU.fmt.price(car.price) + '.' : ''}
-            <a href="${MBU.link('car.html?id=' + encodeURIComponent(car.id))}"
+            <a href="${MBU.link('car?id=' + encodeURIComponent(car.id))}"
                class="px-back">Back to that car</a>
           </div>
         </div>`;

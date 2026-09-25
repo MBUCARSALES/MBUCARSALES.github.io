@@ -20,7 +20,7 @@
 -------------------------------------------------------------------------- */
 (function () {
   var m = location.pathname.match(/^\/c\/([0-9a-fA-F-]{36})\/?$/);
-  if (m) location.replace('/car.html?id=' + encodeURIComponent(m[1]));
+  if (m) location.replace('/car?id=' + encodeURIComponent(m[1]));
 })();
 </script>
 <title>Page not found | MBU Car Sales</title>
@@ -47,8 +47,8 @@
         Have a look at what we have in stock at the moment.
       </p>
       <div class="cluster" style="justify-content:center">
-        <a class="btn btn--primary btn--lg" href="/stock.html">Browse our stock</a>
-        <a class="btn btn--outline btn--lg" href="/index.html">Back to the homepage</a>
+        <a class="btn btn--primary btn--lg" href="/stock">Browse our stock</a>
+        <a class="btn btn--outline btn--lg" href="/">Back to the homepage</a>
       </div>
     </div>
   </section>

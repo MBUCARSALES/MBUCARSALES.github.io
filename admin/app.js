@@ -63,7 +63,14 @@
     copy:     `<rect ${P} x="9" y="9" width="12" height="12" rx="2"/><path ${P} d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>`,
     inbox:    `<path ${P} d="M3 13h5l1.5 3h5L16 13h5"/><path ${P} d="M4.6 5.5 3 13v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5l-1.6-7.5A2 2 0 0 0 17.4 4H6.6a2 2 0 0 0-2 1.5Z"/>`,
     search:   `<circle ${P} cx="11" cy="11" r="7"/><line ${P} x1="20.5" y1="20.5" x2="16" y2="16"/>`,
-    checkCirc:`<circle ${P} cx="12" cy="12" r="9"/><polyline ${P} points="8 12.2 11 15.2 16 9.5"/>`
+    checkCirc:`<circle ${P} cx="12" cy="12" r="9"/><polyline ${P} points="8 12.2 11 15.2 16 9.5"/>`,
+    calendar: `<rect ${P} x="3.5" y="5" width="17" height="15.5" rx="2.5"/><line ${P} x1="3.5" y1="10" x2="20.5" y2="10"/><line ${P} x1="8" y1="3" x2="8" y2="7"/><line ${P} x1="16" y1="3" x2="16" y2="7"/>`,
+    alert:    `<path ${P} d="M10.3 4.2 2.6 17.6A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-2.9L13.7 4.2a2 2 0 0 0-3.4 0Z"/><line ${P} x1="12" y1="9.5" x2="12" y2="13.5"/><line ${P} x1="12" y1="17" x2="12.01" y2="17"/>`,
+    pound:    `<path ${P} d="M17 19.5H7c1.4-1 2.2-2.6 2.2-4.5V8.8A3.8 3.8 0 0 1 13 5a3.9 3.9 0 0 1 3.6 2.4"/><line ${P} x1="6.5" y1="12.5" x2="14" y2="12.5"/>`,
+    gauge:    `<path ${P} d="M3.5 16a8.5 8.5 0 1 1 17 0"/><line ${P} x1="12" y1="16" x2="15.5" y2="10.5"/>`,
+    note:     `<path ${P} d="M14 3.5H7A2 2 0 0 0 5 5.5v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z"/><polyline ${P} points="14 3.5 14 8.5 19 8.5"/><line ${P} x1="8.5" y1="13" x2="15.5" y2="13"/><line ${P} x1="8.5" y1="16.5" x2="13" y2="16.5"/>`,
+    tag:      `<path ${P} d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3.5 13.5V3.5h10l7.1 7.1a2 2 0 0 1 0 2.8Z"/><circle ${P} cx="8.2" cy="8.2" r="1.3"/>`,
+    open:     `<path ${P} d="M14 4h6v6"/><line ${P} x1="20" y1="4" x2="11" y2="13"/><path ${P} d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>`
   };
   const icon = n => ICONS[n] ? `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>` : '';
 
@@ -160,13 +167,18 @@
     enquiries: [],
     requests: [],
     tab: 'available',
+    stockSort: remembered('mbu_stock_sort', 'newest'),
+    stockQuery: '',
+    interestSort: remembered('mbu_interest_sort', 'interest'),
     enqTab: 'new',
     dataTab: 'cars',
     soldMonth: 'all',        // 'all' or 'YYYY-MM', for the Sold tab
     marginOpen: false,       // per-car breakdown under the margin figure
     schema: { v6: null, v7: null },   // optional upgrades: true, false, or null = not checked yet
 
-    view: 'stock',
+    view: 'home',
+    returnTo: 'home',    // where Back goes from a car, a message or the bid tool
+    message: null,       // { kind: 'e' | 'r', id } open in the message view
     editing: null,       // car being edited (null = new)
     photos: [],          // [{public_id,url,width,height,uploading,progress,localUrl}]
     video: null,         // {public_id,duration,width,height} or null
@@ -178,6 +190,19 @@
   const money = n => n == null || n === '' ? 'No price' : '£' + Number(n).toLocaleString('en-GB');
   const num = v => { const n = parseFloat(String(v).replace(/[^0-9.]/g, '')); return isNaN(n) ? null : n; };
   const int = v => { const n = parseInt(String(v).replace(/[^0-9]/g, ''), 10); return isNaN(n) ? null : n; };
+  const DAY = 86400000;
+  const carTitle = c => [c.year, c.make, c.model].filter(Boolean).join(' ')
+    || (c.registration ? fmtReg(c.registration) : 'Untitled car');
+  const inStock = c => c.status === 'available' || c.status === 'reserved';
+
+  /* How you like a list sorted, kept on this phone only. Private browsing or
+     blocked storage just means it starts from the default each time. */
+  function remembered(key, fallback) {
+    try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
+  }
+  function remember(key, value) {
+    try { localStorage.setItem(key, value); } catch { /* not kept, no harm */ }
+  }
 
   function toast(text, kind) {
     const t = $('#toast');
@@ -342,8 +367,13 @@
     $('#whoami').textContent = session.user.email;
 
     buildFormControls();
+    buildStockTools();
+    go('home');
     await Promise.all([loadCars(), loadEnquiries()]);
     checkSchema();
+    // Home's recommendations come from the insight engine, which needs the
+    // interest and ageing figures. go('home') above has already asked for
+    // them, alongside the stock, and Home redraws when they land.
   }
 
   /**
@@ -390,13 +420,15 @@
 
     if (!missing.length) return;
 
-    msg('#stockMsg',
+    const setupMsg =
       `<strong>Setup isn’t finished.</strong><br>
        ${missing.length === 1 ? 'This file hasn’t' : 'These files haven’t'} been run in Supabase yet:
        <br><br>${missing.map(f => '• <strong>' + f + '</strong>').join('<br>')}<br><br>
        Open Supabase → SQL Editor → New query, paste the file in, press Run.
-       Do them in the order listed. Until then some things won’t save.`,
-      'err');
+       Do them in the order listed. Until then some things won’t save.`;
+    // Home is where you land now, so it has to say so there as well as on Stock
+    msg('#stockMsg', setupMsg, 'err');
+    msg('#homeMsg', setupMsg, 'err');
   }
 
   /**
@@ -549,44 +581,384 @@
     return refreshModels;
   }
 
-  /* ============================================================= NAV */
+  /* ============================================================= NAV
+     Five tabs, and four screens you reach from them: the car form, quick
+     add, one message in full, and the bid tool (which used to be a tab and
+     now lives on Home). Back from any of those goes to the tab you came
+     from, so fixing a car from a Home alert lands you back on Home. */
+  const TABS = ['home', 'stock', 'enq', 'data', 'more'];
+  const LIT_TAB = { value: 'home', msg: 'enq' };   // which tab stays lit on a sub-screen
+
   function go(view) {
+    if (!TABS.includes(view) && TABS.includes(state.view)) state.returnTo = state.view;
     state.view = view;
-    ['stock','quick','form','value','enq','data','more'].forEach(v =>
+    ['home','stock','quick','form','value','enq','msg','data','more'].forEach(v =>
       $('#' + v + 'View').classList.toggle('is-hidden', v !== view));
 
     const isForm  = view === 'form';
     const isQuick = view === 'quick';
     const isEdit  = isForm || isQuick;
+    const isSub   = !TABS.includes(view);
     $('#tabbar').style.display = isEdit ? 'none' : '';
     $('#addFab').style.display = view === 'stock' ? '' : 'none';
     $('#saveBar').hidden  = !isForm;
     $('#quickBar').hidden = !isQuick;
-    $('#backBtn').hidden = !isEdit;
-    $('#topbarSpacer').style.display = isEdit ? 'none' : '';
+    $('#backBtn').hidden = !isSub;
+    $('#topbarSpacer').style.display = isSub ? 'none' : '';
 
     $('#topTitle').textContent =
       isForm ? (state.editing ? 'Edit car' : 'Add a car')
       : isQuick ? 'Quick add'
-      : view === 'enq' ? 'Enquiries'
+      : view === 'home' ? 'Home'
+      : view === 'enq' ? 'Inbox'
+      : view === 'msg' ? 'Message'
       : view === 'value' ? 'Before you bid'
       : view === 'data' ? 'Insights'
       : view === 'more' ? 'More' : 'Your stock';
 
     // Figures are loaded on demand, and refreshed each time you open the tab
+    if (view === 'home') { renderHome(); refreshHomeFigures(); }
     if (view === 'data') loadInsights();
     if (view === 'more') atIntro();
 
-    $$('#tabbar button').forEach(b => b.classList.toggle('is-on', b.dataset.view === view));
+    const lit = LIT_TAB[view] || view;
+    $$('#tabbar button').forEach(b => b.classList.toggle('is-on', b.dataset.view === lit));
     window.scrollTo(0, 0);
   }
 
+  const goBack = () => go(TABS.includes(state.returnTo) ? state.returnTo : 'home');
+
   $$('#tabbar button').forEach(b => b.onclick = () => go(b.dataset.view));
   $('#backBtn').onclick = () => {
-    if (!state.dirty) return go('stock');
+    if (!state.dirty || !['form', 'quick'].includes(state.view)) { state.dirty = false; return goBack(); }
     confirmSheet('Leave without saving?', 'Anything you’ve typed will be lost.',
-      'Discard changes', () => { state.dirty = false; go('stock'); }, true);
+      'Discard changes', () => { state.dirty = false; goBack(); }, true);
   };
+  $('#moreValue').onclick = () => go('value');
+
+  /* ============================================================ HOME
+     What needs doing first, then the money, the stock and the messages.
+     Nothing here is new data: it's the same cars, messages and insight
+     engine the other tabs use, pulled together so the morning check is
+     one screen. Every row opens the thing it's about.
+     ==================================================================== */
+
+  /* What to do about each kind of insight, as the headline on Home */
+  const CAUSE_DO = {
+    price: 'Reduce the price', price_unchecked: 'Check the price', price_cat: 'Check the price',
+    photos: 'Add more photos', first_impression: 'Sort out the first photos', visibility: 'Get it seen',
+    unclear: 'Have a look at the listing', interest_falling: 'Interest is dropping off',
+    ageing: 'Review the price', demand: 'Lots of interest: hold the price'
+  };
+
+  let homeActs = [];     // what each Home row does when tapped, by index
+
+  function renderHome() {
+    const body = $('#homeBody');
+    if (!state.carsLoaded) {
+      body.innerHTML = `<div class="section-card"><div class="skel" style="height:120px"></div></div>`.repeat(3);
+      return;
+    }
+    homeActs = [];
+    if (insightsAt) analysis = runEngine();
+
+    const now = new Date();
+    const alerts = homeAlerts();
+    const SHOWN = 6;
+    const row = a => {
+      const i = homeActs.push(a.run) - 1;
+      return `<button class="alert alert--${a.level}" type="button" data-home="${i}">
+        <span class="alert-ic">${icon(a.icon)}</span>
+        <span class="alert-txt"><strong>${esc(a.title)}</strong><small>${esc(a.sub)}</small></span>
+        ${icon('right')}
+      </button>`;
+    };
+
+    body.innerHTML = `
+      <p class="home-date">${esc(now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }))}</p>
+
+      <div class="home-actions">
+        <button class="home-action home-action--primary" type="button" id="hAdd">
+          ${icon('car')}<span><strong>Add a car</strong><small>Plate and what you paid</small></span>
+        </button>
+        <button class="home-action" type="button" id="hBid">
+          ${icon('gauge')}<span><strong>Before you bid</strong><small>History and a max bid</small></span>
+        </button>
+      </div>
+
+      <h2 class="home-h">Needs you${alerts.length ? ` <span class="home-n">${alerts.length}</span>` : ''}</h2>
+      ${alerts.length ? `<div class="card alerts">
+          ${alerts.slice(0, SHOWN).map(row).join('')}
+          ${alerts.length > SHOWN ? `<details class="alerts-more">
+            <summary>Show ${alerts.length - SHOWN} more</summary>
+            ${alerts.slice(SHOWN).map(row).join('')}
+          </details>` : ''}
+        </div>`
+      : `<div class="card alert-none alert-none--ok">${icon('checkCirc')}<span>Nothing needs you right now.</span></div>`}
+      ${!insightsAt && insightsBusy ? '<p class="note home-note">Checking prices and interest…</p>' : ''}
+
+      ${homeMoney()}
+      ${homeStock()}
+      ${homeMessages()}
+      ${homeOldest()}`;
+
+    $('#hAdd').onclick = () => openQuick();
+    $('#hBid').onclick = () => go('value');
+    $$('#homeBody [data-home]').forEach(b => { b.onclick = () => homeActs[+b.dataset.home](); });
+    $$('#homeBody [data-go]').forEach(b => {
+      b.onclick = () => {
+        const [view, tab] = b.dataset.go.split(':');
+        if (view === 'stock') { setStockTab(tab || 'available'); go('stock'); }
+        else if (view === 'data') openDataTab(tab || 'cars');
+        else if (view === 'enq') { setEnqTab(tab || 'new'); go('enq'); }
+      };
+    });
+    wireFigureButtons(body);
+    wireCharts(body);
+  }
+
+  /**
+   * Everything that wants a decision or a missing figure, most urgent first.
+   * Rank: red MOTs, new messages, insights that say act, cars with no photos,
+   * amber MOTs, insights to watch, then gaps in the admin.
+   */
+  function homeAlerts() {
+    const items = [];
+    const add = o => items.push(o);
+    const cars = state.cars;
+    const held = cars.filter(c => inStock(c) || c.status === 'draft');   // cars you still own
+    const live = cars.filter(inStock);
+    const sold = cars.filter(c => c.status === 'sold');
+
+    /* MOTs, one row per car: each one is its own job */
+    held.forEach(c => {
+      const lvl = motLevel(c);
+      if (!lvl) return;
+      add({ level: lvl, rank: lvl === 'red' ? 1 : 5, icon: 'calendar', title: motWords(c),
+        sub: [carTitle(c), c.registration ? fmtReg(c.registration) : null, c.status === 'draft' ? 'draft' : null].filter(Boolean).join(' · '),
+        run: () => sheet(motWords(c), carTitle(c) + ' · ' + new Date(c.mot_expiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), [
+          { label: 'Put in the new MOT date', icon: 'calendar', sub: 'Once it’s been tested', run: () => openForm(c, '#fMot') },
+          { label: 'See the car', icon: 'car', run: () => carActions(c) }
+        ]) });
+    });
+
+    /* New messages */
+    const unread = state.enquiries.filter(e => !e.is_read).map(x => ({ k: 'e', x }))
+      .concat(state.requests.filter(r => !r.is_read).map(x => ({ k: 'r', x })))
+      .sort((a, b) => new Date(a.x.created_at) - new Date(b.x.created_at));
+    if (unread.length) {
+      const first = unread[0];
+      add({ level: 'blue', rank: 2, icon: 'inbox',
+        title: unread.length === 1 ? '1 new message' : unread.length + ' new messages',
+        sub: unread.length === 1 ? `From ${first.x.name || 'someone'}, ${ago(first.x.created_at)}`
+          : `The oldest has waited since ${ago(first.x.created_at)}`,
+        run: () => unread.length === 1 ? openMessage(first.k, first.x.id) : (setEnqTab('new'), go('enq')) });
+    }
+
+    /* The insight engine's recommendations, once its figures are in. Stock
+       goes on in batches and ages together, so five cars saying "review the
+       price" become one row that opens the five. */
+    if (insightsAt && analysis) {
+      const groups = new Map();
+      analysis.findings.forEach((f, i) => {
+        if (f.rule === 'no_photos') return;          // the photos row below covers it
+        const key = f.cause + '|' + f.severity;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push({ f, i });
+      });
+      const also = f => f.suggestion ? f.suggestion.label.replace(/^Drop to/, 'try')
+        : f.cause !== 'demand' && CAUSE_LABEL[f.cause] ? CAUSE_LABEL[f.cause] : '';
+      groups.forEach(list => {
+        const { f, i } = list[0];
+        const good = f.severity === 'good';
+        const what = CAUSE_DO[f.cause] || CAUSE_LABEL[f.cause] || 'Worth a look';
+        const names = list.map(x => x.f.title);
+        add({ level: good ? 'green' : f.severity === 'act' ? 'red' : 'amber',
+          rank: good ? 9 : f.severity === 'act' ? 3 : 6, icon: good ? 'checkCirc' : 'tag',
+          title: list.length === 1 ? what : `${what}: ${list.length} cars`,
+          sub: list.length === 1 ? [f.title, also(f)].filter(Boolean).join(' · ')
+            : names.length > 2 ? `${names[0]}, ${names[1]} and ${names.length - 2} more` : names.join(' and '),
+          run: () => list.length === 1 ? insightSheet(i)
+            : sheet(what, 'Tap one to see why and what to do', list.map(x => ({
+                label: x.f.title, icon: 'tag', sub: [x.f.facts, also(x.f)].filter(Boolean).join(' · '),
+                run: () => insightSheet(x.i) }))) });
+      });
+    }
+
+    /* Gaps in the admin, grouped so ten cars don't make ten rows.
+       `one` and `many` are the headline for one car and for several. */
+    const gap = (list, o) => {
+      if (!list.length) return;
+      add(Object.assign({ level: 'grey', rank: 8 }, o, {
+        title: list.length === 1 ? o.one : `${list.length} ${o.many}`,
+        run: () => carListSheet(list.length === 1 ? o.one : `${list.length} ${o.many}`, list, o.fix, o.fixSub)
+      }));
+    };
+
+    gap(live.filter(c => !(Array.isArray(c.images) && c.images.length)), {
+      level: 'red', rank: 4, icon: 'camera', one: '1 car has no photos', many: 'cars have no photos',
+      sub: 'Nobody gives it a fair look without them', fix: c => openForm(c, '#photoArea') });
+    gap(live.filter(c => c.hpi_status && c.hpi_status !== 'clear' && !c.condition_notes), {
+      level: 'amber', rank: 7, icon: 'note', one: '1 Cat car has no damage note', many: 'Cat cars have no damage note',
+      sub: 'Saying what was done up front sells them', fix: c => openForm(c, '#fCondition') });
+    gap(sold.filter(c => carMargin(c) == null), {
+      level: 'amber', rank: 7, icon: 'pound', one: '1 sale isn’t in your margin', many: 'sales aren’t in your margin',
+      sub: 'What you paid or what it sold for is missing', fix: c => figuresSheet(c) });
+    gap(sold.filter(c => carMargin(c) != null && c.prep_cost == null), {
+      icon: 'pound', one: '1 sale has no prep cost', many: 'sales have no prep cost',
+      sub: 'Counted as £0 prep, so the margin reads high', fix: c => figuresSheet(c),
+      fixSub: c => `Sold ${c.sold_at ? shortDay(c.sold_at) : ''} · margin ${signed(carMargin(c))} before prep` });
+    gap(held.filter(c => c.purchase_price == null), {
+      icon: 'pound', one: '1 car has no purchase price', many: 'cars have no purchase price',
+      sub: 'No margin to show when it sells', fix: c => figuresSheet(c) });
+    gap(held.filter(c => !c.mot_expiry), {
+      icon: 'calendar', one: '1 car has no MOT date', many: 'cars have no MOT date',
+      sub: 'So you can’t be warned before it runs out', fix: c => openForm(c, '#fMot') });
+    const drafts = cars.filter(c => c.status === 'draft');
+    if (drafts.length) add({ level: 'grey', rank: 8, icon: 'edit',
+      title: drafts.length === 1 ? '1 draft isn’t on the website' : drafts.length + ' drafts aren’t on the website',
+      sub: 'Bought, not listed yet', run: () => { setStockTab('draft'); go('stock'); } });
+    gap(live.filter(c => !c.description), {
+      rank: 9, icon: 'note', one: '1 car has no description', many: 'cars have no description',
+      sub: 'The website shows nothing under the photos', fix: c => openForm(c, '#fDescription') });
+
+    const LEVEL = { red: 0, blue: 1, amber: 2, green: 3, grey: 4 };
+    return items.sort((a, b) => a.rank - b.rank || LEVEL[a.level] - LEVEL[b.level]);
+  }
+
+  /** A list of cars that share a problem. One car goes straight to the fix. */
+  function carListSheet(title, cars, fix, fixSub) {
+    if (cars.length === 1) return fix(cars[0]);
+    sheet(title, 'Tap one to sort it', cars.map(c => ({
+      label: carTitle(c), icon: 'car',
+      sub: fixSub ? fixSub(c) : [c.registration ? fmtReg(c.registration) : null,
+        c.status === 'sold' ? 'sold' : c.status === 'draft' ? 'draft' : money(c.price)].filter(Boolean).join(' · '),
+      run: () => fix(c)
+    })));
+  }
+
+  /** One insight, in full, with its buttons, from a Home row. */
+  function insightSheet(i) {
+    const f = analysis && analysis.findings[i];
+    if (!f) return;
+    sheet(CAUSE_DO[f.cause] || 'Worth a look', '', []);
+    $('#sheetActions').innerHTML = insightCard(f, i);
+    wireInsightButtons($('#sheetActions'), closeSheet);
+  }
+
+  /** The margin, this month against the same point last month, and six months of bars. */
+  function homeMoney() {
+    const f = marginFigures(new Date());
+    const t = f.thisMonth;
+    if (!f.allTime.cars.length) return '';
+
+    let compare;
+    if (!t.cars.length) compare = `Nothing sold yet this month. ${esc(f.prevName)} made ${signed(f.prevFull.total)}.`;
+    else if (!f.prevToDate.counted) compare = `Nothing sold by this point in ${esc(f.prevName)}.`;
+    else {
+      const diff = t.total - f.prevToDate.total;
+      compare = diff === 0 ? `Level with this point in ${esc(f.prevName)}.`
+        : `<b class="${diff > 0 ? 'up' : 'down'}">${diff > 0 ? 'Up' : 'Down'} ${signed(Math.abs(diff))}</b> on this point in ${esc(f.prevName)}.`;
+    }
+    const noPrep = t.cars.filter(c => carMargin(c) != null && c.prep_cost == null);
+    const missing = t.cars.filter(c => carMargin(c) == null);
+    const months = monthlyMargins(6);
+
+    return `
+      <h2 class="home-h">Money</h2>
+      <div class="section-card home-money">
+        <div class="hm-label">Margin in ${esc(f.thisName)} so far</div>
+        <div class="hm-figure ${t.total < 0 ? 'is-loss' : ''}">${t.counted ? signed(t.total) : '£0'}</div>
+        <div class="hm-compare">${compare} ${t.cars.length ? `${plural(t.cars.length, 'car')} sold.` : ''}</div>
+        ${missing.length || noPrep.length ? `<div class="hm-flags">
+          ${missing.length ? `<span class="pill pill--amber">${missing.length} not counted, figure missing</span>` : ''}
+          ${noPrep.length ? `<span class="pill pill--grey">${noPrep.length} before prep</span>` : ''}
+        </div>` : ''}
+        ${months.length > 1 ? `<div class="hm-chart">${barChart(months, { compact: true, action: 'open', height: 76 })}</div>` : ''}
+        <button class="btn btn--outline btn--sm btn--block" type="button" data-go="data:sold">See every sale and the charts</button>
+      </div>`;
+  }
+
+  /** How much stock, what it's worth, and what's tied up in it. */
+  function homeStock() {
+    const live = state.cars.filter(inStock);
+    const reserved = live.filter(c => c.status === 'reserved').length;
+    const drafts = state.cars.filter(c => c.status === 'draft');
+    const held = live.concat(drafts);
+    const value = live.reduce((n, c) => n + (c.price || 0), 0);
+    const costed = held.filter(c => c.purchase_price != null);
+    const tied = costed.reduce((n, c) => n + c.purchase_price + (c.prep_cost || 0), 0);
+
+    // Average days to sell, over the last three months of sales
+    const recent = state.cars.filter(c => c.status === 'sold' && c.sold_at && Date.now() - new Date(c.sold_at) < 90 * DAY);
+    const avgDays = recent.length ? Math.round(recent.reduce((n, c) =>
+      n + Math.max(0, (new Date(c.sold_at) - listedAt(c)) / DAY), 0) / recent.length) : null;
+    const month = new Date(); month.setDate(1); month.setHours(0, 0, 0, 0);
+    const soldThisMonth = state.cars.filter(c => c.status === 'sold' && c.sold_at && new Date(c.sold_at) >= month).length;
+
+    const tile = (go, value, label, sub) => `
+      <button class="home-tile" type="button" data-go="${go}">
+        <b>${value}</b><span>${label}</span>${sub ? `<small>${sub}</small>` : ''}
+      </button>`;
+
+    return `
+      <h2 class="home-h">Stock</h2>
+      <div class="home-tiles">
+        ${tile('stock:available', nf(live.length), 'In stock',
+          [reserved ? reserved + ' reserved' : null, drafts.length ? plural(drafts.length, 'draft') : null].filter(Boolean).join(' · '))}
+        ${tile('stock:available', compact(value), 'Stock value', 'at asking prices')}
+        ${tile('stock:available', costed.length ? compact(tied) : '£0', 'Money tied up',
+          held.length - costed.length ? `${held.length - costed.length} with no cost entered` : `in ${plural(held.length, 'car')}`)}
+        ${tile('stock:sold', nf(soldThisMonth), 'Sold this month', avgDays != null ? `about ${avgDays} days to sell` : '')}
+      </div>`;
+  }
+
+  /** The latest few messages, unread first, each opening in full. */
+  function homeMessages() {
+    const all = state.enquiries.map(x => ({ k: 'e', x })).concat(state.requests.map(x => ({ k: 'r', x })))
+      .sort((a, b) => (a.x.is_read - b.x.is_read) || (new Date(b.x.created_at) - new Date(a.x.created_at)));
+    const rows = all.slice(0, 3).map(({ k, x }) => {
+      const about = k === 'r' ? ([x.make, x.model].filter(Boolean).join(' ') || 'Car Finder request')
+        : x.kind === 'car' ? (x.car_title || 'About a car')
+        : x.kind === 'sell' ? (x.car_title ? 'Part exchange' : 'Wants to sell a car')
+        : ((x.details && x.details.subject) || 'General enquiry');
+      const text = k === 'r' ? x.notes : x.message;
+      const i = homeActs.push(() => openMessage(k, x.id)) - 1;
+      return `<button class="home-msg" type="button" data-home="${i}">
+        <span class="enq-dot ${x.is_read ? 'is-read' : ''}"></span>
+        <span class="home-msg-txt">
+          <span class="home-msg-top"><strong>${esc(x.name || 'No name given')}</strong><small>${esc(ago(x.created_at))}</small></span>
+          <span class="home-msg-about">${esc(about)}</span>
+          ${text ? `<span class="home-msg-snip">${esc(text)}</span>` : ''}
+        </span>
+      </button>`;
+    }).join('');
+
+    return `
+      <h2 class="home-h">Messages <button class="home-link" type="button" data-go="enq:all">See all</button></h2>
+      ${rows ? `<div class="card home-msgs">${rows}</div>`
+        : `<div class="card alert-none">${icon('inbox')}<span>No messages yet. Anything from the website lands here.</span></div>`}`;
+  }
+
+  /** The three cars that have been in longest: the first ones to think about. */
+  function homeOldest() {
+    const live = state.cars.filter(c => c.status === 'available').sort((a, b) => listedAt(a) - listedAt(b)).slice(0, 3);
+    if (!live.length) return '';
+    // Same bands as the Ageing tab: your own selling speed once it's known
+    const speed = (analysis && analysis.speed) || { watchDays: 45, actDays: 60 };
+    return `
+      <h2 class="home-h">Longest in stock <button class="home-link" type="button" data-go="stock:available">All stock</button></h2>
+      <div class="card home-cars">${live.map(c => {
+        const imgs = Array.isArray(c.images) ? c.images : [];
+        const i = homeActs.push(() => carActions(c)) - 1;
+        const d = daysIn(c);
+        return `<button class="home-car" type="button" data-home="${i}">
+          <img src="${imgs.length ? imgUrl(imgs[0], 160) : ''}" alt="" onerror="this.style.visibility='hidden'">
+          <span class="home-car-txt"><strong>${esc(carTitle(c))}</strong><small>${money(c.price)}</small></span>
+          <span class="pill ${d >= speed.actDays ? 'pill--red' : d >= speed.watchDays ? 'pill--amber' : 'pill--grey'}">${d}d</span>
+        </button>`;
+      }).join('')}</div>`;
+  }
 
   /* ============================================================ CARS */
   async function loadCars() {
@@ -599,23 +971,120 @@
     }
     msg('#stockMsg', '');
     state.cars = data || [];
+    state.carsLoaded = true;
     renderStock();
   }
 
-  $$('#stockTabs button').forEach(b => b.onclick = () => {
-    state.tab = b.dataset.tab;
-    $$('#stockTabs button').forEach(x => x.classList.toggle('is-on', x === b));
+  $$('#stockTabs button').forEach(b => b.onclick = () => setStockTab(b.dataset.tab));
+
+  function setStockTab(tab) {
+    state.tab = tab;
+    $$('#stockTabs button').forEach(x => x.classList.toggle('is-on', x.dataset.tab === tab));
     renderStock();
-  });
+  }
+
+  /* ---- Sorting and searching the stock list ------------------------------
+     "Oldest first" on In stock is the same as "longest in stock", which is
+     the one you want when deciding what to reprice. On Sold, the dates are
+     when it sold rather than when it went on. */
+  const listedAt = c => new Date(c.listed_at || c.created_at).getTime() || 0;
+  const whenOf = c => state.tab === 'sold' && c.sold_at ? new Date(c.sold_at).getTime() : listedAt(c);
+  const priceOf = c => state.tab === 'sold' && c.sale_price != null ? c.sale_price : c.price;
+  /** Compare on a number, either direction; a car without one always goes last. */
+  const byNum = (f, dir) => (a, b) => {
+    const x = f(a), y = f(b);
+    if (x == null || y == null) return (x == null) - (y == null);
+    return dir * (x - y);
+  };
+  const makeModel = c => [c.make, c.model].filter(Boolean).join(' ');
+
+  // Short labels: the picker sits beside the search box on a phone
+  const SORTS = {
+    newest:     ['Newest',        (a, b) => whenOf(b) - whenOf(a)],
+    oldest:     ['Oldest',        (a, b) => whenOf(a) - whenOf(b)],
+    price_high: ['Dearest',       byNum(priceOf, -1)],
+    price_low:  ['Cheapest',      byNum(priceOf, 1)],
+    miles_low:  ['Lowest miles',  byNum(c => c.mileage, 1)],
+    mot:        ['MOT due first', byNum(motDays, 1)],
+    az:         ['A to Z',        (a, b) => makeModel(a).localeCompare(makeModel(b), 'en-GB')]
+  };
+
+  function buildStockTools() {
+    const sel = $('#stockSort');
+    sel.innerHTML = Object.entries(SORTS).map(([k, [label]]) => `<option value="${k}">${label}</option>`).join('');
+    if (!SORTS[state.stockSort]) state.stockSort = 'newest';
+    sel.value = state.stockSort;
+    sel.onchange = () => { state.stockSort = sel.value; remember('mbu_stock_sort', sel.value); renderStock(); };
+
+    const search = $('#stockSearch');
+    search.addEventListener('input', () => { state.stockQuery = search.value; renderStock(); });
+  }
+
+  /** Everything you might type to find a car: make, model, trim, plate, year, colour. */
+  function matchesQuery(c, q) {
+    if (!q) return true;
+    const hay = [c.make, c.model, c.variant, c.year, c.colour, c.registration,
+      LABEL.fuel[c.fuel], LABEL.transmission[c.transmission]]
+      .filter(Boolean).join(' ').toLowerCase();
+    const plate = String(c.registration || '').toLowerCase();
+    return q.toLowerCase().split(/\s+/).filter(Boolean).every(w =>
+      hay.includes(w) || plate.includes(w.replace(/\s+/g, '')));
+  }
+
+  /* ---- MOT ---------------------------------------------------------------
+     Amber from three months out, red from one month or once it has run out.
+     Only for cars you still have: once it's sold the MOT is the buyer's. */
+  const MOT_AMBER_DAYS = 90, MOT_RED_DAYS = 30;
+
+  function motDays(c) {
+    if (!c.mot_expiry) return null;
+    const d = new Date(String(c.mot_expiry).slice(0, 10) + 'T00:00:00');
+    if (isNaN(d)) return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return Math.round((d - today) / DAY);
+  }
+
+  function motLevel(c) {
+    if (c.status === 'sold') return null;
+    const d = motDays(c);
+    return d == null ? null : d < MOT_RED_DAYS ? 'red' : d < MOT_AMBER_DAYS ? 'amber' : null;
+  }
+
+  function motWords(c) {
+    const d = motDays(c);
+    return d == null ? 'No MOT date' : d < 0 ? `MOT ran out ${plural(-d, 'day')} ago`
+      : d === 0 ? 'MOT runs out today' : `MOT runs out in ${plural(d, 'day')}`;
+  }
+
+  const plural = (n, one, many) => `${nf(n)} ${n === 1 ? one : (many || one + 's')}`;
+  const daysIn = c => Math.max(0, Math.round((Date.now() - listedAt(c)) / DAY));
 
   function renderStock() {
     const list = $('#stockList');
-    const cars = state.cars.filter(c =>
-      state.tab === 'available' ? (c.status === 'available' || c.status === 'reserved')
-      : state.tab === 'sold' ? c.status === 'sold'
-      : c.status === 'draft');
+    const byTab = {
+      available: state.cars.filter(inStock),
+      sold: state.cars.filter(c => c.status === 'sold'),
+      draft: state.cars.filter(c => c.status === 'draft')
+    };
+    $('#nAvailable').textContent = byTab.available.length || '';
+    $('#nSold').textContent = byTab.sold.length || '';
+    $('#nDraft').textContent = byTab.draft.length || '';
 
-    if (!cars.length) {
+    const all = byTab[state.tab];
+    const q = state.stockQuery.trim();
+    const cars = all.filter(c => matchesQuery(c, q)).sort(SORTS[state.stockSort][1]);
+
+    // One line saying what you're looking at, and on In stock what it's worth
+    const priced = cars.filter(c => c.price != null);
+    const worth = state.tab === 'available' && priced.length
+      ? ` · ${money(priced.reduce((n, c) => n + c.price, 0))} at asking` : '';
+    $('#stockSummary').textContent = !all.length ? ''
+      : q ? `${cars.length} of ${all.length} match “${q}”${worth}`
+      : `${plural(all.length, state.tab === 'sold' ? 'car sold' : state.tab === 'draft' ? 'draft' : 'car', state.tab === 'sold' ? 'cars sold' : undefined)}${worth}`;
+
+    if (state.view === 'home') renderHome();
+
+    if (!all.length) {
       const copy = {
         available: ['Nothing in stock yet', 'Tap “Add a car” to put your first one on the website.'],
         sold: ['No sold cars yet', 'When you mark a car sold it’ll appear here.'],
@@ -624,38 +1093,56 @@
       list.innerHTML = `<div class="empty">${icon('car')}<h3>${copy[0]}</h3><p>${copy[1]}</p></div>`;
       return;
     }
+    if (!cars.length) {
+      list.innerHTML = `<div class="empty">${icon('search')}<h3>Nothing matches</h3>
+        <p>Try the make, the model or part of the plate.</p></div>`;
+      return;
+    }
 
     list.innerHTML = cars.map(c => {
       const imgs = Array.isArray(c.images) ? c.images : [];
-      const title = [c.year, c.make, c.model].filter(Boolean).join(' ')
-                    || (c.registration ? fmtReg(c.registration) : 'Untitled car');
+      const sold = c.status === 'sold';
       const meta = [
+        sold && c.sold_at ? 'Sold ' + shortDay(c.sold_at) : null,
+        !sold && c.status !== 'draft' ? plural(daysIn(c), 'day') + ' in stock' : null,
         c.mileage != null ? Number(c.mileage).toLocaleString('en-GB') + ' mi' : null,
-        c.fuel && LABEL.fuel[c.fuel],
-        c.transmission && LABEL.transmission[c.transmission],
-        imgs.length ? imgs.length + ' photo' + (imgs.length === 1 ? '' : 's') : 'No photos'
+        !sold ? (imgs.length ? imgs.length + ' photo' + (imgs.length === 1 ? '' : 's') : 'No photos') : null,
+        sold ? null : c.transmission && LABEL.transmission[c.transmission]
       ].filter(Boolean).join(' · ');
 
       const pill =
         c.status === 'reserved' ? '<span class="pill pill--amber">Reserved</span>' :
-        c.status === 'sold' ? '<span class="pill pill--navy">Sold</span>' :
         c.status === 'draft' ? '<span class="pill pill--grey">Draft</span>' :
+        sold ? '' :
         !imgs.length ? '<span class="pill pill--red">Needs photos</span>' :
         c.featured ? '<span class="pill pill--blue">Featured</span>' : '';
 
-      const atPill = (c.at_published && c.status !== 'sold')
+      const mot = motLevel(c);
+      const motPill = mot ? `<span class="pill pill--${mot}">${icon('calendar')}${
+        motDays(c) < 0 ? 'MOT ran out' : 'MOT ' + shortDay(c.mot_expiry)}</span>` : '';
+
+      // On a sold car the useful number is what you made, and whether it's complete
+      const mg = sold ? carMargin(c) : null;
+      const price = sold
+        ? (mg != null ? `<span class="stock-price ${mg < 0 ? 'is-loss' : ''}">${signed(mg)}</span><span class="stock-price-note">margin</span>`
+                      : '<span class="stock-price is-missing">Figures missing</span>')
+        : `<span class="stock-price">${money(c.price)}</span>`;
+      const soldPill = sold && mg != null && c.prep_cost == null ? '<span class="pill pill--grey">No prep entered</span>' : '';
+
+      const atPill = (c.at_published && !sold)
         ? '<span class="pill pill--accent" style="background:var(--accent-100);color:var(--accent-600)">AT</span>' : '';
 
       return `
       <div class="card"><div class="stock-row" data-id="${esc(c.id)}">
-        <img class="stock-thumb" src="${imgs.length ? imgUrl(imgs[0], 240) : ''}" alt=""
-             onerror="this.style.background='#EFF2F6';this.removeAttribute('src')">
+        ${imgs.length ? `<img class="stock-thumb" src="${imgUrl(imgs[0], 240)}" alt=""
+             onerror="this.style.visibility='hidden'">`
+          : `<span class="stock-thumb stock-thumb--none">${icon('camera')}</span>`}
         <div class="stock-info">
-          <h3>${esc(title)}</h3>
+          <h3>${esc(carTitle(c))}</h3>
           <div class="stock-meta">${esc(meta)}</div>
-          <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
-            <span class="stock-price">${c.status === 'sold' ? 'Sold' : money(c.price)}</span>
-            ${pill}${atPill}
+          <div class="stock-line">
+            ${price}
+            ${pill}${motPill}${soldPill}${atPill}
           </div>
         </div>
         <span class="stock-chev">${icon('right')}</span>
@@ -670,9 +1157,23 @@
   function carActions(car) {
     if (!car) return;
     const title = [car.year, car.make, car.model].filter(Boolean).join(' ') || 'This car';
-    const acts = [
-      { label: 'Edit details', icon: 'edit', run: () => openForm(car) }
-    ];
+    const acts = [];
+
+    // On a sold car the money is the thing you come back to fix, so it goes first
+    if (car.status === 'sold') {
+      const mg = carMargin(car);
+      acts.push({ label: 'Edit the figures', icon: 'pound',
+        sub: mg == null ? 'A figure is missing, so it isn’t in your margin'
+           : car.prep_cost == null ? `Margin ${signed(mg)}, but no prep cost entered yet`
+           : `Margin ${signed(mg)}. Paid, prep and what it sold for`,
+        run: () => figuresSheet(car) });
+    }
+    acts.push({ label: 'Edit details', icon: 'edit', run: () => openForm(car) });
+    if (car.status !== 'sold') {
+      acts.push({ label: 'What it cost you', icon: 'pound',
+        sub: car.purchase_price == null ? 'Nothing entered yet' : `Paid ${money(car.purchase_price)}${car.prep_cost != null ? ' + ' + money(car.prep_cost) + ' prep' : ', no prep entered'}`,
+        run: () => figuresSheet(car) });
+    }
 
     if (car.status !== 'draft') {
       acts.push({ label: 'Listing pack', icon: 'copy',
@@ -718,7 +1219,7 @@
 
     if (car.status !== 'draft') {
       acts.push({ label: 'View on the website', icon: 'eye',
-        run: () => window.open(`../car.html?id=${encodeURIComponent(car.id)}`, '_blank') });
+        run: () => window.open(`../car?id=${encodeURIComponent(car.id)}`, '_blank') });
     }
     acts.push({ label: 'Delete this car', icon: 'trash', danger: true,
       sub: 'Permanent. No undo.',
@@ -729,37 +1230,120 @@
     sheet(title, car.registration ? fmtReg(car.registration) : '', acts);
   }
 
-  async function setStatus(car, status) {
-    const patch = { status, updated_at: new Date().toISOString() };
+  async function setStatus(car, status, extra) {
+    // Marking sold asks for the figures first: it's the one moment you'll
+    // reliably remember what it went for. The sheet calls back here with them.
+    if (status === 'sold' && !extra) return figuresSheet(car, { markSold: true });
 
-    if (status === 'sold') {
-      patch.sold_at = new Date().toISOString();
-      // Optional, but it's the one number that makes the margin figures real,
-      // and now is the only moment you'll reliably remember it.
-      // The box starts at the advertised price for speed, and most cars do sell
-      // at asking (the dealer confirmed, 13 Sept 2026). Say so anyway, because
-      // some go for less and a popular one can go for more.
-      const asked = prompt(
-        'What did it actually sell for?\n\n' +
-        (car.price != null
-          ? `The box shows the advertised price (${money(car.price)}). If it went for less, or more, change it.\n`
-          : '') +
-        'Just for your own figures. Never shown on the website.\n' +
-        'Leave blank to skip.',
-        car.price != null ? String(car.price) : '');
-      if (asked !== null) {
-        const n = parseInt(String(asked).replace(/[^0-9]/g, ''), 10);
-        if (!isNaN(n)) patch.sale_price = n;
-      }
-    }
+    const patch = Object.assign({ status, updated_at: new Date().toISOString() }, extra || {});
+    if (status === 'sold') patch.sold_at = new Date().toISOString();
     if (status === 'available' && car.status === 'sold') patch.sold_at = null;
 
     const { error } = await sb.from('cars').update(patch).eq('id', car.id);
     if (error) return toast('Couldn’t update: ' + error.message);
     Object.assign(car, patch);
+    syncStats(car);
     renderStock();
     toast(status === 'sold' ? 'Marked as sold' : status === 'reserved' ? 'Marked as reserved'
           : status === 'available' ? 'Now live on the website' : 'Updated', 'ok');
+  }
+
+  /* ---- The money on one car ----------------------------------------------
+     What you paid, what the prep came to, and on a sold car what it went
+     for, with the margin worked out as you type. Also the "Mark as sold"
+     screen, so the figures go in at the moment you know them.
+
+     A blank prep box means "not entered yet", not £0. The margin still
+     counts it as £0 (so a sale isn't left out for want of it), but it is
+     flagged on Home and in the lists until somebody fills it in or taps
+     "No prep on this one". */
+  function figuresSheet(car, opts) {
+    opts = opts || {};
+    const markSold = !!opts.markSold;
+    const sold = markSold || car.status === 'sold';
+    const title = carTitle(car);
+
+    sheet(markSold ? 'Mark as sold' : 'Your figures', title + ' · never shown on the website', []);
+    const saleStart = car.sale_price != null ? car.sale_price : markSold && car.price != null ? car.price : '';
+    $('#sheetActions').innerHTML = `
+      <div class="card figs">
+        ${sold ? `
+        <div class="f">
+          <label for="fgSale">What it sold for</label>
+          <div class="money"><input class="in" id="fgSale" type="number" inputmode="numeric" placeholder="0" value="${esc(saleStart)}"></div>
+          ${markSold && car.price != null ? `<span class="hint">Starts at the advertised price (${money(car.price)}). If it went for less, or more, change it.</span>` : ''}
+        </div>` : ''}
+        <div class="row-2">
+          <div class="f">
+            <label for="fgPaid">What you paid</label>
+            <div class="money"><input class="in" id="fgPaid" type="number" inputmode="numeric" placeholder="0" value="${esc(car.purchase_price ?? '')}"></div>
+          </div>
+          <div class="f">
+            <label for="fgPrep">Prep costs</label>
+            <div class="money"><input class="in" id="fgPrep" type="number" inputmode="numeric" placeholder="?" value="${esc(car.prep_cost ?? '')}"></div>
+          </div>
+        </div>
+        <button class="chip figs-noprep" type="button" id="fgNoPrep">No prep on this one (£0)</button>
+        <div class="moneyline" id="fgSummary"></div>
+        <button class="btn btn--accent btn--block" id="fgSave" style="margin-top:16px">
+          ${markSold ? 'Mark as sold' : 'Save the figures'}
+        </button>
+        ${markSold ? '<p class="hint" style="margin-top:10px;text-align:center">Don’t know them all yet? Leave any box blank and fill it in later.</p>' : ''}
+      </div>`;
+
+    const val = sel => { const el = $(sel); return el && el.value.trim() !== '' ? int(el.value) : null; };
+    const summary = () => {
+      const paid = val('#fgPaid'), prep = val('#fgPrep');
+      const against = sold ? val('#fgSale') : car.price;
+      $('#fgNoPrep').classList.toggle('is-on', prep === 0);
+      if (paid == null) {
+        $('#fgSummary').innerHTML = `<div class="ml-note">Put in what you paid and the margin works itself out.</div>`;
+        return;
+      }
+      const inCar = paid + (prep || 0);
+      const mg = against != null ? against - inCar : null;
+      $('#fgSummary').innerHTML =
+        `<div class="ml ml--total"><span>Total in the car</span><b>${money(inCar)}</b></div>` +
+        (mg == null ? '' : `<div class="ml ${mg >= 0 ? 'ml--good' : 'ml--bad'}">
+          <span>${sold ? (mg >= 0 ? 'Margin on the sale' : 'Lost on the sale') : (mg >= 0 ? 'Margin at asking price' : 'Short by')}</span>
+          <b>${signed(mg)}</b></div>`) +
+        (prep == null ? `<div class="ml-note">No prep entered, so this is before prep. Tap “No prep on this one” if there wasn’t any.</div>` : '');
+    };
+    ['#fgSale', '#fgPaid', '#fgPrep'].forEach(s => { const el = $(s); if (el) el.addEventListener('input', summary); });
+    $('#fgNoPrep').onclick = () => { $('#fgPrep').value = '0'; summary(); };
+    summary();
+
+    $('#fgSave').onclick = async () => {
+      const patch = { purchase_price: val('#fgPaid'), prep_cost: val('#fgPrep') };
+      if (sold) patch.sale_price = val('#fgSale');
+      const btn = $('#fgSave');
+      btn.disabled = true;
+
+      if (markSold) {
+        closeSheet();
+        await setStatus(car, 'sold', patch);
+        if (opts.after) opts.after();
+        return;
+      }
+      const { error } = await sb.from('cars').update(patch).eq('id', car.id);
+      btn.disabled = false;
+      if (error) return toast('Couldn’t save: ' + error.message);
+      closeSheet();
+      Object.assign(car, patch);
+      syncStats(car);
+      renderStock();
+      if (state.view === 'data' && stats) renderInsights();
+      toast('Figures saved', 'ok');
+      if (opts.after) opts.after();
+    };
+  }
+
+  /** Keep the Insights copy of a car's figures in step without a reload. */
+  function syncStats(car) {
+    const row = (stats || []).find(s => String(s.car_id) === String(car.id));
+    if (!row) return;
+    ['status', 'price', 'sold_at', 'purchase_price', 'prep_cost', 'sale_price'].forEach(k => { row[k] = car[k]; });
+    row.margin = carMargin(car);
   }
 
   /* ---- Auto Trader advert slots ------------------------------------------
@@ -1037,8 +1621,9 @@
         openForm(data);
         toast('Saved. Now add the photos and the words', 'ok');
       } else {
+        setStockTab('draft');
         go('stock');
-        toast('Saved as a draft. It is in the Drafts tab', 'ok');
+        toast('Saved as a draft', 'ok');
       }
     } catch (err) {
       console.error(err);
@@ -1123,7 +1708,11 @@
     renderFeatures();
   }
 
-  function openForm(car) {
+  /**
+   * @param {object|null} car
+   * @param {string} [focusSel]  a field to scroll to, e.g. '#fMot' from an MOT alert
+   */
+  function openForm(car, focusSel) {
     state.editing = car;
     state.dirty = false;
     state.features = new Set(Array.isArray(car && car.features) ? car.features : []);
@@ -1172,6 +1761,14 @@
     $('#saveDraftBtn').style.display = car && car.status !== 'draft' ? 'none' : '';
 
     go('form');
+    if (focusSel && $(focusSel)) {
+      const field = $(focusSel).closest('.f, .section-card');
+      setTimeout(() => {
+        field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        field.classList.add('is-flagged');
+        setTimeout(() => field.classList.remove('is-flagged'), 2400);
+      }, 60);
+    }
   }
 
   /* ============================================================ PHOTOS */
@@ -1500,9 +2097,7 @@
       if (d.motExpiryDate) set('#fMot', String(d.motExpiryDate).slice(0, 10));
       if (miles != null) set('#fMileage', miles);
 
-      const fuelMap = { PETROL:'petrol', DIESEL:'diesel', HYBRID:'hybrid',
-                        'HYBRID ELECTRIC':'hybrid', ELECTRICITY:'electric', ELECTRIC:'electric' };
-      const f = fuelMap[String(d.fuelType || '').toUpperCase()];
+      const f = fuelFrom(d.fuelType);
       if (f) setChip('#fFuel', f);
 
       state.dirty = true;
@@ -1525,6 +2120,27 @@
   }
 
   const titleCase = s => String(s).toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+
+  /**
+   * A fuel as the DVLA or Auto Trader words it, as one of ours. The DVLA says
+   * "ELECTRICITY" and "HYBRID ELECTRIC"; Auto Trader says "Petrol Hybrid",
+   * "Diesel Plug-in Hybrid", "Electric". Plug-in is checked first because it
+   * contains "hybrid"; "ELECTRIC DIESEL" is the DVLA's name for a diesel hybrid.
+   * @returns {string|null} petrol | diesel | hybrid | phev | electric | lpg
+   */
+  function fuelFrom(s) {
+    const t = String(s || '').toLowerCase();
+    if (!t) return null;
+    if (/plug-?in/.test(t)) return 'phev';
+    if (/hybrid|petrol\/electric|electric diesel|electric\/diesel/.test(t)) return 'hybrid';
+    if (/electric/.test(t)) return 'electric';
+    if (/lpg|gas/.test(t)) return 'lpg';
+    if (/diesel/.test(t)) return 'diesel';
+    if (/petrol/.test(t)) return 'petrol';
+    return null;
+  }
+  /** Same rule as the website: asking for a hybrid takes a plug-in hybrid too. */
+  const fuelMatches = (carFuel, wanted) => carFuel === wanted || (wanted === 'hybrid' && carFuel === 'phev');
 
   /* ---- Make and model spelling -----------------------------------------
      Plate lookups return capitals ("BMW", "MAZDA CX-3") and title-casing them
@@ -1580,7 +2196,9 @@
 
     if (trans === 'automatic') bits.push('Automatic gearbox.');
     if (fuel === 'diesel' && miles > 60000) bits.push('The diesel is well suited to longer runs and is economical with it.');
-    if (fuel === 'electric') bits.push('Fully electric, so nothing to pay in road tax and very cheap to run.');
+    if (fuel === 'electric') bits.push('Fully electric, so no fuel to buy and very cheap to run.');
+    if (fuel === 'hybrid') bits.push('Hybrid, so it runs on electric around town and saves on fuel.');
+    if (fuel === 'phev') bits.push('Plug-in hybrid: charge it at home and short trips can be done on electric alone.');
 
     if (feats.length) {
       bits.push(`Equipment includes ${feats.slice(0, 6).map(f => f.toLowerCase()).join(', ')}${feats.length > 6 ? ' and more' : ''}.`);
@@ -1686,9 +2304,12 @@
         state.cars.unshift(data);
       }
       state.dirty = false;
-      renderStock();
-      go('stock');
-      toast(status === 'draft' ? 'Saved as a draft' : 'Live on the website', 'ok');
+      const wasNew = !state.editing;
+      if (state.editing) syncStats(state.editing);
+      // A new car: show it in the list it landed in. An edit: back where you were.
+      if (wasNew) { setStockTab(status === 'draft' ? 'draft' : 'available'); go('stock'); }
+      else { renderStock(); goBack(); }
+      toast(status === 'draft' ? 'Saved as a draft' : wasNew ? 'Live on the website' : 'Saved', 'ok');
     } catch (err) {
       console.error(err);
       msg('#formMsg', 'Couldn’t save: ' + esc(err.message || 'unknown error') +
@@ -1723,6 +2344,7 @@
     const dot = $('#enqDot');
     dot.textContent = n > 99 ? '99+' : n;
     dot.classList.toggle('is-zero', n === 0);
+    if (state.view === 'home') renderHome();
   }
 
   const TIMESCALE = {
@@ -1742,7 +2364,8 @@
       r.body_type && LABEL.body[r.body_type]
     ].filter(Boolean).join(' · ');
 
-    return `<div class="card"><div class="enq">
+    return `<div class="card enq-card" data-open="r:${esc(r.id)}" tabindex="0" role="button"
+                 aria-label="Open the request from ${esc(r.name || 'someone')}"><div class="enq">
       <span class="enq-dot ${r.is_read ? 'is-read' : ''}"></span>
       <div class="enq-body">
         <h3>${esc(r.name || 'No name given')}
@@ -1761,50 +2384,52 @@
         ${r.car_title ? `<div class="enq-meta" style="margin-top:3px">Saw: ${esc(r.car_title)}</div>` : ''}
         ${r.notes ? `<div class="enq-msg">${esc(r.notes)}</div>` : ''}
         <div class="enq-actions">
-          ${r.phone ? `<a class="btn btn--green btn--sm" href="https://wa.me/${ukNumber(r.phone)}" target="_blank" rel="noopener">${icon('whatsapp')} WhatsApp</a>` : ''}
-          ${r.phone ? `<a class="btn btn--outline btn--sm" href="tel:${esc(r.phone)}">${icon('phone')} Call</a>` : ''}
-          ${r.email ? `<a class="btn btn--outline btn--sm" href="mailto:${esc(r.email)}">${icon('mail')}</a>` : ''}
-          <button class="btn btn--ghost btn--sm" data-req="${esc(r.id)}">More</button>
+          ${contactButtons(r, 'sm')}
+          <span class="enq-open">Open ${icon('right')}</span>
         </div>
       </div>
     </div></div>`;
   }
 
-  function requestActions(r) {
-    if (!r) return;
-    const setStatusTo = async (status, label) => {
-      const { error } = await sb.from('wanted_requests')
-        .update({ status, is_read: true }).eq('id', r.id);
-      if (error) return toast('Couldn’t update');
-      r.status = status; r.is_read = true;
-      renderEnquiries(); updateEnqDot();
-      toast(label, 'ok');
-    };
-
-    sheet(r.name || 'Car request',
-      [r.phone, r.email].filter(Boolean).join('  ·  '),
-      [
-        { label: 'Mark as looking', icon: 'eye',   sub: 'You’re keeping an eye out',
-          run: () => setStatusTo('searching', 'Marked as looking') },
-        { label: 'Found them one',  icon: 'check', sub: 'Matched to a car',
-          run: () => setStatusTo('matched', 'Marked as matched') },
-        { label: 'Close this off',  icon: 'close', sub: 'No longer looking',
-          run: () => setStatusTo('closed', 'Closed') },
-        { label: 'Archive', icon: 'trash', danger: true, sub: 'Hides it from this list',
-          run: async () => {
-            const { error } = await sb.from('wanted_requests').update({ archived: true }).eq('id', r.id);
-            if (error) return toast('Couldn’t archive');
-            state.requests = state.requests.filter(x => x.id !== r.id);
-            renderEnquiries(); updateEnqDot(); toast('Archived', 'ok');
-          } }
-      ]);
+  /**
+   * WhatsApp, Call and Email for whoever sent it. WhatsApp opens with a first
+   * line already written, naming the car if there is one, so replying is one
+   * tap and a send rather than starting from nothing.
+   */
+  function contactButtons(x, size) {
+    const first = String(x.name || '').trim().split(/\s+/)[0];
+    const about = x.car_title ? 'the ' + x.car_title : x.kind === 'sell' ? 'your car' : '';
+    const hello = `Hi${first ? ' ' + first : ''}, it's MBU Car Sales` +
+      (about ? `, about ${about}.` : '. Thanks for getting in touch.');
+    const sz = size === 'sm' ? ' btn--sm' : '';
+    return [
+      x.phone ? `<a class="btn btn--green${sz}" href="https://wa.me/${ukNumber(x.phone)}?text=${encodeURIComponent(hello)}" target="_blank" rel="noopener">${icon('whatsapp')} WhatsApp</a>` : '',
+      x.phone ? `<a class="btn btn--outline${sz}" href="tel:${esc(x.phone)}">${icon('phone')} Call</a>` : '',
+      x.email ? `<a class="btn btn--outline${sz}" href="mailto:${esc(x.email)}${x.car_title ? '?subject=' + encodeURIComponent('Re: ' + x.car_title) : ''}" aria-label="Email">${icon('mail')}${size === 'sm' ? '' : ' Email'}</a>` : ''
+    ].join('');
   }
 
-  $$('#enqTabs button').forEach(b => b.onclick = () => {
-    state.enqTab = b.dataset.tab;
-    $$('#enqTabs button').forEach(x => x.classList.toggle('is-on', x === b));
+  const REQUEST_STATUS = {
+    new: 'New', searching: 'Looking for one', matched: 'Found them one', closed: 'Closed'
+  };
+
+  async function setRequestStatus(r, status, label) {
+    const { error } = await sb.from('wanted_requests')
+      .update({ status, is_read: true }).eq('id', r.id);
+    if (error) return toast('Couldn’t update');
+    r.status = status; r.is_read = true;
+    renderEnquiries(); updateEnqDot();
+    if (state.view === 'msg') renderMessage();
+    toast(label, 'ok');
+  }
+
+  $$('#enqTabs button').forEach(b => b.onclick = () => setEnqTab(b.dataset.tab));
+
+  function setEnqTab(tab) {
+    state.enqTab = tab;
+    $$('#enqTabs button').forEach(x => x.classList.toggle('is-on', x.dataset.tab === tab));
     renderEnquiries();
-  });
+  }
 
   function renderEnquiries() {
     const list = $('#enqList');
@@ -1817,9 +2442,7 @@
         : `<div class="empty">${icon('car')}<h3>No car requests yet</h3>
              <p>When someone uses the Car Finder, or registers interest in a car
              that's sold, it lands here.</p></div>`;
-      list.querySelectorAll('[data-req]').forEach(btn => {
-        btn.onclick = () => requestActions(state.requests.find(r => String(r.id) === btn.dataset.req));
-      });
+      wireEnquiryButtons(list);
       return;
     }
 
@@ -1881,7 +2504,8 @@
       : e.kind === 'car' ? (d.subject || '')
       : '';
 
-    return `<div class="card"><div class="enq">
+    return `<div class="card enq-card" data-open="e:${esc(e.id)}" tabindex="0" role="button"
+                 aria-label="Open the message from ${esc(e.name || 'someone')}"><div class="enq">
       <span class="enq-dot ${e.is_read ? 'is-read' : ''}"></span>
       <div class="enq-body">
         <h3>${esc(e.name || 'No name given')}</h3>
@@ -1889,21 +2513,19 @@
         ${extra ? `<div class="enq-meta" style="margin-top:4px;color:var(--navy-700);font-weight:600">${esc(extra)}</div>` : ''}
         ${e.message ? `<div class="enq-msg">${esc(e.message)}</div>` : ''}
         <div class="enq-actions">
-          ${e.phone ? `<a class="btn btn--green btn--sm" href="https://wa.me/${ukNumber(e.phone)}" target="_blank" rel="noopener">${icon('whatsapp')} WhatsApp</a>` : ''}
-          ${e.phone ? `<a class="btn btn--outline btn--sm" href="tel:${esc(e.phone)}">${icon('phone')} Call</a>` : ''}
-          ${e.email ? `<a class="btn btn--outline btn--sm" href="mailto:${esc(e.email)}">${icon('mail')}</a>` : ''}
-          <button class="btn btn--ghost btn--sm" data-more="${esc(e.id)}">More</button>
+          ${contactButtons(e, 'sm')}
+          <span class="enq-open">Open ${icon('right')}</span>
         </div>
       </div>
     </div></div>`;
   }
 
+  /** The whole card opens the message. The call and WhatsApp buttons on it still just work. */
   function wireEnquiryButtons(list) {
-    list.querySelectorAll('[data-more]').forEach(btn => {
-      btn.onclick = () => enquiryActions(state.enquiries.find(e => String(e.id) === btn.dataset.more));
-    });
-    list.querySelectorAll('[data-req]').forEach(btn => {
-      btn.onclick = () => requestActions(state.requests.find(r => String(r.id) === btn.dataset.req));
+    list.querySelectorAll('[data-open]').forEach(card => {
+      const open = () => { const [kind, id] = card.dataset.open.split(':'); openMessage(kind, id); };
+      card.onclick = ev => { if (!ev.target.closest('a, button')) open(); };
+      card.onkeydown = ev => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target === card) { ev.preventDefault(); open(); } };
     });
   }
 
@@ -1914,30 +2536,176 @@
     return n;
   }
 
-  function enquiryActions(e) {
-    if (!e) return;
-    const d = e.details || {};
-    const detail = Object.entries(d).filter(([, v]) => v)
-      .map(([k, v]) => `${k.replace(/_/g,' ')}: ${v}`).join('\n');
+  /* ==========================================================================
+     ONE MESSAGE, IN FULL
+     The cards in the Inbox cut the message at two lines. Tapping one opens
+     this: the whole message, every detail the form collected, the car it's
+     about, and the ways to answer it. Opening it marks it read.
+     ========================================================================== */
+  const findMessage = (kind, id) => (kind === 'r' ? state.requests : state.enquiries)
+    .find(x => String(x.id) === String(id)) || null;
 
-    sheet(e.name || 'Enquiry',
-      [e.phone, e.email].filter(Boolean).join('  ·  '),
-      [
-        { label: e.is_read ? 'Mark as unread' : 'Mark as read', icon: 'check',
-          run: () => toggleRead(e) },
-        ...(detail ? [{ label: 'See all details', icon: 'copy',
-          run: () => alert(detail + (e.message ? '\n\nmessage: ' + e.message : '')) }] : []),
-        { label: 'Archive', icon: 'trash', danger: true,
-          sub: 'Hides it from this list',
-          run: () => archive(e) }
-      ]);
+  function openMessage(kind, id) {
+    const x = findMessage(kind, id);
+    if (!x) return toast('That message has gone. It may have been archived');
+    state.message = { kind, id: x.id };
+    renderMessage();
+    go('msg');
+    if (!x.is_read) {
+      sb.from(kind === 'r' ? 'wanted_requests' : 'enquiries').update({ is_read: true }).eq('id', x.id)
+        .then(({ error }) => {
+          if (error) return;
+          x.is_read = true;
+          renderEnquiries(); updateEnqDot();
+        });
+    }
   }
 
-  async function toggleRead(e) {
-    const { error } = await sb.from('enquiries').update({ is_read: !e.is_read }).eq('id', e.id);
-    if (error) return toast('Couldn’t update');
-    e.is_read = !e.is_read;
-    renderEnquiries(); updateEnqDot();
+  /** "2 hours ago", "yesterday", "12 days ago": how long they've been waiting. */
+  function ago(d) {
+    const mins = Math.round((Date.now() - new Date(d)) / 60000);
+    if (mins < 2) return 'just now';
+    if (mins < 60) return mins + ' minutes ago';
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return hrs === 1 ? 'an hour ago' : hrs + ' hours ago';
+    const days = Math.round(hrs / 24);
+    return days === 1 ? 'yesterday' : days + ' days ago';
+  }
+
+  /* The form fields, in words. Anything not listed is shown with its own name. */
+  const DETAIL_LABEL = {
+    subject: 'What it’s about', registration: 'Registration', make: 'Make', model: 'Model',
+    year: 'Year', mileage: 'Mileage', hpi: 'History', condition: 'Condition',
+    asking_price: 'Hoping for', service_history: 'Service history', owners: 'Owners',
+    colour: 'Colour', fuel: 'Fuel', transmission: 'Gearbox', preferred_contact: 'Best way to reach them',
+    best_time: 'Best time', finance: 'Finance', px: 'Part exchange', source: 'Came from'
+  };
+
+  function detailRows(pairs) {
+    const shown = pairs.filter(([, v]) => v != null && v !== '' && v !== false);
+    if (!shown.length) return '';
+    return `<dl class="kv">${shown.map(([k, v]) => {
+      const label = DETAIL_LABEL[k] || (k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' '));
+      const value = v === true ? 'Yes'
+        : Array.isArray(v) ? v.join(', ')
+        : typeof v === 'object' ? JSON.stringify(v)
+        : k === 'mileage' && !isNaN(+v) ? nf(+v) + ' miles'
+        : String(v);
+      return `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`;
+    }).join('')}</dl>`;
+  }
+
+  function renderMessage() {
+    const m = state.message;
+    const x = m && findMessage(m.kind, m.id);
+    const body = $('#msgBody');
+    if (!x) { body.innerHTML = `<div class="empty">${icon('inbox')}<h3>Message not found</h3></div>`; return; }
+
+    const isReq = m.kind === 'r';
+    const when = new Date(x.created_at);
+    const whenText = when.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) +
+      ' at ' + when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+    const kindLabel = isReq
+      ? (x.kind === 'sold_interest' ? 'Wants one like a sold car' : 'Car Finder request')
+      : x.kind === 'sell' ? (x.car_title ? 'Part exchange' : 'Wants to sell a car')
+      : x.kind === 'car' ? 'About a car' : 'General enquiry';
+
+    // The car it's about, if we still have it. Tap for the usual car actions.
+    const car = x.car_id ? state.cars.find(c => String(c.id) === String(x.car_id)) : null;
+    const carBlock = car ? `
+      <button class="msg-car" type="button" id="msgCar">
+        <img src="${Array.isArray(car.images) && car.images.length ? imgUrl(car.images[0], 200) : ''}" alt=""
+             onerror="this.style.visibility='hidden'">
+        <span><strong>${esc(carTitle(car))}</strong>
+          <small>${car.status === 'sold' ? 'Sold' : money(car.price)}${car.status === 'reserved' ? ' · Reserved' : ''}${car.registration ? ' · ' + esc(fmtReg(car.registration)) : ''}</small></span>
+        ${icon('right')}
+      </button>`
+      : x.car_title ? `<p class="msg-about">${isReq ? 'Saw' : 'About'}: <strong>${esc(x.car_title)}</strong></p>` : '';
+
+    const d = x.details || {};
+    let facts;
+    if (isReq) {
+      facts = detailRows([
+        ['Looking for', [x.make, x.model].filter(Boolean).join(' ') || 'Anything suitable'],
+        ['Budget', x.budget_min || x.budget_max
+          ? [x.budget_min ? money(x.budget_min) : null, x.budget_max ? money(x.budget_max) : null].filter(Boolean).join(' to ') : null],
+        ['Mileage', x.max_mileage ? 'Under ' + nf(x.max_mileage) + ' miles' : null],
+        ['Fuel', x.fuel && (LABEL.fuel[x.fuel] || x.fuel)],
+        ['Gearbox', x.transmission && (LABEL.transmission[x.transmission] || x.transmission)],
+        ['Body', x.body_type && (LABEL.body[x.body_type] || x.body_type)],
+        ['When', x.timescale && (TIMESCALE[x.timescale] || x.timescale)],
+        ['Part exchange', x.part_ex ? 'Has one' : null],
+        ['Status', REQUEST_STATUS[x.status] || x.status]
+      ]);
+    } else {
+      facts = detailRows(Object.entries(d).concat([
+        ['part_ex', x.part_ex || null],
+        ['part_ex_details', x.part_ex_details || null],
+        ['finance', x.finance_interest ? 'Ticked that they’re interested' : null]
+      ]));
+    }
+
+    const text = isReq ? x.notes : x.message;
+
+    body.innerHTML = `
+      <div class="section-card msg-head">
+        <span class="pill ${isReq ? 'pill--blue' : 'pill--grey'}">${esc(kindLabel)}</span>
+        <h2 class="msg-name">${esc(x.name || 'No name given')}</h2>
+        <p class="msg-when">${esc(whenText)} · ${esc(ago(x.created_at))}</p>
+        ${x.phone || x.email ? `<p class="msg-contact">
+          ${x.phone ? `<a href="tel:${esc(x.phone)}">${esc(x.phone)}</a>` : ''}
+          ${x.email ? `<a href="mailto:${esc(x.email)}">${esc(x.email)}</a>` : ''}</p>` : ''}
+        <div class="msg-reply">${contactButtons(x) || '<p class="hint">They didn’t leave a phone number or email.</p>'}</div>
+      </div>
+
+      ${carBlock ? `<div class="section-card"><h2>${isReq ? 'The car they saw' : 'The car'}</h2>${carBlock}</div>` : ''}
+
+      <div class="section-card">
+        <h2>${isReq ? 'Their notes' : 'Their message'}</h2>
+        ${text ? `<p class="msg-text">${esc(text)}</p>` : '<p class="hint">No message, just the details below.</p>'}
+      </div>
+
+      ${facts ? `<div class="section-card"><h2>${isReq ? 'What they want' : 'Details'}</h2>${facts}</div>` : ''}
+
+      <div class="section-card">
+        <h2>Tidy up</h2>
+        <div class="sheet-actions">
+          ${isReq ? `
+            <button class="sheet-action" data-rs="searching">${icon('eye')}<div><span>Mark as looking</span><small>You’re keeping an eye out</small></div></button>
+            <button class="sheet-action" data-rs="matched">${icon('check')}<div><span>Found them one</span><small>Matched to a car</small></div></button>
+            <button class="sheet-action" data-rs="closed">${icon('close')}<div><span>Close this off</span><small>No longer looking</small></div></button>`
+          : `<button class="sheet-action" id="msgUnread">${icon('inbox')}<div><span>Mark as unread</span><small>Puts it back under New</small></div></button>`}
+          <button class="sheet-action danger" id="msgArchive">${icon('trash')}<div><span>Archive</span><small>Hides it from the Inbox</small></div></button>
+        </div>
+      </div>`;
+
+    const carBtn = $('#msgCar');
+    if (carBtn) carBtn.onclick = () => carActions(car);
+    $$('#msgBody [data-rs]').forEach(b => {
+      b.onclick = () => setRequestStatus(x, b.dataset.rs,
+        { searching: 'Marked as looking', matched: 'Marked as matched', closed: 'Closed' }[b.dataset.rs]);
+    });
+    const unread = $('#msgUnread');
+    if (unread) unread.onclick = async () => {
+      const { error } = await sb.from('enquiries').update({ is_read: false }).eq('id', x.id);
+      if (error) return toast('Couldn’t update');
+      x.is_read = false;
+      renderEnquiries(); updateEnqDot();
+      toast('Marked as unread', 'ok');
+      goBack();
+    };
+    $('#msgArchive').onclick = () => confirmSheet('Archive this?', 'It comes off the Inbox. Nothing is deleted.',
+      'Archive it', async () => {
+        const table = isReq ? 'wanted_requests' : 'enquiries';
+        const { error } = await sb.from(table).update({ archived: true }).eq('id', x.id);
+        if (error) return toast('Couldn’t archive');
+        if (isReq) state.requests = state.requests.filter(r => r.id !== x.id);
+        else state.enquiries = state.enquiries.filter(e => e.id !== x.id);
+        renderEnquiries(); updateEnqDot();
+        toast('Archived', 'ok');
+        goBack();
+      }, true);
   }
 
   /** Mark everything currently on screen as seen. Handles both kinds. */
@@ -1955,14 +2723,6 @@
     await Promise.all(jobs);
     items.forEach(x => { x.is_read = true; });
     updateEnqDot();
-  }
-
-  async function archive(e) {
-    const { error } = await sb.from('enquiries').update({ archived: true }).eq('id', e.id);
-    if (error) return toast('Couldn’t archive');
-    state.enquiries = state.enquiries.filter(x => x.id !== e.id);
-    renderEnquiries(); updateEnqDot();
-    toast('Archived', 'ok');
   }
 
   /* ==========================================================================
@@ -1987,9 +2747,42 @@
   state.dataTab = 'cars';
 
   async function loadInsights() {
-    $('#dataBody').innerHTML =
-      `<div class="section-card"><div class="skel" style="height:130px"></div></div>`.repeat(3);
+    // Show what we already have straight away and refresh underneath it;
+    // skeletons only the very first time
+    if (stats) renderInsights();
+    else {
+      $('#dataBody').innerHTML =
+        `<div class="section-card"><div class="skel" style="height:130px"></div></div>`.repeat(3);
+    }
+    const err = await fetchInsightData();
+    if (err) {
+      msg('#dataMsg',
+        'Couldn’t load the figures: ' + esc(err.message) +
+        '<br><br>If you haven’t run <strong>schema-v2-additions.sql</strong> in Supabase yet, that’s why.',
+        'err');
+      $('#dataBody').innerHTML = '';
+      return;
+    }
+    msg('#dataMsg', '');
+    renderInsights();
+    if (state.view === 'home') renderHome();
+  }
 
+  /* Home asks for these too, but it doesn't need them to the second. If
+     they can't be loaded, Home carries on without the recommendations. */
+  let insightsAt = 0, insightsBusy = null;
+  function refreshHomeFigures() {
+    if (insightsBusy || Date.now() - insightsAt < 120000) return;
+    insightsBusy = fetchInsightData()
+      .catch(err => console.warn('Insight figures unavailable', err))
+      .finally(() => { insightsBusy = null; if (state.view === 'home') renderHome(); });
+  }
+
+  /**
+   * Everything the Insights tab and the insight engine read, in one go.
+   * @returns {Promise<Error|null>} the error if the basic views are missing
+   */
+  async function fetchInsightData() {
     const since = new Date(Date.now() - 90 * 86400000).toISOString();
     const [s, d, a, ci, ts, ia, pc] = await Promise.all([
       sb.from('car_stats').select('*'),
@@ -2003,15 +2796,8 @@
         .order('created_at', { ascending: false }).limit(500)
     ]);
 
-    if (s.error || d.error) {
-      msg('#dataMsg',
-        'Couldn’t load the figures: ' + esc((s.error || d.error).message) +
-        '<br><br>If you haven’t run <strong>schema-v2-additions.sql</strong> in Supabase yet, that’s why.',
-        'err');
-      $('#dataBody').innerHTML = '';
-      return;
-    }
-    msg('#dataMsg', '');
+    if (s.error || d.error) return s.error || d.error;
+    insightsAt = Date.now();
     stats = s.data || [];
     demand = d.data || [];
     ageing = a.error ? null : (a.data || []);   // null = schema v4 not run yet
@@ -2019,7 +2805,7 @@
     trackStatus = ts.error ? null : ts.data;
     insightActs = ia.error ? null : (ia.data || []);
     priceChecks = pc.error ? [] : (pc.data || []);
-    renderInsights();
+    return null;
   }
 
   /** True once the new tracking has actually counted somebody. */
@@ -2258,6 +3044,11 @@
     </div>`;
   }
 
+  const INTEREST_SORTS = {
+    interest: 'Most interest first', least: 'Least interest first', contact: 'Most contact first',
+    oldest: 'Longest in stock', newest: 'Newest in', price_high: 'Price, high to low', price_low: 'Price, low to high'
+  };
+
   function carInsights() {
     const live = stats.filter(c => c.status === 'available' || c.status === 'reserved');
     const sold = stats.filter(c => c.status === 'sold');
@@ -2295,14 +3086,23 @@
         ${statTile(avgDays != null ? avgDays + 'd' : 'Not yet', 'Avg to sell')}`;
     }
 
-    /* Ranked list of live stock by interest */
+    /* Live stock, most interest first unless you've picked another order */
     const legacyById = Object.fromEntries(stats.map(c => [String(c.car_id), c]));
-    const rows = (people
-      ? live.map(c => ({ c, i: interestFor(c.car_id) })).sort((a, b) =>
-          ((b.i && b.i.visitors) || 0) - ((a.i && a.i.visitors) || 0))
-      : live.map(c => ({ c, i: null })).sort((a, b) =>
-          (b.c.views || 0) - (a.c.views || 0) || (b.c.enquiries || 0) - (a.c.enquiries || 0))
-    ).map(({ c, i }) => people && i ? interestRow(c, i, legacyById) : legacyRow(c)).join('');
+    const looked = x => people ? ((x.i && x.i.visitors) || 0) : (x.c.views || 0);
+    const touched = x => people ? ((x.i && Math.max(x.i.contacted || 0, x.i.enquiries_since_tracking || 0)) || 0)
+      : (x.c.whatsapp_clicks || 0) + (x.c.phone_clicks || 0) + (x.c.enquiries || 0);
+    const order = INTEREST_SORTS[state.interestSort] ? state.interestSort : 'interest';
+    const cmp = {
+      interest: (a, b) => looked(b) - looked(a) || touched(b) - touched(a),
+      least:    (a, b) => looked(a) - looked(b) || touched(a) - touched(b),
+      contact:  (a, b) => touched(b) - touched(a) || looked(b) - looked(a),
+      oldest:   (a, b) => (b.c.days_in_stock || 0) - (a.c.days_in_stock || 0),
+      newest:   (a, b) => (a.c.days_in_stock || 0) - (b.c.days_in_stock || 0),
+      price_high: (a, b) => (b.c.price || 0) - (a.c.price || 0),
+      price_low:  (a, b) => (a.c.price || 0) - (b.c.price || 0)
+    }[order];
+    const rows = live.map(c => ({ c, i: people ? interestFor(c.car_id) : null })).sort(cmp)
+      .map(({ c, i }) => people && i ? interestRow(c, i, legacyById) : legacyRow(c)).join('');
 
     return `
       ${marginHero()}
@@ -2316,7 +3116,13 @@
       </div>
 
       <div class="section-card">
-        <h2>In stock, most interest first</h2>
+        <div class="card-head">
+          <h2>In stock</h2>
+          <select class="sel sel--sm" id="interestSort" aria-label="Order the cars by">
+            ${Object.entries(INTEREST_SORTS).map(([k, label]) =>
+              `<option value="${k}"${k === order ? ' selected' : ''}>${label}</option>`).join('')}
+          </select>
+        </div>
         ${rows || '<p class="hint">No cars in stock at the moment.</p>'}
       </div>
 
@@ -2427,7 +3233,8 @@
         <strong>${esc(title)}</strong>
         <span class="mc-margin ${mg == null ? 'is-missing' : mg < 0 ? 'is-loss' : ''}">${mg == null ? 'Not counted' : signed(mg)}</span>
         <span class="mc-meta">${esc(bits)}</span>
-        ${mg == null ? `<button class="mc-fix" type="button" data-fixcar="${esc(c.id)}">Add ${esc(missing)}</button>` : ''}
+        <button class="mc-fix" type="button" data-figs="${esc(c.id)}">${
+          mg == null ? 'Add ' + esc(missing) : c.prep_cost == null ? 'Add the prep cost' : 'Edit the figures'}</button>
       </div>`;
     }).join('');
 
@@ -2542,6 +3349,9 @@
     </div>`;
   }
 
+  /** After acting on an insight, redraw wherever it was shown. */
+  const redrawInsights = () => { if (stats) renderInsights(); if (state.view === 'home') renderHome(); };
+
   async function onInsightAction(n, what) {
     const f = analysis && analysis.findings[n];
     if (!f) return;
@@ -2550,8 +3360,8 @@
 
     if (what === 'reprice') return repriceCar(car.id, f.suggestion && f.suggestion.price, f);
     if (what === 'edit') return openForm(car);
-    if (what === 'feature') { await toggleFeatured(car); return renderInsights(); }
-    if (what === 'autotrader') { await toggleAutoTrader(car); return renderInsights(); }
+    if (what === 'feature') { await toggleFeatured(car); return redrawInsights(); }
+    if (what === 'autotrader') { await toggleAutoTrader(car); return redrawInsights(); }
     if (what === 'listing_pack') return showListingPack(car);
     if (what === 'check_market') return checkMarket(car, () => loadInsights());
 
@@ -2566,7 +3376,7 @@
       const { data, error } = await sb.from('insight_actions').insert(row).select().single();
       if (error) return toast('Couldn’t save that: ' + error.message);
       insightActs.unshift(data);
-      renderInsights();
+      redrawInsights();
       toast(what === 'snooze'
         ? 'Hidden for 7 days'
         : 'Got it. It won’t mention the price again unless it changes', 'ok');
@@ -2669,6 +3479,259 @@
       .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
   };
 
+  /* ==========================================================================
+     MARGIN CHARTS
+     Plain HTML and SVG, no library. Two views of the same numbers the margin
+     figure uses (sale − paid − prep, blank prep counted as £0):
+
+       barChart   margin month by month, one bar each, a loss hangs below
+                  the line. Tap a bar on the Sold tab to see that month.
+       paceChart  this month against last, added up day by day, so you can
+                  see whether you're ahead of where you were at this point.
+
+     Colours are the app's own blue for this month and orange for last, a
+     pair checked for colour blindness. A loss is red with a minus sign.
+     ========================================================================== */
+  const CHART = { now: '#2A62B4', prev: '#EB6834' };
+
+  /** A round step that gives about three gridlines. */
+  function niceStep(span) {
+    const raw = span / 3;
+    const p = Math.pow(10, Math.floor(Math.log10(raw)));
+    const m = raw / p;
+    return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+  }
+  function scaleFor(values) {
+    const hi = Math.max(0, ...values), lo = Math.min(0, ...values);
+    const step = niceStep(Math.max(hi - lo, 100));
+    const top = Math.ceil(hi / step) * step || step;
+    const bottom = Math.floor(lo / step) * step;
+    const ticks = [];
+    for (let v = bottom; v <= top + step / 2; v += step) ticks.push(v);
+    return { top, bottom, span: top - bottom, ticks };
+  }
+  /** £1.2k style, for axis labels and bar tips where space is tight. */
+  const compact = n => {
+    const a = Math.abs(n), s = n < 0 ? '−' : '';
+    if (a < 1000) return s + '£' + Math.round(a);
+    const k = a / 1000;
+    return s + '£' + (k >= 10 || Number.isInteger(k) ? Math.round(k) : k.toFixed(1)) + 'k';
+  };
+
+  /** Margin per month, oldest first, for the last `count` months with sales in reach. */
+  function monthlyMargins(count) {
+    const sold = state.cars.filter(c => c.status === 'sold' && c.sold_at);
+    if (!sold.length) return [];
+    const firstSale = new Date(Math.min(...sold.map(c => new Date(c.sold_at).getTime())));
+    const firstMonth = new Date(firstSale.getFullYear(), firstSale.getMonth(), 1);
+    const now = new Date();
+    const out = [];
+    for (let i = count - 1; i >= 0; i--) {
+      const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      if (start < firstMonth) continue;
+      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+      const list = sold.filter(c => { const t = new Date(c.sold_at); return t >= start && t < end; });
+      const counted = list.filter(c => carMargin(c) != null);
+      out.push({
+        key: monthKey(start), current: i === 0,
+        short: start.toLocaleDateString('en-GB', { month: 'short' }),
+        long: monthName(monthKey(start)),
+        total: counted.reduce((n, c) => n + carMargin(c), 0),
+        sold: list.length, counted: counted.length,
+        noPrep: counted.filter(c => c.prep_cost == null).length,
+        missing: list.length - counted.length
+      });
+    }
+    return out;
+  }
+
+  function monthTip(d) {
+    return `${d.long}${d.current ? ' so far' : ''}: ${signed(d.total)} margin from ${plural(d.sold, 'car')} sold` +
+      (d.missing ? `, ${d.missing} not counted (figure missing)` : '') +
+      (d.noPrep ? `, ${d.noPrep} with no prep entered` : '');
+  }
+
+  /**
+   * @param {object[]} data     from monthlyMargins
+   * @param {object} [opts]     { compact, selected: 'YYYY-MM', action: 'filter'|'open', height }
+   */
+  function barChart(data, opts) {
+    opts = opts || {};
+    if (!data.length) return '';
+    const sc = scaleFor(data.map(d => d.total));
+    const zero = sc.top / sc.span * 100;                  // % down from the top
+    const best = data.reduce((a, d) => d.total > a.total ? d : a, data[0]);
+
+    const cols = data.map(d => {
+      const h = Math.abs(d.total) / sc.span * 100;
+      const neg = d.total < 0;
+      // Label sparingly: this month, and the best month if it's a different one
+      const label = !opts.compact && (d.current || d === best) && d.sold
+        ? `<span class="bar-val" style="${neg ? `top:calc(${zero + h}% + 3px)` : `bottom:calc(${100 - zero + h}% + 3px)`}">${compact(d.total)}</span>` : '';
+      return `<button class="bar-col${d.key === opts.selected ? ' is-selected' : ''}" type="button"
+          data-month="${d.key}" data-tip="${esc(monthTip(d))}" aria-label="${esc(monthTip(d))}">
+        <span class="bar${neg ? ' bar--neg' : ''}${d.current ? ' bar--now' : ''}"
+              style="${neg ? `top:${zero}%` : `bottom:${100 - zero}%`};height:${h}%"></span>
+        ${label}
+      </button>`;
+    }).join('');
+
+    return `<div class="chart" data-chart="bars" data-action="${opts.action || 'filter'}">
+      <div class="chart-plot" style="height:${opts.height || 150}px">
+        ${sc.ticks.map(v => `<div class="grid${v === 0 ? ' grid--zero' : ''}" style="top:${(sc.top - v) / sc.span * 100}%"><span>${compact(v)}</span></div>`).join('')}
+        <div class="bar-cols">${cols}</div>
+        <div class="chart-tip" hidden></div>
+      </div>
+      <div class="chart-x">${data.map(d => `<span${d.current ? ' class="is-now"' : ''}>${esc(d.short)}</span>`).join('')}</div>
+    </div>`;
+  }
+
+  /** Margin added up day by day through one month: [end of day 1, end of day 2, ...]. */
+  function runningMargin(start, upToDay) {
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+    const byDay = {};
+    state.cars.forEach(c => {
+      if (c.status !== 'sold' || !c.sold_at || carMargin(c) == null) return;
+      const t = new Date(c.sold_at);
+      if (t >= start && t < end) byDay[t.getDate()] = (byDay[t.getDate()] || 0) + carMargin(c);
+    });
+    const out = [];
+    let run = 0;
+    for (let d = 1; d <= upToDay; d++) { run += byDay[d] || 0; out.push(run); }
+    return out;
+  }
+
+  function paceChart() {
+    const now = new Date();
+    const startThis = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startPrev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const daysThis = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const daysPrev = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+    const cur = runningMargin(startThis, now.getDate());
+    const prev = runningMargin(startPrev, daysPrev);
+    if (!cur.some(Boolean) && !prev.some(Boolean)) return '';
+
+    const nameThis = startThis.toLocaleDateString('en-GB', { month: 'long' });
+    const namePrev = startPrev.toLocaleDateString('en-GB', { month: 'long' });
+    const N = Math.max(daysThis, daysPrev);
+    const sc = scaleFor(cur.concat(prev));
+    const x = day => (day - 1) / (N - 1) * 100;
+    const y = v => (sc.top - v) / sc.span * 100;
+    const line = s => s.map((v, i) => `${x(i + 1).toFixed(2)},${y(v).toFixed(2)}`).join(' ');
+    const dot = (s, colour) => s.length
+      ? `<span class="pace-dot" style="left:${x(s.length)}%;top:${y(s[s.length - 1])}%;background:${colour}"></span>` : '';
+
+    const today = now.getDate();
+    const prevAtToday = prev[Math.min(today, prev.length) - 1] || 0;
+    const ticksX = [1, 8, 15, 22, N];
+
+    return `<div class="chart" data-chart="pace"
+        data-cur="${cur.join(',')}" data-prev="${prev.join(',')}" data-n="${N}"
+        data-names="${esc(nameThis)}|${esc(namePrev)}">
+      <div class="legend">
+        <span><i class="key" style="background:${CHART.now}"></i><span>${esc(nameThis)} so far <b>${signed(cur[cur.length - 1] || 0)}</b></span></span>
+        <span><i class="key" style="background:${CHART.prev}"></i><span>${esc(namePrev)} by the ${ordinal(today)} <b>${signed(prevAtToday)}</b>, ${signed(prev[prev.length - 1] || 0)} in all</span></span>
+      </div>
+      <div class="chart-plot" style="height:150px">
+        ${sc.ticks.map(v => `<div class="grid${v === 0 ? ' grid--zero' : ''}" style="top:${y(v)}%"><span>${compact(v)}</span></div>`).join('')}
+        <svg class="pace-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <polyline points="${line(prev)}" stroke="${CHART.prev}"/>
+          <polyline points="${line(cur)}" stroke="${CHART.now}"/>
+        </svg>
+        ${dot(prev, CHART.prev)}${dot(cur, CHART.now)}
+        <div class="crosshair" hidden></div>
+        <div class="chart-tip" hidden></div>
+        <div class="pace-hit" role="img" tabindex="0"
+             aria-label="${esc(`${nameThis} so far ${signed(cur[cur.length - 1] || 0)}; ${namePrev} was ${signed(prevAtToday)} by the same day`)}"></div>
+      </div>
+      <div class="chart-x chart-x--days">${ticksX.map(d => `<span style="left:${x(d)}%">${d === N ? 'end' : ordinal(d)}</span>`).join('')}</div>
+    </div>`;
+  }
+
+  const ordinal = n => n + (n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th');
+
+  /** Hover, focus and tap for every chart inside `root`. */
+  function wireCharts(root) {
+    root.querySelectorAll('.chart[data-chart="bars"]').forEach(chart => {
+      const tip = chart.querySelector('.chart-tip');
+      const plot = chart.querySelector('.chart-plot');
+      const show = col => {
+        tip.textContent = col.dataset.tip;
+        tip.hidden = false;
+        const pr = plot.getBoundingClientRect(), cr = col.getBoundingClientRect();
+        const mid = (cr.left + cr.width / 2 - pr.left) / pr.width * 100;
+        tip.style.left = Math.min(78, Math.max(22, mid)) + '%';
+      };
+      chart.querySelectorAll('.bar-col').forEach(col => {
+        col.addEventListener('pointerenter', () => show(col));
+        col.addEventListener('focus', () => show(col));
+        col.addEventListener('pointerleave', () => { tip.hidden = true; });
+        col.addEventListener('blur', () => { tip.hidden = true; });
+        col.onclick = () => {
+          if (chart.dataset.action === 'open') return openDataTab('sold', col.dataset.month);
+          state.soldMonth = state.soldMonth === col.dataset.month ? 'all' : col.dataset.month;
+          renderInsights();
+        };
+      });
+    });
+
+    root.querySelectorAll('.chart[data-chart="pace"]').forEach(chart => {
+      const cur = chart.dataset.cur.split(',').map(Number);
+      const prev = chart.dataset.prev.split(',').map(Number);
+      const N = +chart.dataset.n;
+      const [nameThis, namePrev] = chart.dataset.names.split('|');
+      const hit = chart.querySelector('.pace-hit');
+      const cross = chart.querySelector('.crosshair');
+      const tip = chart.querySelector('.chart-tip');
+
+      const showDay = day => {
+        const left = (day - 1) / (N - 1) * 100;
+        cross.hidden = false; cross.style.left = left + '%';
+        tip.hidden = false; tip.style.left = Math.min(74, Math.max(26, left)) + '%';
+        tip.replaceChildren();
+        const head = document.createElement('div');
+        head.className = 'tip-head';
+        head.textContent = 'By the ' + ordinal(day);
+        tip.append(head);
+        [[nameThis, cur, CHART.now], [namePrev, prev, CHART.prev]].forEach(([name, s, colour]) => {
+          const row = document.createElement('div');
+          row.className = 'tip-row';
+          const key = document.createElement('i');
+          key.className = 'key'; key.style.background = colour;
+          const val = document.createElement('b');
+          val.textContent = day <= s.length ? signed(s[day - 1]) : 'not yet';
+          row.append(key, val, document.createTextNode(' ' + name));
+          tip.append(row);
+        });
+      };
+      const fromPointer = e => {
+        const r = hit.getBoundingClientRect();
+        const day = Math.round((e.clientX - r.left) / r.width * (N - 1)) + 1;
+        showDay(Math.min(N, Math.max(1, day)));
+      };
+      const hide = () => { cross.hidden = true; tip.hidden = true; };
+      hit.addEventListener('pointermove', fromPointer);
+      hit.addEventListener('pointerdown', fromPointer);
+      hit.addEventListener('pointerleave', hide);
+      hit.addEventListener('focus', () => showDay(cur.length || 1));
+      hit.addEventListener('blur', hide);
+      hit.addEventListener('keydown', e => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        const nowDay = Math.round(parseFloat(cross.style.left || '0') / 100 * (N - 1)) + 1;
+        showDay(Math.min(N, Math.max(1, nowDay + (e.key === 'ArrowRight' ? 1 : -1))));
+      });
+    });
+  }
+
+  /** Jump to an Insights tab, optionally with the Sold tab set to a month. */
+  function openDataTab(tab, month) {
+    state.dataTab = tab;
+    if (month) state.soldMonth = month;
+    $$('#dataTabs button').forEach(x => x.classList.toggle('is-on', x.dataset.tab === tab));
+    go('data');
+  }
+
   /** Sold cars for the month currently selected, newest first. */
   function soldRows() {
     const all = (stats || [])
@@ -2719,37 +3782,63 @@
       }
     }
 
+    const noPrep = rows.filter(c => c.margin != null && c.prep_cost == null).length;
+
+    // Each sale opens its figures, so a missing prep cost is one tap to fix
     const list = rows.map(c => {
       const title = [c.year, c.make, c.model].filter(Boolean).join(' ') || 'Untitled';
       const when  = new Date(c.sold_at).toLocaleDateString('en-GB',
         { day: 'numeric', month: 'short', year: 'numeric' });
       const good  = c.margin != null && c.margin >= 0;
+      const flag  = c.margin == null ? '<span class="pill pill--amber">Figure missing</span>'
+        : c.prep_cost == null ? '<span class="pill pill--grey">No prep entered</span>' : '';
 
-      return `<div class="card" style="margin-bottom:10px"><div style="padding:14px">
-        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+      return `<button class="card sold-row" type="button" data-figs="${esc(c.car_id)}">
+        <div class="sold-top">
           <div>
-            <strong style="font-size:15.5px">${esc(title)}</strong>
-            <div style="font-size:13px;color:var(--ink-3);margin-top:2px">
+            <strong>${esc(title)}</strong>
+            <div class="sold-when">
               ${esc(when)}${c.days_in_stock != null ? ' · ' + c.days_in_stock + ' days in stock' : ''}
             </div>
           </div>
-          <div style="text-align:right;white-space:nowrap">
-            <div style="font-size:17px;font-weight:800;color:${
-              c.margin == null ? 'var(--ink-3)' : good ? 'var(--green-600)' : 'var(--red-600)'}">
-              ${signed(c.margin)}
-            </div>
-            <div style="font-size:11px;color:var(--ink-3)">margin</div>
+          <div class="sold-margin ${c.margin == null ? 'is-missing' : good ? 'is-good' : 'is-loss'}">
+            ${signed(c.margin)}<small>margin</small>
           </div>
         </div>
-        <div style="display:flex;gap:14px;margin-top:10px;font-size:13px;color:var(--ink-3);flex-wrap:wrap">
-          <span>Sold for <strong style="color:var(--navy-900)">${money(c.sale_price)}</strong></span>
-          <span>Paid <strong style="color:var(--navy-900)">${money(c.purchase_price)}</strong></span>
-          <span>Prep <strong style="color:var(--navy-900)">${money(c.prep_cost)}</strong></span>
+        <div class="sold-figs">
+          <span>Sold for <strong>${c.sale_price != null ? money(c.sale_price) : 'not entered'}</strong></span>
+          <span>Paid <strong>${c.purchase_price != null ? money(c.purchase_price) : 'not entered'}</strong></span>
+          <span>Prep <strong>${c.prep_cost != null ? money(c.prep_cost) : 'not entered'}</strong></span>
+          ${flag}
+          <span class="sold-edit">${icon('edit')} Edit</span>
         </div>
-      </div></div>`;
+      </button>`;
     }).join('');
 
+    const byMonth = monthlyMargins(12);
+    const pace = paceChart();
+
     return `
+      ${byMonth.length ? `<div class="section-card">
+        <h2>Margin by month</h2>
+        ${barChart(byMonth, { selected: state.soldMonth })}
+        <p class="note chart-note">Tap a month to see its sales below.${byMonth.some(d => d.noPrep)
+          ? ' Months with sales that have no prep entered are counted before prep.' : ''}</p>
+        <details class="chart-table">
+          <summary>See these as a table</summary>
+          <table>
+            <thead><tr><th>Month</th><th>Sold</th><th>Margin</th></tr></thead>
+            <tbody>${byMonth.slice().reverse().map(d => `<tr><td>${esc(d.long)}</td><td>${d.sold}</td><td>${signed(d.total)}${
+              d.missing || d.noPrep ? `<small>${[d.missing ? d.missing + ' not counted' : '', d.noPrep ? d.noPrep + ' before prep' : ''].filter(Boolean).join(', ')}</small>` : ''}</td></tr>`).join('')}</tbody>
+          </table>
+        </details>
+      </div>` : ''}
+
+      ${pace ? `<div class="section-card">
+        <h2>This month against last</h2>
+        ${pace}
+      </div>` : ''}
+
       <div class="section-card" style="padding:12px;margin-bottom:12px">
         <label for="soldMonth" style="font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)">Month</label>
         <select class="sel" id="soldMonth" style="margin-top:6px">
@@ -2773,8 +3862,12 @@
 
       ${missing ? `<div class="msg msg--info is-shown" style="margin-bottom:14px">
         <strong>${missing} of these ${missing === 1 ? 'has' : 'have'} no margin figure.</strong>
-        Fill in what you paid, the prep and what it sold for on the car itself and
-        it will be counted here.</div>` : ''}
+        Tap the car to fill in what you paid and what it sold for, and it will be counted here.</div>` : ''}
+
+      ${noPrep ? `<div class="msg msg--warn is-shown" style="margin-bottom:14px">
+        <strong>${noPrep} ${noPrep === 1 ? 'sale has' : 'sales have'} no prep cost entered</strong>, so
+        ${noPrep === 1 ? 'its margin is' : 'their margins are'} before prep and the total is higher than it
+        really is. Tap each one to add it, or tap “No prep on this one” if there wasn’t any.</div>` : ''}
 
       <div class="section-card">
         <h2>${state.soldMonth === 'all' ? 'Everything sold' : esc(monthName(state.soldMonth))}, newest first</h2>
@@ -2877,14 +3970,29 @@
     /* Cars tab: margin breakdown, missing figures, insight buttons */
     const mt = $('#marginToggle');
     if (mt) mt.onclick = () => { state.marginOpen = !state.marginOpen; renderInsights(); };
-    $$('#dataBody [data-fixcar]').forEach(b => {
+    wireFigureButtons($('#dataBody'));
+    wireInsightButtons($('#dataBody'));
+
+    const is = $('#interestSort');
+    if (is) is.onchange = () => { state.interestSort = is.value; remember('mbu_interest_sort', is.value); renderInsights(); };
+
+    wireCharts($('#dataBody'));
+  }
+
+  /** Anything marked data-figs="<car id>" opens that car's money sheet. */
+  function wireFigureButtons(root) {
+    root.querySelectorAll('[data-figs]').forEach(b => {
       b.onclick = () => {
-        const car = state.cars.find(c => String(c.id) === b.dataset.fixcar);
-        if (car) openForm(car);
+        const car = state.cars.find(c => String(c.id) === b.dataset.figs);
+        if (car) figuresSheet(car);
       };
     });
-    $$('#dataBody [data-ins]').forEach(b => {
+  }
+
+  function wireInsightButtons(root, before) {
+    root.querySelectorAll('[data-ins]').forEach(b => {
       b.onclick = async () => {
+        if (before) before();
         b.disabled = true;
         try { await onInsightAction(+b.dataset.ins, b.dataset.do); }
         finally { b.disabled = false; }
@@ -3554,7 +4662,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     const mentions = word.length >= 3
       ? new RegExp('\\b' + word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
     const gear = String((v.at && v.at.transmissionType) || '').toLowerCase();
-    const fuel = String((v.at && v.at.fuelType) || v.fuelType || '').toLowerCase();
+    const fuel = fuelFrom((v.at && v.at.fuelType) || v.fuelType);
     const body = String((v.at && v.at.bodyType) || '').toLowerCase();
 
     return state.requests.filter(r => {
@@ -3572,7 +4680,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
 
       let asked = 0;
       if (r.transmission) { asked++; if (gear !== r.transmission) return false; }
-      if (r.fuel)         { asked++; if (!fuel.includes(r.fuel)) return false; }
+      if (r.fuel)         { asked++; if (!fuelMatches(fuel, r.fuel)) return false; }
       if (r.body_type)    { asked++; if (body !== r.body_type) return false; }
       return asked > 0;
     });
@@ -3942,9 +5050,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       if (BODIES.some(([k]) => k === body)) setChip('#fBody', body);
     }
 
-    const fuelMap = { PETROL:'petrol', DIESEL:'diesel', HYBRID:'hybrid',
-                      'HYBRID ELECTRIC':'hybrid', ELECTRICITY:'electric', ELECTRIC:'electric' };
-    const f = fuelMap[String(v.fuelType || '').toUpperCase()];
+    const f = fuelFrom(v.fuelType);
     if (f) setChip('#fFuel', f);
 
     if (v.mot && v.mot.currentAdvisories.length) {

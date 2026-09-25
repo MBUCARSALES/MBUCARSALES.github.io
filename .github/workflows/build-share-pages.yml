@@ -100,12 +100,16 @@ jobs:
 
             const keep = new Set();
 
+            // The words the website uses, so a preview never says "phev"
+            const FUEL = { petrol: 'Petrol', diesel: 'Diesel', hybrid: 'Hybrid',
+                           phev: 'Plug-in hybrid', electric: 'Electric', lpg: 'LPG' };
+
             for (const car of cars) {
               const sold  = car.status === 'sold';
               const title = [car.year, car.make, car.model].filter(Boolean).join(' ') || 'Used car';
               const specs = [
                 car.mileage != null ? Number(car.mileage).toLocaleString('en-GB') + ' miles' : null,
-                car.fuel, car.transmission,
+                FUEL[car.fuel] || car.fuel, car.transmission,
                 car.engine_size ? Number(car.engine_size).toFixed(1) + 'L' : null
               ].filter(Boolean).join(' · ');
 

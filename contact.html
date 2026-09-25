@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Contact Us | MBU Car Sales, Newcastle upon Tyne</title>
 <meta name="description" content="Get in touch with MBU Car Sales in Newcastle upon Tyne. Ring us, WhatsApp us or send an email. Viewings by appointment, seven days a week.">
-<link rel="canonical" href="https://mbucarsales.co.uk/contact.html">
+<link rel="canonical" href="https://mbucarsales.co.uk/contact">
 <meta property="og:title" content="Contact MBU Car Sales">
 <meta property="og:description" content="Call, WhatsApp or email us. Viewings by appointment, seven days a week.">
 <meta name="theme-color" content="#0A1830">
@@ -25,7 +25,7 @@
   <section class="page-head">
     <div class="container">
       <nav class="breadcrumb" aria-label="Breadcrumb">
-        <a href="index.html">Home</a>
+        <a href="./">Home</a>
         <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span>Contact</span>
       </nav>
@@ -148,7 +148,7 @@
                 <p style="margin-top:6px">
                   We are set back off Westgate Road behind the Gulf petrol station, so
                   the postcode alone will not put you at the gate.
-                  <a href="find-us.html" class="ct-link" style="margin-top:4px">See how to find us</a>
+                  <a href="find-us" class="ct-link" style="margin-top:4px">See how to find us</a>
                 </p>
                 <p style="margin-top:8px">Viewings by appointment. Give us a ring first and we’ll have the car ready.</p>
               </div>
@@ -283,13 +283,13 @@
   /* Some reasons have a proper form behind them that captures far more than a
      free-text message ever will. Point at it rather than duplicating it. */
   function hintFor(r) {
-    const px = car ? MBU.link('sell.html?px=' + encodeURIComponent(car.id)) : MBU.link('sell.html');
+    const px = car ? MBU.link('sell?px=' + encodeURIComponent(car.id)) : MBU.link('sell');
     if (r === 'Part exchange')
       return `Want a firm number for yours? <a href="${px}">Fill in the quick valuation form</a> and we will price it properly.`;
     if (r === 'Selling my car to you')
-      return `<a href="${MBU.link('sell.html')}">The valuation form</a> is quicker, it asks the few things we need to price it.`;
+      return `<a href="${MBU.link('sell')}">The valuation form</a> is quicker, it asks the few things we need to price it.`;
     if (r === 'Looking for a specific car')
-      return `<a href="${MBU.link('wanted.html')}">The Car Finder</a> takes the full brief so we know exactly what to look out for.`;
+      return `<a href="${MBU.link('wanted')}">The Car Finder</a> takes the full brief so we know exactly what to look out for.`;
     return '';
   }
 
@@ -377,7 +377,7 @@
         <div>
           <strong>The ${esc(MBU.fmt.title(c))} has sold</strong>
           We buy cars like it most weeks though. Tell us what you are after below, or
-          <a href="${MBU.link('wanted.html?car=' + encodeURIComponent(c.id))}" class="ct-link">give the Car Finder the full brief</a>.
+          <a href="${MBU.link('wanted?car=' + encodeURIComponent(c.id))}" class="ct-link">give the Car Finder the full brief</a>.
         </div>
       </div>`;
   }
@@ -389,7 +389,7 @@
         <div>
           <strong>About the ${esc(MBU.fmt.title(c))}${c.price != null ? ', ' + MBU.fmt.price(c.price) : ''}</strong>
           Pick what you need below and we will come straight back to you.
-          <a href="${MBU.link('car.html?id=' + encodeURIComponent(c.id))}" class="ct-link">Back to that car</a>
+          <a href="${MBU.link('car?id=' + encodeURIComponent(c.id))}" class="ct-link">Back to that car</a>
         </div>
       </div>`;
   }

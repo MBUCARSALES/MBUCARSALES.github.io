@@ -144,6 +144,15 @@
   };
   MBU.label = (group, key) => (MBU.labels[group] && MBU.labels[group][key]) || fmt.titleCase(key || '');
 
+  /* The fuels anyone can search for or ask us to find, whether or not one is
+     on the forecourt today. Searching for an electric car when there isn't
+     one should say so and offer the Car Finder, not hide the option. */
+  MBU.fuelChoices = ['petrol', 'diesel', 'hybrid', 'electric'];
+  /** "Hybrid" takes plug-in hybrids too: anyone asking for one would look at either. */
+  MBU.fuelMatches = (carFuel, wanted) => carFuel === wanted || (wanted === 'hybrid' && carFuel === 'phev');
+  /** A car's fuel as one of the search choices (a plug-in hybrid searches as hybrid). */
+  MBU.fuelChoice = f => f === 'phev' ? 'hybrid' : f;
+
   /* ==========================================================================
      IMAGES  (Cloudinary with graceful fallback)
      ========================================================================== */
@@ -735,7 +744,7 @@
   MBU.carUrl = function (car) {
     const base = (CFG.options.siteUrl || '').replace(/\/$/, '');
     return CFG.options.sharePages === false
-      ? `${base}/car.html?id=${encodeURIComponent(car.id)}`
+      ? `${base}/car?id=${encodeURIComponent(car.id)}`
       : `${base}/c/${encodeURIComponent(car.id)}/`;
   };
 
