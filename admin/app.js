@@ -663,6 +663,58 @@
 
   let homeActs = [];     // what each Home row does when tapped, by index
 
+  /* ======================================================= VERSE OF THE DAY
+     A verse of the Qur'an or a hadith, above the money on Home and at the
+     top of the Sold tab, and "Mashallah · Barakallah" beside the figures.
+     The words and where each comes from are in verses.js; if that file is
+     missing, none of this shows and nothing else changes.
+     ==================================================================== */
+  const VERSES = window.MBU_VERSES || null;
+
+  /** Today's, by the local date: the same on both phones, a new one at midnight. */
+  function verseOfTheDay() {
+    if (!VERSES || !VERSES.list.length) return null;
+    const d = new Date();
+    const day = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY);
+    return VERSES.list[day % VERSES.list.length];
+  }
+
+  function verseCard(v) {
+    v = v || verseOfTheDay();
+    if (!v) return '';
+    const quran = v.kind === 'quran';
+    return `<figure class="verse verse--${quran ? 'quran' : 'hadith'}">
+      <figcaption class="verse-head">
+        <span class="verse-tag">${quran ? 'Qur’an' : 'Hadith'}</span>
+        <span>For today</span>
+      </figcaption>
+      <blockquote class="verse-ar" lang="ar" dir="rtl">${esc(v.ar)}</blockquote>
+      ${!quran && v.intro ? `<p class="verse-intro">${esc(v.intro)}</p>` : ''}
+      <p class="verse-en">${esc(v.en)}</p>
+      <a class="verse-ref" href="${esc(v.link)}" target="_blank" rel="noopener">${esc(v.ref)}${v.source ? ' · ' + esc(v.source) : ''}</a>
+    </figure>`;
+  }
+
+  /** The small badge beside a money figure. Tap it for what it means. */
+  const mashallah = () => VERSES
+    ? `<button class="mashallah" type="button" data-mashallah aria-label="${esc(VERSES.mashallah.en)}"><span lang="ar" dir="rtl">${esc(VERSES.mashallah.ar)}</span></button>`
+    : '';
+
+  function wireMashallah(root) {
+    root.querySelectorAll('[data-mashallah]').forEach(b => {
+      b.onclick = e => {
+        e.stopPropagation();
+        const m = VERSES.mashallah;
+        const find = ref => VERSES.list.find(v => v.ref.startsWith(ref));
+        sheet(m.en, m.meaning, []);
+        $('#sheetActions').innerHTML = [find('Al-Kahf 18:39'), find('Sunan Ibn Majah 3509')]
+          .filter(Boolean).map(v => verseCard(v).replace(/<figcaption[\s\S]*?<\/figcaption>/,
+            `<figcaption class="verse-head"><span class="verse-tag">${v.kind === 'quran' ? 'Qur’an' : 'Hadith'}</span></figcaption>`)).join('') +
+          `<p class="hint" style="padding:4px 4px 0;text-align:center">Said over what Allah has given, so the credit goes where it belongs.</p>`;
+      };
+    });
+  }
+
   function renderHome() {
     const body = $('#homeBody');
     if (!state.carsLoaded) {
@@ -729,6 +781,7 @@
       : `<div class="card alert-none alert-none--ok">${icon('checkCirc')}<span>Nothing needs you right now.</span></div>`}
       ${!insightsAt && insightsBusy ? '<p class="note home-note">Checking prices and interest…</p>' : ''}
 
+      ${verseCard()}
       ${homeMoney()}
       ${homeStock()}
       ${homeMessages()}
@@ -752,6 +805,7 @@
     });
     wireFigureButtons(body);
     wireCharts(body);
+    wireMashallah(body);
   }
 
   /**
@@ -920,7 +974,7 @@
       <h2 class="home-h">Money</h2>
       <div class="section-card home-money">
         <div class="hm-label">Margin in ${esc(f.thisName)} so far</div>
-        <div class="hm-figure ${t.total < 0 ? 'is-loss' : ''}">${t.counted ? signed(t.total) : '£0'}</div>
+        <div class="hm-top"><div class="hm-figure ${t.total < 0 ? 'is-loss' : ''}">${t.counted ? signed(t.total) : '£0'}</div>${mashallah()}</div>
         <div class="hm-compare">${compare} ${t.cars.length ? `${plural(t.cars.length, 'car')} sold.` : ''}</div>
         ${missing.length || noPrep.length ? `<div class="hm-flags">
           ${missing.length ? `<span class="pill pill--amber">${missing.length} not counted, figure missing</span>` : ''}
@@ -954,7 +1008,7 @@
       </button>`;
 
     return `
-      <h2 class="home-h">Stock</h2>
+      <h2 class="home-h">Stock ${mashallah()}</h2>
       <div class="home-tiles">
         ${tile('stock:available', nf(live.length), 'In stock',
           [reserved ? reserved + ' reserved' : null, drafts.length ? plural(drafts.length, 'draft') : null].filter(Boolean).join(' · '))}
@@ -3292,7 +3346,7 @@
 
     return `<div class="margin-hero">
       <div class="mh-label">Margin in ${esc(f.thisName)} so far</div>
-      <div class="mh-figure ${t.total < 0 ? 'is-loss' : ''}">${t.counted ? signed(t.total) : '£0'}</div>
+      <div class="hm-top"><div class="mh-figure ${t.total < 0 ? 'is-loss' : ''}">${t.counted ? signed(t.total) : '£0'}</div>${mashallah()}</div>
       <div class="mh-compare">${compare}</div>
       ${t.missing ? `<div class="mh-compare" style="margin-top:4px">${t.missing} of ${t.cars.length} sale${t.cars.length === 1 ? '' : 's'} this month ${t.missing === 1 ? 'has' : 'have'} a figure missing, so ${t.missing === 1 ? 'isn’t' : 'aren’t'} counted.</div>` : ''}
       ${noPrep ? `<div class="mh-compare" style="margin-top:4px">${
@@ -3871,8 +3925,9 @@
     const pace = paceChart();
 
     return `
+      ${verseCard()}
       ${byMonth.length ? `<div class="section-card">
-        <h2>Margin by month</h2>
+        <div class="card-head"><h2>Margin by month</h2>${mashallah()}</div>
         ${barChart(byMonth, { selected: state.soldMonth })}
         <p class="note chart-note">Tap a month to see its sales below.${byMonth.some(d => d.noPrep)
           ? ' Months with sales that have no prep entered are counted before prep.' : ''}</p>
@@ -4029,6 +4084,7 @@
     if (is) is.onchange = () => { state.interestSort = is.value; remember('mbu_interest_sort', is.value); renderInsights(); };
 
     wireCharts($('#dataBody'));
+    wireMashallah($('#dataBody'));
   }
 
   /** Anything marked data-figs="<car id>" opens that car's money sheet. */
