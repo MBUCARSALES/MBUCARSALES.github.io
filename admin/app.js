@@ -1220,9 +1220,13 @@
     const priced = cars.filter(c => c.price != null);
     const worth = state.tab === 'available' && priced.length
       ? ` · ${money(priced.reduce((n, c) => n + c.price, 0))} at asking` : '';
-    $('#stockSummary').textContent = !all.length ? ''
+    const summary = !all.length ? ''
       : q ? `${cars.length} of ${all.length} match “${q}”${worth}`
       : `${plural(all.length, state.tab === 'sold' ? 'car sold' : state.tab === 'draft' ? 'draft' : 'car', state.tab === 'sold' ? 'cars sold' : undefined)}${worth}`;
+    // Mashallah beside what the stock is worth, as it is beside the money on Home
+    const box = $('#stockSummary');
+    box.innerHTML = summary ? `<span>${esc(summary)}</span>${worth ? mashallah() : ''}` : '';
+    wireMashallah(box);
 
     if (state.view === 'home') renderHome();
 
