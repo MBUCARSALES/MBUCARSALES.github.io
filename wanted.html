@@ -235,6 +235,7 @@
 
 <script src="assets/js/config.js"></script>
 <script src="assets/js/demo-data.js"></script>
+<script src="assets/js/makes.js"></script>
 <script src="assets/js/data.js"></script>
 <script src="assets/js/ui.js"></script>
 <script>
@@ -277,7 +278,7 @@
 
   /* Suggest makes we actually deal in */
   MBU.getCars().then(cars => {
-    const makes = [...new Set(cars.map(c => c.make).filter(Boolean))].sort();
+    const makes = MBU.makesIn(cars);
     document.getElementById('makeList').innerHTML =
       makes.map(m => `<option value="${esc(m)}">`).join('');
   });

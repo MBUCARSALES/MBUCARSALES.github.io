@@ -842,6 +842,23 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
 .figs .row-2 .f { margin-bottom: 0; }
 .figs-noprep { margin-top: 12px; min-height: 40px; font-size: 14px; }
 
+/* Part exchange: the tick, the cash box it opens, and where it shows up */
+.figs-px { min-height: 40px; font-size: 14px; margin: -2px 0 14px; }
+.figs-px-box { padding: 12px 12px 0; margin: -4px 0 14px; border-radius: var(--r-md); background: var(--blue-100); }
+.figs-px-box[hidden] { display: none; }
+.figs-px-box .f { margin-bottom: 12px; }
+.figs-px-note { margin: 0 0 14px; padding: 10px 12px; border-radius: var(--r-md); background: var(--blue-100);
+  color: var(--navy-700); font-size: 13.5px; line-height: 1.45; }
+.moneyline .ml--px b { color: var(--navy-700); }
+.stock-price.is-px { font-size: 14px; color: var(--navy-700); }
+.margin-car .mc-margin.is-px { color: #B9CEF0; font-size: 13px; font-weight: 700; }
+.sold-margin.is-px { color: var(--navy-700); font-size: 15px; }
+
+/* Tidy spellings */
+.tidy-list { display: grid; gap: 10px; padding: 0 0 4px; }
+.tidy-list .btn { margin-top: 6px; }
+.tidy-guess { color: var(--amber-600) !important; font-weight: 700; }
+
 /* ---- Inbox cards open the message ---------------------------------------- */
 .enq-card { cursor: pointer; }
 .enq-card:active { background: var(--line-2); }

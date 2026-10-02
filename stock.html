@@ -32,8 +32,8 @@
       </nav>
       <h1>Cars in stock</h1>
       <p>Everything priced below is here in Newcastle and ready to view. The price is what you pay, no admin fees.
-         Cars marked <strong>SOLD</strong> went in the last few weeks; if one of those is what you're after,
-         tell us and we'll look out for another.</p>
+         Cars marked <strong>SOLD</strong> went in the last few days; if one of those is what you’re after,
+         tell us and we’ll look out for another.</p>
     </div>
   </section>
 
@@ -157,6 +157,7 @@
 
 <script src="assets/js/config.js"></script>
 <script src="assets/js/demo-data.js"></script>
+<script src="assets/js/makes.js"></script>
 <script src="assets/js/data.js"></script>
 <script src="assets/js/ui.js"></script>
 <script>
@@ -184,6 +185,9 @@
       .forEach(k => { if (p.get(k)) state[k] = p.get(k); });
     ['fuel', 'transmission'].forEach(k => { if (p.get(k)) state[k] = p.get(k).split(','); });
     if (p.get('body')) state.body_type = p.get('body').split(',');
+    // An old link may say ?make=Bmw; the list says BMW
+    state.make = MBU.makeFromLink(state.make);
+    state.model = MBU.modelFromLink(state.make, state.model);
   }
 
   function writeUrl() {
@@ -220,8 +224,11 @@
         c.make, c.model, c.variant, c.colour, c.registration,
         MBU.label('fuel', c.fuel), MBU.label('transmission', c.transmission),
         MBU.label('body', c.body_type), c.year, (c.features || []).join(' ')
-      ].join(' ').toLowerCase();
-      const ok = s.search.toLowerCase().split(/\s+/).filter(Boolean).every(t => hay.includes(t));
+      ].join(' ');
+      // Accents ignored, and "vw" or "merc" find the make they stand for
+      const folded = MBU.fold(hay);
+      const ok = MBU.fold(s.search).split(/\s+/).filter(Boolean)
+        .every(t => folded.includes(t) || MBU.makeFromLink(t) === c.make);
       if (!ok) return false;
     }
     return true;
@@ -358,7 +365,7 @@
 
   function buildModels() {
     const pool = state.make ? ALL.filter(c => c.make === state.make) : ALL;
-    const models = [...new Set(pool.map(c => c.model).filter(Boolean))].sort();
+    const models = MBU.modelsIn(pool);
     buildSelect($('#fModel'), models, null, 'Any model');
     if (state.model && models.includes(state.model)) $('#fModel').value = state.model;
     else state.model = '';
@@ -426,7 +433,7 @@
   MBU.getStock().then(cars => {
     ALL = cars;
 
-    const makes = [...new Set(cars.map(c => c.make).filter(Boolean))].sort();
+    const makes = MBU.makesIn(cars);
     buildSelect($('#fMake'), makes, null, 'Any make');
 
     // Restore state into the controls

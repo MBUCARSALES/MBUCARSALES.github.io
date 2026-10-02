@@ -14,7 +14,7 @@
    makes phones throw the old files away.
    ========================================================================== */
 
-const CACHE = 'mbu-admin-v8';
+const CACHE = 'mbu-admin-v9';
 const SHELL = [
   './',
   './index.html',
@@ -24,6 +24,7 @@ const SHELL = [
   './verses.js',
   './manifest.json',
   '../assets/js/config.js',
+  '../assets/js/makes.js',
   '../assets/js/features.js',
   '../assets/js/autotrader-adapter.js',
   '../assets/img/favicon.svg'

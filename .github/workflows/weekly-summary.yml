@@ -50,7 +50,9 @@ jobs:
               "$SUPABASE_URL/rest/v1/$1"
           }
 
-          CARS=$(api "cars?select=id,make,model,year,price,status,created_at,sold_at,purchase_price,sale_price,prep_cost,listed_at")
+          # Part exchange columns come with schema-v8; without them, ask without
+          CAR_COLS="id,make,model,year,price,status,created_at,sold_at,purchase_price,sale_price,prep_cost,listed_at"
+          CARS=$(api "cars?select=$CAR_COLS,px_sale,px_cash" 2>/dev/null) || CARS=$(api "cars?select=$CAR_COLS")
           STATS=$(api "car_stats?select=make,model,year,status,views,enquiries,whatsapp_clicks,phone_clicks,days_in_stock")
           REQS=$(api "wanted_requests?select=make,model,budget_max,created_at&created_at=gte.$SINCE")
 
@@ -66,9 +68,15 @@ jobs:
             const soldIn  = cars.filter(c => c.sold_at && new Date(c.sold_at) >= since);
             const live    = cars.filter(c => c.status === "available" || c.status === "reserved");
 
-            const margin = soldIn.reduce((n, c) =>
-              (c.sale_price != null && c.purchase_price != null)
-                ? n + (c.sale_price - c.purchase_price - (c.prep_cost || 0)) : n, 0);
+            // Same rule as the admin app: a part-exchange sale has no margin of
+            // its own (it shows when their car sells), except any cash beyond
+            // what the car cost
+            const carMargin = c => c.px_sale
+              ? (c.px_cash != null && c.purchase_price != null
+                  ? Math.max(0, c.px_cash - c.purchase_price - (c.prep_cost || 0)) : 0)
+              : (c.sale_price != null && c.purchase_price != null)
+                ? c.sale_price - c.purchase_price - (c.prep_cost || 0) : 0;
+            const margin = soldIn.reduce((n, c) => n + carMargin(c), 0);
 
             const liveStats = stats.filter(s => s.status === "available" || s.status === "reserved");
             const top = liveStats.slice().sort((a,b) => (b.views||0)-(a.views||0)).slice(0,5);
@@ -95,7 +103,7 @@ jobs:
 
             if (soldIn.length) {
               L.push("SOLD THIS WEEK");
-              soldIn.forEach(c => L.push(`  · ${name(c)}`));
+              soldIn.forEach(c => L.push(`  · ${name(c)}${c.px_sale ? " (part exchange)" : ""}`));
               L.push("");
             }
             if (addedIn.length) {

@@ -67,6 +67,14 @@ jobs:
           const CLOUD = pick(/cloudName:\s*'([^']*)'/);
           const BRAND = pick(/name:\s*'([^']*)'/) || 'MBU Car Sales';
 
+          // The website's spelling of makes and models (BMW, not Bmw), same as data.js
+          const MK = require(path.resolve('assets/js/makes.js'));
+          const named = car => {
+            const fix = MK.spellingFix(car);
+            const sure = fix && !fix.guess ? fix : null;
+            return { make: sure ? sure.make : MK.makeName(car.make), model: sure ? sure.model : MK.modelName(car.make, car.model) };
+          };
+
           const esc = s => String(s == null ? '' : s)
             .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
             .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -106,7 +114,8 @@ jobs:
 
             for (const car of cars) {
               const sold  = car.status === 'sold';
-              const title = [car.year, car.make, car.model].filter(Boolean).join(' ') || 'Used car';
+              const { make, model } = named(car);
+              const title = [car.year, make, model].filter(Boolean).join(' ') || 'Used car';
               const specs = [
                 car.mileage != null ? Number(car.mileage).toLocaleString('en-GB') + ' miles' : null,
                 FUEL[car.fuel] || car.fuel, car.transmission,

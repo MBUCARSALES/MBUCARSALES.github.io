@@ -253,6 +253,32 @@
 
   let cache = null;
   let cachePromise = null;
+  const MK = window.MBU_MAKES || null;
+
+  /**
+   * A make or model that isn't on the list can still be typed two ways
+   * ("Cooper S", "COOPER S"). Give every car the spelling most of them use,
+   * so the drop-downs show it once.
+   */
+  function oneSpelling(cars) {
+    if (!MK) return cars;
+    const unify = (keyOf, field) => {
+      const counts = {};
+      cars.forEach(c => {
+        if (!c[field]) return;
+        const g = counts[keyOf(c)] = counts[keyOf(c)] || {};
+        g[c[field]] = (g[c[field]] || 0) + 1;
+      });
+      const best = {};
+      Object.entries(counts).forEach(([k, g]) => {
+        best[k] = Object.keys(g).sort((a, b) => g[b] - g[a] || a.localeCompare(b))[0];
+      });
+      cars.forEach(c => { if (c[field]) c[field] = best[keyOf(c)]; });
+    };
+    unify(c => MK.makeKey(c.make), 'make');
+    unify(c => MK.makeKey(c.make) + '|' + MK.modelKey(c.model), 'model');
+    return cars;
+  }
 
   /** Normalise a record so the rest of the site can rely on its shape */
   function normalise(c) {
@@ -267,7 +293,17 @@
     }
     if (!Array.isArray(features)) features = [];
 
+    // One spelling of each make and model, and trims out of capitals, so
+    // "Bmw" and "BMW" are one choice in the search (assets/js/makes.js).
+    // Certain fixes only ("1 Series 116i" is the 1 Series); a likely typo
+    // ("Hazz") waits for the admin app's Tidy spellings.
+    const fix = MK && MK.spellingFix(c);
+    const sure = fix && !fix.guess ? fix : null;
+
     return Object.assign({}, c, {
+      make: sure ? sure.make : MK ? MK.makeName(c.make) : c.make,
+      model: sure ? sure.model : MK ? MK.modelName(c.make, c.model) : c.model,
+      variant: MK ? MK.tidyTrim(sure ? sure.variant : c.variant) : c.variant,
       images,
       features,
       price: c.price == null ? null : Number(c.price),
@@ -296,7 +332,7 @@
     cachePromise = (async () => {
       // No backend configured yet, so show the demo cars to keep the site viewable.
       if (!hasBackend) {
-        cache = (window.MBU_DEMO_CARS || []).map(normalise);
+        cache = oneSpelling((window.MBU_DEMO_CARS || []).map(normalise));
         return cache;
       }
 
@@ -304,7 +340,7 @@
         const q = 'cars_public?select=*&order=sort_index.asc,created_at.desc';
         const res = await fetch(restUrl(q), { headers: restHeaders() });
         if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + (await res.text()).slice(0, 200));
-        cache = (await res.json()).map(normalise);
+        cache = oneSpelling((await res.json()).map(normalise));
         return cache;
       } catch (err) {
         // IMPORTANT: never fall back to demo cars once we are live. Showing
@@ -317,6 +353,18 @@
     })();
     return cachePromise;
   };
+
+  /** Makes in these cars, once each, A to Z. Spelling is already one per make (normalise). */
+  MBU.makesIn = cars => [...new Set(cars.map(c => c.make).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'en-GB'));
+  /** Models in these cars, once each, in number-then-name order ("1 Series" before "A3"). */
+  MBU.modelsIn = cars => [...new Set(cars.map(c => c.model).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'en-GB', { numeric: true }));
+  /** The make as the search lists it, whatever was in the link: ?make=bmw → "BMW". */
+  MBU.makeFromLink = s => (s && MK ? MK.makeName(s) : s) || '';
+  MBU.modelFromLink = (make, s) => (s && MK ? MK.modelName(make, s) : s) || '';
+  /** Lower case with accents taken off, for search: "Citroën" finds "citroen". */
+  MBU.fold = s => String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
   MBU.getAvailable = async () => {
     const all = await MBU.getCars();

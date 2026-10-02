@@ -229,7 +229,8 @@
 
     // Worked out from the cars themselves, so "Mercedes" and "Mercedes-Benz"
     // count as the same thing (the stock_ageing view only lower-cases them)
-    const same = sameModelSold(car, ctx.cars);
+    // Not part-exchange sales: their price is a deal price, not what the car fetched
+    const same = sameModelSold(car, ctx.cars).filter(c => !c.px_sale);
     if (same.length) {
       const achieved = Math.round(same.reduce((n, c) => n + (c.sale_price != null ? c.sale_price : c.price), 0) / same.length);
       const pct = ctx.haggle ? ctx.haggle.pct : null;
@@ -697,7 +698,8 @@
    */
   function usualHaggle(cars) {
     const pcts = cars
-      .filter(c => c.status === 'sold' && c.price > 0 && c.sale_price != null)
+      // A part exchange hides the haggle in what was allowed for their car
+      .filter(c => c.status === 'sold' && !c.px_sale && c.price > 0 && c.sale_price != null)
       .map(c => 100 * (c.price - c.sale_price) / c.price)
       // Negative is real: a popular car can go for MORE than asking to secure it
       .filter(p => p > -25 && p < 40);

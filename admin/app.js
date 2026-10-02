@@ -82,67 +82,24 @@
   const BODIES = [['hatchback','Hatchback'],['saloon','Saloon'],['estate','Estate'],['suv','SUV'],
                   ['coupe','Coupe'],['convertible','Convertible'],['mpv','MPV'],['van','Van'],['pickup','Pickup']];
   /* --------------------------------------------------------------------------
-     MAKES AND MODELS
-
-     Just a starting list so the dropdowns are useful on day one. Anything you
-     type yourself, and anything the plate lookup returns, gets added to the
-     list automatically, and every make and model already in your own stock is
-     merged in on top. So it learns what you actually sell.
-
-     Add to it freely. Order does not matter, it is sorted before it is shown.
+     MAKES AND MODELS live in assets/js/makes.js, shared with the website, so
+     both spell a make the same way. Anything you type yourself, and anything
+     the plate lookup returns, gets added to the drop-downs automatically, and
+     every make and model already in your own stock is merged in on top.
      -------------------------------------------------------------------------- */
-  const MODELS = {
-    'Abarth':        ['500','595','695','124 Spider'],
-    'Alfa Romeo':    ['Giulia','Giulietta','Mito','Stelvio','Tonale'],
-    'Audi':          ['A1','A3','A4','A5','A6','A7','A8','Q2','Q3','Q5','Q7','Q8','TT','R8','e-tron','S3','RS3'],
-    'BMW':           ['1 Series','2 Series','3 Series','4 Series','5 Series','6 Series','7 Series','8 Series',
-                      'X1','X2','X3','X4','X5','X6','X7','Z4','i3','i4','iX','M2','M3','M4'],
-    'Citroën':       ['C1','C3','C3 Aircross','C4','C4 Cactus','C5 Aircross','Berlingo','DS3'],
-    'Cupra':         ['Ateca','Born','Formentor','Leon'],
-    'Dacia':         ['Sandero','Duster','Jogger','Logan'],
-    'Fiat':          ['500','500L','500X','Panda','Punto','Tipo','Doblo'],
-    'Ford':          ['Fiesta','Focus','Puma','Kuga','EcoSport','Mondeo','C-Max','S-Max','Galaxy','Ka',
-                      'B-Max','Mustang','Ranger','Transit','Transit Custom','Transit Connect','Tourneo'],
-    'Honda':         ['Jazz','Civic','CR-V','HR-V','Accord','e'],
-    'Hyundai':       ['i10','i20','i30','i40','Tucson','Santa Fe','Kona','Ioniq','Ioniq 5','Bayon'],
-    'Jaguar':        ['XE','XF','XJ','E-Pace','F-Pace','I-Pace','F-Type'],
-    'Jeep':          ['Renegade','Compass','Cherokee','Wrangler','Avenger'],
-    'Kia':           ['Picanto','Rio','Ceed','Proceed','Stonic','Sportage','Sorento','Niro','EV6','Soul','XCeed'],
-    'Land Rover':    ['Defender','Discovery','Discovery Sport','Freelander','Range Rover',
-                      'Range Rover Sport','Range Rover Evoque','Range Rover Velar'],
-    'Lexus':         ['CT','IS','ES','NX','RX','UX'],
-    'Mazda':         ['2','3','6','CX-3','CX-30','CX-5','MX-5'],
-    'Mercedes-Benz': ['A Class','B Class','C Class','E Class','S Class','CLA','CLS','GLA','GLB','GLC','GLE',
-                      'V Class','Vito','Sprinter','SLK'],
-    'MG':            ['MG3','MG4','MG5','ZS','HS','MG ZS EV'],
-    'Mini':          ['Hatch','Clubman','Countryman','Convertible','Paceman'],
-    'Mitsubishi':    ['Mirage','ASX','Outlander','Shogun','L200','Eclipse Cross'],
-    'Nissan':        ['Micra','Note','Juke','Qashqai','X-Trail','Leaf','Ariya','Navara','Pulsar'],
-    'Peugeot':       ['108','208','2008','308','3008','5008','508','Partner','Rifter','Expert','Boxer'],
-    'Porsche':       ['Macan','Cayenne','Panamera','911','Boxster','Cayman','Taycan'],
-    'Renault':       ['Clio','Captur','Megane','Kadjar','Scenic','Zoe','Arkana','Trafic','Master','Kangoo'],
-    'Seat':          ['Ibiza','Leon','Arona','Ateca','Tarraco','Alhambra','Mii'],
-    'Škoda':         ['Citigo','Fabia','Scala','Octavia','Superb','Kamiq','Karoq','Kodiaq','Enyaq','Yeti','Rapid'],
-    'Smart':         ['ForTwo','ForFour'],
-    'Subaru':        ['Impreza','Forester','Outback','XV'],
-    'Suzuki':        ['Swift','Vitara','S-Cross','Ignis','Jimny','Celerio'],
-    'Tesla':         ['Model 3','Model Y','Model S','Model X'],
-    'Toyota':        ['Aygo','Yaris','Corolla','Auris','C-HR','RAV4','Prius','Hilux','Proace','Land Cruiser'],
-    'Vauxhall':      ['Corsa','Astra','Insignia','Adam','Viva','Crossland','Grandland','Mokka','Zafira',
-                      'Meriva','Antara','Vivaro','Combo','Movano'],
-    'Volkswagen':    ['up!','Polo','Golf','Golf SV','Passat','Arteon','T-Cross','T-Roc','Tiguan','Touareg',
-                      'Touran','Sharan','Scirocco','Beetle','Caddy','Transporter','ID.3','ID.4'],
-    'Volvo':         ['V40','V60','V90','S60','S90','XC40','XC60','XC90','C40'],
-    'Chevrolet':     ['Aveo','Cruze','Spark'],
-    'Chrysler':      ['Ypsilon','300C'],
-    'DS':            ['DS 3','DS 4','DS 7'],
-    'Isuzu':         ['D-Max'],
-    'SsangYong':     ['Tivoli','Korando','Musso','Rexton'],
-    'Polestar':      ['2','3'],
-    'Genesis':       ['G70','GV70','GV80'],
-    'Infiniti':      ['Q30','Q50','QX30'],
-    'BYD':           ['Atto 3','Dolphin','Seal']
-  };
+  const MK = window.MBU_MAKES;
+  const MODELS = MK.MODELS;
+
+  /* Plate lookups return capitals ("BMW", "MAZDA CX-3") and title-casing them
+     blindly gave "Bmw" and "Cx-3", which then sat in the dropdowns next to the
+     proper spelling and stopped your own history and the price book matching.
+     Anything we recognise gets its proper spelling; anything we don't is
+     title-cased but keeps short and digit-bearing parts in capitals. Matching
+     ignores spelling altogether (keyOf / modelKeyOf). */
+  const keyOf = MK.makeKey;
+  const modelKeyOf = MK.modelKey;
+  const canonicalMake = MK.canonicalMake;
+  const canonicalModel = MK.canonicalModel;
 
   const COLOURS = ['Black','White','Silver','Grey','Blue','Red','Green','Blue (metallic)',
                    'Grey (metallic)','Bronze','Beige','Brown','Gold','Orange','Purple','Yellow'];
@@ -175,13 +132,14 @@
     dataTab: 'cars',
     soldMonth: 'all',        // 'all' or 'YYYY-MM', for the Sold tab
     marginOpen: false,       // per-car breakdown under the margin figure
-    schema: { v6: null, v7: null },   // optional upgrades: true, false, or null = not checked yet
+    schema: { v6: null, v7: null, v8: null },   // optional upgrades: true, false, or null = not checked yet
 
     view: 'home',
     returnTo: 'home',    // where Back goes from a car, a message or the bid tool
     message: null,       // { kind: 'e' | 'r', id } open in the message view
     homeOpen: new Set(), // Home "Needs you" sections dropped down, by key
     editing: null,       // car being edited (null = new)
+    pxFrom: null,        // Quick add is for the car taken in on this part-exchange sale
     photos: [],          // [{public_id,url,width,height,uploading,progress,localUrl}]
     video: null,         // {public_id,duration,width,height} or null
     features: new Set(),
@@ -413,11 +371,12 @@
         return !(error && /does not exist|schema cache|not find the table/i.test(error.message));
       } catch { return false; }
     };
-    const [v6, v7] = await Promise.all([
+    const [v6, v7, v8] = await Promise.all([
       has(() => sb.from('tracking_status').select('v2_since').limit(1)),
-      has(() => sb.from('insight_actions').select('id').limit(1))
+      has(() => sb.from('insight_actions').select('id').limit(1)),
+      has(() => sb.from('cars').select('px_sale').limit(1))
     ]);
-    state.schema = { v6, v7 };
+    state.schema = { v6, v7, v8 };
     renderUpgrades();
 
     if (!missing.length) return;
@@ -452,6 +411,10 @@
     if (state.schema.v7 === false) {
       items.push(['"Price is right" and "Remind me" on insights',
         'Run <strong>schema-v7-insights.sql</strong> in Supabase → SQL Editor, after v6.']);
+    }
+    if (state.schema.v8 === false) {
+      items.push(['Part exchange sales',
+        'Run <strong>schema-v8-part-exchange.sql</strong> in Supabase → SQL Editor. Then a sale can be marked as a part exchange, and it stays out of your margins until their car sells.']);
     }
 
     $('#upgradesCard').hidden = !items.length;
@@ -511,17 +474,24 @@
      ==================================================================== */
   const OTHER = '__other';
 
-  /** Everything we know about, ours and the built-in list, sorted. */
+  /** Everything we know about, ours and the built-in list, sorted. One entry
+      per make however it was typed: an old "Bmw" record shows up as BMW. */
   function knownMakes() {
-    const set = new Set(Object.keys(MODELS));
-    state.cars.forEach(c => { if (c.make) set.add(c.make); });
-    return [...set].sort((a, b) => a.localeCompare(b, 'en-GB'));
+    const byKey = new Map(Object.keys(MODELS).map(m => [keyOf(m), m]));
+    state.cars.forEach(c => {
+      if (c.make && !byKey.has(keyOf(c.make))) byKey.set(keyOf(c.make), MK.makeName(c.make));
+    });
+    return [...byKey.values()].sort((a, b) => a.localeCompare(b, 'en-GB'));
   }
 
   function knownModels(make) {
-    const set = new Set(MODELS[make] || []);
-    state.cars.forEach(c => { if (c.model && (!make || c.make === make)) set.add(c.model); });
-    return [...set].sort((a, b) => a.localeCompare(b, 'en-GB', { numeric: true }));
+    const byKey = new Map((MODELS[MK.knownMake(make)] || []).map(m => [modelKeyOf(m), m]));
+    state.cars.forEach(c => {
+      if (c.model && (!make || keyOf(c.make) === keyOf(make)) && !byKey.has(modelKeyOf(c.model))) {
+        byKey.set(modelKeyOf(c.model), String(c.model).trim());
+      }
+    });
+    return [...byKey.values()].sort((a, b) => a.localeCompare(b, 'en-GB', { numeric: true }));
   }
 
   /**
@@ -956,14 +926,21 @@
       key: 'cat', level: 'amber', rank: 7, icon: 'note', one: '1 Cat car has no damage note', many: 'Cat cars have no damage note',
       sub: 'Saying what was done up front sells them', fix: c => openForm(c, '#fCondition'),
       itemSub: c => [LABEL.hpi[c.hpi_status], money(c.price)].filter(Boolean).join(' · ') });
-    gap(sold.filter(c => carMargin(c) == null), {
+    gap(sold.filter(unmargined), {
       key: 'unmargined', level: 'amber', rank: 7, icon: 'pound', one: '1 sale isn’t in your margin', many: 'sales aren’t in your margin',
       sub: 'What you paid or what it sold for is missing', fix: c => figuresSheet(c),
       itemSub: c => `Sold ${c.sold_at ? shortDay(c.sold_at) : ''} · ${[c.sale_price == null ? 'no sale price' : '', c.purchase_price == null ? 'no purchase price' : ''].filter(Boolean).join(', ')}` });
-    gap(sold.filter(c => carMargin(c) != null && c.prep_cost == null), {
+    gap(sold.filter(c => (carMargin(c) != null || c.px_sale) && c.prep_cost == null), {
       key: 'noprep', icon: 'pound', one: '1 sale has no prep cost', many: 'sales have no prep cost',
       sub: 'Counted as £0 prep, so the margin reads high', fix: c => figuresSheet(c),
-      itemSub: c => `Sold ${c.sold_at ? shortDay(c.sold_at) : ''} · margin ${signed(carMargin(c))} before prep` });
+      // On a part exchange the prep goes into what their car is worked out at
+      itemSub: c => `Sold ${c.sold_at ? shortDay(c.sold_at) : ''} · ${c.px_sale
+        ? 'part exchange, their car’s cost leaves the prep out' : `margin ${signed(carMargin(c))} before prep`}` });
+    // A part exchange whose car never went in: the profit on that deal would never show
+    gap(sold.filter(c => c.px_sale && !pxCarOf(c)), {
+      key: 'pxcar', level: 'amber', rank: 7, icon: 'car', one: '1 part exchange car isn’t in yet', many: 'part exchange cars aren’t in yet',
+      sub: 'Add it so the profit on the deal shows when it sells', fix: c => addPxCar(c),
+      itemSub: c => `Taken in when this sold, ${c.sold_at ? shortDay(c.sold_at) : ''}${pxCarried(c) != null ? ' · goes in at ' + money(pxCarried(c)) : ''}` });
     gap(held.filter(c => c.purchase_price == null), {
       key: 'nopaid', icon: 'pound', one: '1 car has no purchase price', many: 'cars have no purchase price',
       sub: 'No margin to show when it sells', fix: c => figuresSheet(c) });
@@ -974,9 +951,68 @@
     gap(live.filter(c => !c.description), {
       key: 'nodesc', rank: 9, icon: 'note', one: '1 car has no description', many: 'cars have no description',
       sub: 'The website shows nothing under the photos', fix: c => openForm(c, '#fDescription') });
+    /* Old records spelt another way ("Bmw", "Hazz"): one sheet tidies the lot */
+    const respell = cars.filter(c => MK.spellingFix(c));
+    gap(respell, {
+      key: 'spelling', rank: 9, icon: 'edit', one: '1 car’s name to tidy', many: 'car names to tidy',
+      sub: 'Spelt another way, so the search lists it twice', fix: () => spellingSheet(),
+      itemSub: c => MK.spellingFix(c).changes.join(' · ') });
 
     const LEVEL = { red: 0, blue: 1, amber: 2, green: 3, grey: 4 };
     return out.sort((a, b) => a.rank - b.rank || LEVEL[a.level] - LEVEL[b.level]);
+  }
+
+  /**
+   * Tidy spellings: every car whose make or model is spelt differently from
+   * the proper one ("Bmw" → BMW, "A220" → A Class with A220 in the trim), or
+   * looks like a typo ("Hazz" → Jazz). Each can be unticked before saving.
+   * The website already shows the certain ones properly; this fixes the
+   * records, so the app, the share links and the weekly email agree.
+   */
+  function spellingSheet() {
+    const list = state.cars.map(c => ({ c, fix: MK.spellingFix(c) })).filter(x => x.fix);
+    if (!list.length) return toast('Every name is spelt properly', 'ok');
+    sheet('Tidy spellings', 'Untick any you’d rather leave as they are', []);
+    $('#sheetActions').innerHTML = `
+      <div class="figs tidy-list">
+        ${list.map(({ c, fix }, i) => `
+          <label class="tickrow">
+            <input type="checkbox" data-i="${i}" checked>
+            <span>
+              <strong>${esc(carTitle(c))}${c.registration ? ' · ' + esc(fmtReg(c.registration)) : ''}</strong>
+              <small>${fix.changes.map(esc).join('<br>')}</small>
+              ${fix.guess ? '<small class="tidy-guess">Looks like a typo. Check it’s right.</small>' : ''}
+            </span>
+          </label>`).join('')}
+        <button class="btn btn--accent btn--block" id="tidyGo" type="button">Tidy ${plural(list.length, 'car')}</button>
+      </div>`;
+
+    const ticked = () => $$('#sheetActions input[type=checkbox]').filter(b => b.checked).map(b => list[+b.dataset.i]);
+    $$('#sheetActions input[type=checkbox]').forEach(b => b.onchange = () => {
+      const n = ticked().length;
+      $('#tidyGo').textContent = n ? `Tidy ${plural(n, 'car')}` : 'Nothing ticked';
+      $('#tidyGo').disabled = !n;
+    });
+    $('#tidyGo').onclick = async () => {
+      const go = ticked();
+      $('#tidyGo').disabled = true;
+      $('#tidyGo').textContent = 'Tidying…';
+      let done = 0, failed = 0;
+      for (const { c, fix } of go) {
+        const patch = {};
+        ['make', 'model', 'variant'].forEach(k => { if ((fix[k] || null) !== (c[k] || null)) patch[k] = fix[k]; });
+        const { error } = await sb.from('cars').update(patch).eq('id', c.id);
+        if (error) { failed++; console.warn('Tidy failed', c.id, error); continue; }
+        Object.assign(c, patch);
+        const row = (stats || []).find(r => String(r.car_id) === String(c.id));
+        if (row) Object.assign(row, patch);
+        done++;
+      }
+      closeSheet();
+      renderStock();
+      if (state.view === 'data' && stats) renderInsights();
+      toast(failed ? `Tidied ${done}, ${failed} couldn’t be saved. Try again in a moment.` : `Tidied ${plural(done, 'car')}`, failed ? '' : 'ok');
+    };
   }
 
   /** One insight, in full, with its buttons, from a Home row. */
@@ -1003,7 +1039,7 @@
         : `<b class="${diff > 0 ? 'up' : 'down'}">${diff > 0 ? 'Up' : 'Down'} ${signed(Math.abs(diff))}</b> on this point in ${esc(f.prevName)}.`;
     }
     const noPrep = t.cars.filter(c => carMargin(c) != null && c.prep_cost == null);
-    const missing = t.cars.filter(c => carMargin(c) == null);
+    const missing = t.cars.filter(unmargined);
     const months = monthlyMargins(6);
 
     return `
@@ -1012,9 +1048,10 @@
         <div class="hm-label">Margin in ${esc(f.thisName)} so far</div>
         <div class="hm-top"><div class="hm-figure ${t.total < 0 ? 'is-loss' : ''}">${t.counted ? signed(t.total) : '£0'}</div>${mashallah()}</div>
         <div class="hm-compare">${compare} ${t.cars.length ? `${plural(t.cars.length, 'car')} sold.` : ''}</div>
-        ${missing.length || noPrep.length ? `<div class="hm-flags">
+        ${missing.length || noPrep.length || t.px ? `<div class="hm-flags">
           ${missing.length ? `<span class="pill pill--amber">${missing.length} not counted, figure missing</span>` : ''}
           ${noPrep.length ? `<span class="pill pill--grey">${noPrep.length} before prep</span>` : ''}
+          ${t.px ? `<span class="pill pill--blue">${t.px} part exchange${t.px === 1 ? '' : 's'}, profit on their car</span>` : ''}
         </div>` : ''}
         ${months.length > 1 ? `<div class="hm-chart">${barChart(months, { compact: true, action: 'open', height: 76 })}</div>` : ''}
         <button class="btn btn--outline btn--sm btn--block" type="button" data-go="data:sold">See every sale and the charts</button>
@@ -1165,12 +1202,14 @@
   /** Everything you might type to find a car: make, model, trim, plate, year, colour. */
   function matchesQuery(c, q) {
     if (!q) return true;
-    const hay = [c.make, c.model, c.variant, c.year, c.colour, c.registration,
+    // Accents and spelling ignored: "citroen" finds Citroën, "merc" and "vw" work
+    const fold = t => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const hay = fold([c.make, MK.makeName(c.make), c.model, c.variant, c.year, c.colour, c.registration,
       LABEL.fuel[c.fuel], LABEL.transmission[c.transmission]]
-      .filter(Boolean).join(' ').toLowerCase();
+      .filter(Boolean).join(' '));
     const plate = String(c.registration || '').toLowerCase();
-    return q.toLowerCase().split(/\s+/).filter(Boolean).every(w =>
-      hay.includes(w) || plate.includes(w.replace(/\s+/g, '')));
+    return fold(q).split(/\s+/).filter(Boolean).every(w =>
+      hay.includes(w) || plate.includes(w) || (MK.knownMake(w) && keyOf(w) === keyOf(c.make)));
   }
 
   /* ---- MOT ---------------------------------------------------------------
@@ -1271,9 +1310,13 @@
       const mg = sold ? carMargin(c) : null;
       const price = sold
         ? (mg != null ? `<span class="stock-price ${mg < 0 ? 'is-loss' : ''}">${signed(mg)}</span><span class="stock-price-note">margin</span>`
-                      : '<span class="stock-price is-missing">Figures missing</span>')
+           : carried(c) ? '<span class="stock-price is-px">Part exchange</span><span class="stock-price-note">profit on their car</span>'
+           : '<span class="stock-price is-missing">Figures missing</span>')
         : `<span class="stock-price">${money(c.price)}</span>`;
       const soldPill = sold && mg != null && c.prep_cost == null ? '<span class="pill pill--grey">No prep entered</span>' : '';
+      // Taken in part exchange (its margin is the profit on both cars), or sold
+      // in one where the cash already made a profit; a carried one says so above
+      const pxPill = c.px_from || (c.px_sale && mg != null) ? '<span class="pill pill--blue">Part ex</span>' : '';
 
       const atPill = (c.at_published && !sold)
         ? '<span class="pill pill--accent" style="background:var(--accent-100);color:var(--accent-600)">AT</span>' : '';
@@ -1288,7 +1331,7 @@
           <div class="stock-meta">${esc(meta)}</div>
           <div class="stock-line">
             ${price}
-            ${pill}${motPill}${soldPill}${atPill}
+            ${pill}${motPill}${soldPill}${pxPill}${atPill}
           </div>
         </div>
         <span class="stock-chev">${icon('right')}</span>
@@ -1309,10 +1352,28 @@
     if (car.status === 'sold') {
       const mg = carMargin(car);
       acts.push({ label: 'Edit the figures', icon: 'pound',
-        sub: mg == null ? 'A figure is missing, so it isn’t in your margin'
+        sub: carried(car) ? 'Part exchange: the profit shows when their car sells'
+           : mg == null ? 'A figure is missing, so it isn’t in your margin'
            : car.prep_cost == null ? `Margin ${signed(mg)}, but no prep cost entered yet`
            : `Margin ${signed(mg)}. Paid, prep and what it sold for`,
         run: () => figuresSheet(car) });
+      if (car.px_sale) {
+        const theirs = pxCarOf(car);
+        acts.push(theirs
+          ? { label: 'Their car: ' + carTitle(theirs), icon: 'car',
+              sub: 'Taken in part exchange' + (theirs.purchase_price != null ? ` at ${money(theirs.purchase_price)}` : ''),
+              run: () => carActions(theirs) }
+          : { label: 'Add their car', icon: 'car',
+              sub: pxCarried(car) != null ? `Goes in at ${money(pxCarried(car))}, worked out from this sale`
+                                          : 'What it cost you is worked out from this sale',
+              run: () => addPxCar(car) });
+      }
+    }
+    const pxFrom = pxSaleOf(car);
+    if (pxFrom) {
+      acts.push({ label: 'Part exchange on the ' + carTitle(pxFrom), icon: 'car',
+        sub: 'Its cost is what that car cost you minus the cash, so its margin covers both',
+        run: () => carActions(pxFrom) });
     }
     acts.push({ label: 'Edit details', icon: 'edit', run: () => openForm(car) });
     if (car.status !== 'sold') {
@@ -1383,7 +1444,10 @@
 
     const patch = Object.assign({ status, updated_at: new Date().toISOString() }, extra || {});
     if (status === 'sold') patch.sold_at = new Date().toISOString();
-    if (status === 'available' && car.status === 'sold') patch.sold_at = null;
+    if (status === 'available' && car.status === 'sold') {
+      patch.sold_at = null;
+      if (car.px_sale) Object.assign(patch, { px_sale: false, px_cash: null });   // back in stock, so not sold in a part exchange either
+    }
 
     const { error } = await sb.from('cars').update(patch).eq('id', car.id);
     if (error) return toast('Couldn’t update: ' + error.message);
@@ -1408,17 +1472,30 @@
     const markSold = !!opts.markSold;
     const sold = markSold || car.status === 'sold';
     const title = carTitle(car);
+    const from = pxSaleOf(car);          // this car came in part exchange
+    let px = !!car.px_sale;              // this car went out in one
 
     sheet(markSold ? 'Mark as sold' : 'Your figures', title + ' · never shown on the website', []);
     const saleStart = car.sale_price != null ? car.sale_price : markSold && car.price != null ? car.price : '';
     $('#sheetActions').innerHTML = `
       <div class="card figs">
+        ${from ? `<p class="figs-px-note">Taken in part exchange on the ${esc(carTitle(from))}. What you paid is
+          what that car cost you minus the cash they paid, so this car’s margin is the profit on both.</p>` : ''}
         ${sold ? `
         <div class="f">
           <label for="fgSale">What it sold for</label>
           <div class="money"><input class="in" id="fgSale" type="number" inputmode="numeric" placeholder="0" value="${esc(saleStart)}"></div>
-          ${markSold && car.price != null ? `<span class="hint">Starts at the advertised price (${money(car.price)}). If it went for less, or more, change it.</span>` : ''}
-        </div>` : ''}
+          <span class="hint" id="fgSaleHint"></span>
+        </div>
+        <button class="chip figs-px" type="button" id="fgPx" aria-pressed="false">Sold with a part exchange</button>
+        <div class="figs-px-box" id="fgPxBox" hidden>
+          <div class="f">
+            <label for="fgCash">Cash they paid on top of their car</label>
+            <div class="money"><input class="in" id="fgCash" type="number" inputmode="numeric" placeholder="0" value="${esc(car.px_cash ?? '')}"></div>
+            <span class="hint">Their car goes in at what this one cost you minus this, so the profit shows when it sells.</span>
+          </div>
+        </div>
+        <p class="hint" id="fgPxNote" hidden></p>` : ''}
         <div class="row-2">
           <div class="f">
             <label for="fgPaid">What you paid</label>
@@ -1438,36 +1515,101 @@
       </div>`;
 
     const val = sel => { const el = $(sel); return el && el.value.trim() !== '' ? int(el.value) : null; };
+    /** The car as it would be saved, for the part exchange sums. */
+    const draft = () => Object.assign({}, car, {
+      purchase_price: val('#fgPaid'), prep_cost: val('#fgPrep'),
+      sale_price: sold ? val('#fgSale') : car.sale_price, px_sale: px, px_cash: px ? val('#fgCash') : null });
+
+    const saleHint = () => {
+      const h = $('#fgSaleHint');
+      if (!h) return;
+      h.textContent = px ? 'The deal price: their cash plus what you allowed for their car. Not used for the margin.'
+        : markSold && car.price != null ? `Starts at the advertised price (${money(car.price)}). If it went for less, or more, change it.` : '';
+    };
+
     const summary = () => {
       const paid = val('#fgPaid'), prep = val('#fgPrep');
       const against = sold ? val('#fgSale') : car.price;
       $('#fgNoPrep').classList.toggle('is-on', prep === 0);
       if (paid == null) {
-        $('#fgSummary').innerHTML = `<div class="ml-note">Put in what you paid and the margin works itself out.</div>`;
+        $('#fgSummary').innerHTML = `<div class="ml-note">Put in what you paid and the ${px ? 'part exchange' : 'margin'} works itself out.</div>`;
         return;
       }
       const inCar = paid + (prep || 0);
+      const noPrepNote = prep == null ? `<div class="ml-note">No prep entered, so this is before prep. Tap “No prep on this one” if there wasn’t any.</div>` : '';
+
+      if (px) {
+        const d = draft();
+        const cash = d.px_cash;
+        const allowed = cash != null && d.sale_price != null && d.sale_price > cash ? d.sale_price - cash : null;
+        const rows = [`<div class="ml ml--total"><span>Total in this car</span><b>${money(inCar)}</b></div>`];
+        if (cash == null) {
+          rows.push(`<div class="ml-note">Put in the cash they paid and the app works out what their car goes in at.</div>`);
+        } else {
+          rows.push(`<div class="ml"><span>Cash they paid</span><b>${money(cash)}</b></div>`);
+          const now = pxMadeNow(d);
+          if (now > 0) rows.push(`<div class="ml ml--good"><span>Margin made today</span><b>${signed(now)}</b></div>`);
+          rows.push(`<div class="ml ml--px"><span>Their car goes in at</span><b>${money(pxCarried(d))}</b></div>`);
+          rows.push(`<div class="ml-note">${now > 0
+            ? `The cash covered what this one cost you, so ${money(now)} is profit already and counts this month. Whatever their car sells for is profit too.`
+            : 'No margin on this one. The profit on the whole deal shows when their car sells.'}${
+            allowed != null ? ` You allowed ${money(allowed)} for their car.` : ''}</div>`);
+        }
+        $('#fgSummary').innerHTML = rows.join('') + noPrepNote;
+        return;
+      }
+
       const mg = against != null ? against - inCar : null;
       $('#fgSummary').innerHTML =
         `<div class="ml ml--total"><span>Total in the car</span><b>${money(inCar)}</b></div>` +
         (mg == null ? '' : `<div class="ml ${mg >= 0 ? 'ml--good' : 'ml--bad'}">
           <span>${sold ? (mg >= 0 ? 'Margin on the sale' : 'Lost on the sale') : (mg >= 0 ? 'Margin at asking price' : 'Short by')}</span>
           <b>${signed(mg)}</b></div>`) +
-        (prep == null ? `<div class="ml-note">No prep entered, so this is before prep. Tap “No prep on this one” if there wasn’t any.</div>` : '');
+        (from && sold && mg != null ? `<div class="ml-note">That’s the profit on both cars, this one and the ${esc(carTitle(from))}.</div>` : '') +
+        noPrepNote;
     };
-    ['#fgSale', '#fgPaid', '#fgPrep'].forEach(s => { const el = $(s); if (el) el.addEventListener('input', summary); });
+
+    const setPx = on => {
+      px = on;
+      const chip = $('#fgPx');
+      if (!chip) return;
+      chip.classList.toggle('is-on', on);
+      chip.setAttribute('aria-pressed', String(on));
+      $('#fgPxBox').hidden = !on;
+      saleHint();
+      summary();
+    };
+
+    ['#fgSale', '#fgPaid', '#fgPrep', '#fgCash'].forEach(s => { const el = $(s); if (el) el.addEventListener('input', summary); });
     $('#fgNoPrep').onclick = () => { $('#fgPrep').value = '0'; summary(); };
-    summary();
+    if ($('#fgPx')) {
+      $('#fgPx').onclick = () => {
+        if (!px && !pxReady()) {
+          const note = $('#fgPxNote');
+          note.hidden = false;
+          note.innerHTML = 'Part exchange needs a one-off database update first: run <strong>schema-v8-part-exchange.sql</strong> (More → Ready to switch on).';
+          return;
+        }
+        setPx(!px);
+        if (px) $('#fgCash').focus();
+      };
+    }
+    setPx(px);
 
     $('#fgSave').onclick = async () => {
+      const before = Object.assign({}, car);
       const patch = { purchase_price: val('#fgPaid'), prep_cost: val('#fgPrep') };
       if (sold) patch.sale_price = val('#fgSale');
+      // Only sent once the columns exist, so saving never breaks without v8
+      if (sold && (px || car.px_sale) && pxReady()) Object.assign(patch, { px_sale: px, px_cash: px ? val('#fgCash') : null });
       const btn = $('#fgSave');
       btn.disabled = true;
 
       if (markSold) {
         closeSheet();
         await setStatus(car, 'sold', patch);
+        if (car.status !== 'sold') return;             // didn't save; setStatus has said why
+        if (car.px_sale && !pxCarOf(car)) return addPxCar(car);
         if (opts.after) opts.after();
         return;
       }
@@ -1477,11 +1619,52 @@
       closeSheet();
       Object.assign(car, patch);
       syncStats(car);
+      const followed = await followPx(before, car);
       renderStock();
       if (state.view === 'data' && stats) renderInsights();
-      toast('Figures saved', 'ok');
+      toast(followed || 'Figures saved', 'ok');
       if (opts.after) opts.after();
     };
+  }
+
+  /**
+   * Their car went in at this sale's cost minus the cash. If those figures
+   * change afterwards, their car's cost follows, as long as nobody has typed
+   * a different figure into it since.
+   * @returns {Promise<string|null>} what to tell you, if anything changed
+   */
+  async function followPx(before, car) {
+    const theirs = car.px_sale && pxCarOf(car);
+    if (!theirs) return null;
+    const was = pxCarried(before), now = pxCarried(car);
+    if (now == null || now === was || theirs.purchase_price !== was) return null;
+    const { error } = await sb.from('cars').update({ purchase_price: now }).eq('id', theirs.id);
+    if (error) return 'Saved. Their car’s cost couldn’t be updated: ' + error.message;
+    theirs.purchase_price = now;
+    syncStats(theirs);
+    return `Saved. Their car now goes in at ${money(now)}`;
+  }
+
+  /**
+   * Put the car taken in part exchange into stock: Quick add, with what you
+   * paid worked out from the sale and the two cars linked.
+   */
+  function addPxCar(sale) {
+    openQuick();
+    state.pxFrom = sale;
+    const carriedAt = pxCarried(sale);
+    if (carriedAt != null) $('#qPaid').value = carriedAt;
+    $('#qNotes').value = `Part exchange on the ${carTitle(sale)}${sale.registration ? ' (' + fmtReg(sale.registration) + ')' : ''}, sold ${
+      sale.sold_at ? shortDay(sale.sold_at) : 'today'}.`;
+    const madeNow = pxMadeNow(sale);
+    msg('#quickMsg', `<strong>Their car, taken in part exchange.</strong> ${carriedAt == null
+      ? `Put in what it cost you: what the ${esc(carTitle(sale))} cost minus the cash they paid. When it sells, its margin is the profit on both cars.`
+      : madeNow > 0
+      ? `The ${money(sale.px_cash)} cash more than covered the ${money(costOf(sale))} in the ${esc(carTitle(sale))}, so ${money(madeNow)} is
+         already counted as profit and this goes in at <strong>£0</strong>. Whatever it sells for is profit too.`
+      : `What you paid is worked out for you: ${money(costOf(sale))} in the ${esc(carTitle(sale))} minus ${money(sale.px_cash)} cash =
+         <strong>${money(carriedAt)}</strong>. When it sells, its margin is the profit on both cars.`}`, 'info');
+    renderQuickSummary();
   }
 
   /** Keep the Insights copy of a car's figures in step without a reload. */
@@ -1490,6 +1673,7 @@
     if (!row) return;
     ['status', 'price', 'sold_at', 'purchase_price', 'prep_cost', 'sale_price'].forEach(k => { row[k] = car[k]; });
     row.margin = carMargin(car);
+    row.px = carried(car);
   }
 
   /* ---- Auto Trader advert slots ------------------------------------------
@@ -1649,6 +1833,7 @@
 
   function openQuick() {
     state.editing = null;
+    state.pxFrom = null;      // addPxCar sets it straight after, for a part exchange
     state.dirty = false;
     ['#qReg', '#qYear', '#qPaid', '#qPrep', '#qTarget', '#qNotes'].forEach(sel => { $(sel).value = ''; });
     fillPicker('#qMake', '#qMakeOther', knownMakes(), 'Choose…');
@@ -1750,6 +1935,9 @@
       private_notes: $('#qNotes').value.trim() || null,
       updated_at: new Date().toISOString()
     };
+    // Taken in part exchange: linked to the sale it came in on
+    const pxFrom = state.pxFrom;
+    if (pxFrom) record.px_from = pxFrom.id;
 
     const btns = [$('#quickSaveBtn'), $('#quickFullBtn')];
     const labels = btns.map(b => b.textContent);
@@ -1762,8 +1950,13 @@
       if (error) throw error;
       state.cars.unshift(data);
       state.dirty = false;
+      state.pxFrom = null;
       renderStock();
-      if (thenEdit) {
+      if (pxFrom && !thenEdit) {
+        setStockTab('draft');
+        go('stock');
+        toast('Their car is in as a draft, linked to the sale', 'ok');
+      } else if (thenEdit) {
         openForm(data);
         toast('Saved. Now add the photos and the words', 'ok');
       } else {
@@ -1871,9 +2064,10 @@
 
     // Rebuild the dropdowns first, so this car's make and model are in them
     fillPicker('#fMake', '#fMakeOther', knownMakes(), 'Choose…');
-    setPicker('#fMake', '#fMakeOther', (car && car.make) || '');
+    // Shown in the proper spelling where we know it; saving keeps it that way
+    setPicker('#fMake', '#fMakeOther', (car && MK.makeName(car.make)) || '');
     fillPicker('#fModel', '#fModelOther', knownModels(car && car.make), 'Choose…');
-    setPicker('#fModel', '#fModelOther', (car && car.model) || '');
+    setPicker('#fModel', '#fModelOther', (car && MK.modelName(car.make, car.model)) || '');
     fillPicker('#fColour', '#fColourOther', COLOURS, 'Choose…');
     setPicker('#fColour', '#fColourOther', (car && car.colour) || '');
 
@@ -2287,34 +2481,6 @@
   }
   /** Same rule as the website: asking for a hybrid takes a plug-in hybrid too. */
   const fuelMatches = (carFuel, wanted) => carFuel === wanted || (wanted === 'hybrid' && carFuel === 'phev');
-
-  /* ---- Make and model spelling -----------------------------------------
-     Plate lookups return capitals ("BMW", "MAZDA CX-3") and title-casing them
-     blindly gave "Bmw" and "Cx-3", which then sat in the dropdowns next to the
-     proper spelling and stopped your own history and the price book matching.
-     Anything we recognise gets its proper spelling; anything we don't is
-     title-cased but keeps short and digit-bearing parts in capitals. */
-  const keyOf = window.MBU_INSIGHTS ? window.MBU_INSIGHTS.makeKey : s => String(s || '').toLowerCase();
-  const modelKeyOf = window.MBU_INSIGHTS ? window.MBU_INSIGHTS.modelKey : s => String(s || '').toLowerCase();
-
-  function smartCase(s) {
-    return String(s || '').trim().split(/(\s+|-)/).map(part =>
-      /\d/.test(part) || (/^[a-z]{2}$/i.test(part) && part === part.toUpperCase())
-        ? part.toUpperCase() : titleCase(part)).join('');
-  }
-
-  function canonicalMake(s) {
-    if (!s) return s;
-    const k = keyOf(s);
-    return Object.keys(MODELS).find(m => keyOf(m) === k) || smartCase(s);
-  }
-
-  function canonicalModel(make, s) {
-    if (!s) return s;
-    const k = modelKeyOf(s);
-    const known = MODELS[canonicalMake(make)] || [];
-    return known.find(m => modelKeyOf(m) === k) || smartCase(s);
-  }
 
   /* ================================================ DESCRIPTION HELPER */
   function draftDescription() {
@@ -3022,11 +3188,8 @@
       const lastChange = c.last_price_change
         ? Math.round((Date.now() - new Date(c.last_price_change)) / 86400000) : null;
       // What you've sold these for, spelling ignored, from the cars themselves
-      const soldSame = state.cars.filter(s => s.status === 'sold' && String(s.id) !== String(c.id)
-        && keyOf(s.make) === keyOf(c.make) && modelKeyOf(s.model) === modelKeyOf(c.model)
-        && (s.sale_price != null || s.price != null));
-      const achieved = soldSame.length
-        ? Math.round(soldSame.reduce((n, s) => n + (s.sale_price != null ? s.sale_price : s.price), 0) / soldSame.length) : null;
+      const soldSame = soldLike(c);
+      const achieved = averageAchieved(soldSame);
       // Sale prices have the haggle taken off; compare like with like
       const askingEquivalent = achieved != null && haggle && haggle.pct
         ? Math.round(achieved / (1 - haggle.pct / 100) / 10) * 10 : achieved;
@@ -3101,6 +3264,18 @@
   }
 
   /**
+   * Sold cars of the same make and model, spelling ignored. Not part-exchange
+   * sales: their sale price is a deal price, not what the car fetched.
+   */
+  function soldLike(car) {
+    return state.cars.filter(s => s.status === 'sold' && !s.px_sale && String(s.id) !== String(car.id)
+      && keyOf(s.make) === keyOf(car.make) && modelKeyOf(s.model) === modelKeyOf(car.model)
+      && (s.sale_price != null || s.price != null));
+  }
+  const averageAchieved = list => list.length
+    ? Math.round(list.reduce((n, s) => n + (s.sale_price != null ? s.sale_price : s.price), 0) / list.length) : null;
+
+  /**
    * Interest on an ageing car. People and contacts from the new tracking when
    * it's live, the old page-view counts otherwise. The cause, if any, comes
    * from the insight engine rather than a blanket "that's a price problem".
@@ -3143,11 +3318,10 @@
    */
   async function repriceCar(carId, suggested, finding) {
     const car = state.cars.find(c => String(c.id) === String(carId));
-    const info = (ageing || []).find(c => String(c.id) === String(carId));
     if (!car) return toast('Couldn’t find that car');
 
     const title = [car.year, car.make, car.model].filter(Boolean).join(' ');
-    const avg = info && info.avg_achieved != null ? info.avg_achieved : null;
+    const avg = averageAchieved(soldLike(car));
 
     const entered = prompt(
       `New price for the ${title}\n\n` +
@@ -3287,9 +3461,45 @@
      figure missing is left out and counted, never guessed.
      ------------------------------------------------------------------------ */
   function carMargin(c) {
+    if (c.px_sale) { const now = pxMadeNow(c); return now > 0 ? now : null; }
     return c.sale_price != null && c.purchase_price != null
       ? c.sale_price - c.purchase_price - (c.prep_cost || 0) : null;
   }
+
+  /* ---- Part exchanges ------------------------------------------------------
+     A car sold with a part exchange (px_sale) doesn't carry its own profit.
+     Their car goes into stock at what this one cost you minus the cash they
+     paid (px_from links it back), so the profit on the whole deal shows when
+     THEIR car sells. Until then the sale counts as a car sold, and in days to
+     sell, but not in the money: no margin, no average per car, no haggle %.
+
+     If the cash alone covered what this car cost you, the extra is profit
+     made on the day, so that much counts now and their car goes in at £0.
+     Needs schema-v8-part-exchange.sql; without it no car has px_sale, so
+     everything below is simply never true. */
+  const costOf = c => c.purchase_price == null ? null : c.purchase_price + (c.prep_cost || 0);
+
+  /** What their car goes in at: this car's cost less the cash, never under £0. */
+  function pxCarried(c) {
+    const cost = costOf(c);
+    return cost == null || c.px_cash == null ? null : Math.max(0, cost - c.px_cash);
+  }
+
+  /** Profit already made on the day: only cash beyond what this car cost you. */
+  function pxMadeNow(c) {
+    const cost = costOf(c);
+    return cost == null || c.px_cash == null ? null : Math.max(0, c.px_cash - cost);
+  }
+
+  /** A part-exchange sale whose profit waits for their car (nothing missing). */
+  const carried = c => !!c.px_sale && carMargin(c) == null;
+  /** Left out of the margin because a figure really is missing. */
+  const unmargined = c => carMargin(c) == null && !c.px_sale;
+  /** The car taken in against this sale, and the sale a car was taken in on. */
+  const pxCarOf = c => state.cars.find(x => x.px_from && String(x.px_from) === String(c.id)) || null;
+  const pxSaleOf = c => (c.px_from && state.cars.find(x => String(x.id) === String(c.px_from))) || null;
+  /** Whether part exchanges can be saved yet (schema v8; null = still checking, so try). */
+  const pxReady = () => state.schema.v8 !== false;
 
   function marginFigures(now) {
     const y = now.getFullYear(), m = now.getMonth();
@@ -3310,7 +3520,8 @@
         cars: list,
         total: counted.reduce((n, c) => n + carMargin(c), 0),
         counted: counted.length,
-        missing: list.length - counted.length
+        missing: list.filter(unmargined).length,
+        px: list.filter(carried).length          // part exchanges: profit shows on their car
       };
     };
     const name = d => d.toLocaleDateString('en-GB', { month: 'long' });
@@ -3361,15 +3572,19 @@
 
     const carRows = list.map(c => {
       const mg = carMargin(c);
+      const px = carried(c);
       const title = [c.year, c.make, c.model].filter(Boolean).join(' ') || 'Untitled';
-      const haggle = c.price != null && c.sale_price != null && c.price > c.sale_price
+      const haggle = !c.px_sale && c.price != null && c.sale_price != null && c.price > c.sale_price
         ? ` (${money(c.price - c.sale_price)} off asking)` : '';
+      const from = pxSaleOf(c);
       const days = c.sold_at && (c.listed_at || c.created_at)
         ? Math.max(0, Math.round((new Date(c.sold_at) - new Date(c.listed_at || c.created_at)) / 86400000)) : null;
       const bits = [
         'Sold ' + shortDay(c.sold_at),
-        c.sale_price != null ? 'for ' + money(c.sale_price) + haggle : null,
+        c.px_sale ? 'part exchange' + (c.px_cash != null ? `, ${money(c.px_cash)} cash and their car` : '') : null,
+        c.sale_price != null && !c.px_sale ? 'for ' + money(c.sale_price) + haggle : null,
         c.purchase_price != null ? 'paid ' + money(c.purchase_price) + (c.prep_cost ? ' + ' + money(c.prep_cost) + ' prep' : ', no prep entered') : null,
+        from ? `taken in on the ${carTitle(from)}, so this covers both` : null,
         days != null ? days + ' days' : null
       ].filter(Boolean).join(' · ');
       const missing = [c.sale_price == null ? 'what it sold for' : null, c.purchase_price == null ? 'what you paid' : null]
@@ -3377,10 +3592,10 @@
 
       return `<div class="margin-car">
         <strong>${esc(title)}</strong>
-        <span class="mc-margin ${mg == null ? 'is-missing' : mg < 0 ? 'is-loss' : ''}">${mg == null ? 'Not counted' : signed(mg)}</span>
+        <span class="mc-margin ${px ? 'is-px' : mg == null ? 'is-missing' : mg < 0 ? 'is-loss' : ''}">${px ? 'Part exchange' : mg == null ? 'Not counted' : signed(mg)}</span>
         <span class="mc-meta">${esc(bits)}</span>
         <button class="mc-fix" type="button" data-figs="${esc(c.id)}">${
-          mg == null ? 'Add ' + esc(missing) : c.prep_cost == null ? 'Add the prep cost' : 'Edit the figures'}</button>
+          px ? 'Edit the figures' : mg == null ? 'Add ' + esc(missing) : c.prep_cost == null ? 'Add the prep cost' : 'Edit the figures'}</button>
       </div>`;
     }).join('');
 
@@ -3389,6 +3604,7 @@
       <div class="hm-top"><div class="mh-figure ${t.total < 0 ? 'is-loss' : ''}">${t.counted ? signed(t.total) : '£0'}</div>${mashallah()}</div>
       <div class="mh-compare">${compare}</div>
       ${t.missing ? `<div class="mh-compare" style="margin-top:4px">${t.missing} of ${t.cars.length} sale${t.cars.length === 1 ? '' : 's'} this month ${t.missing === 1 ? 'has' : 'have'} a figure missing, so ${t.missing === 1 ? 'isn’t' : 'aren’t'} counted.</div>` : ''}
+      ${t.px ? `<div class="mh-compare" style="margin-top:4px">${t.px === 1 ? '1 sale this month was a part exchange, so it isn’t' : `${t.px} sales this month were part exchanges, so they aren’t`} in the margin. The profit on the deal shows when their car sells.</div>` : ''}
       ${noPrep ? `<div class="mh-compare" style="margin-top:4px">${
         noPrep < t.counted ? `${noPrep} of ${t.counted} sales ${noPrep === 1 ? 'has' : 'have'} no prep cost entered, so ${noPrep === 1 ? 'that one is' : 'those are'} counted before prep.`
         : t.counted === 1 ? 'No prep cost entered on that sale, so it’s counted before prep.'
@@ -3685,7 +3901,8 @@
         total: counted.reduce((n, c) => n + carMargin(c), 0),
         sold: list.length, counted: counted.length,
         noPrep: counted.filter(c => c.prep_cost == null).length,
-        missing: list.length - counted.length
+        missing: list.filter(unmargined).length,
+        px: list.filter(carried).length
       });
     }
     return out;
@@ -3694,6 +3911,7 @@
   function monthTip(d) {
     return `${d.long}${d.current ? ' so far' : ''}: ${signed(d.total)} margin from ${plural(d.sold, 'car')} sold` +
       (d.missing ? `, ${d.missing} not counted (figure missing)` : '') +
+      (d.px ? `, ${d.px} part exchange${d.px === 1 ? '' : 's'} (profit shows when their car sells)` : '') +
       (d.noPrep ? `, ${d.noPrep} with no prep entered` : '');
   }
 
@@ -3878,10 +4096,23 @@
     go('data');
   }
 
+  /**
+   * The car_stats rows with the money worked out from the cars themselves,
+   * so a part-exchange sale has no margin of its own (the view doesn't know
+   * about part exchanges). `px` marks one whose profit is on their car.
+   */
+  function statsWithFigures() {
+    return (stats || []).map(r => {
+      const car = state.cars.find(c => String(c.id) === String(r.car_id));
+      return car ? Object.assign({}, r, { margin: carMargin(car), px: carried(car), px_sale: !!car.px_sale,
+        px_cash: car.px_cash ?? null, px_from: car.px_from || null }) : r;
+    });
+  }
+  const everySoldRow = () => statsWithFigures().filter(c => c.status === 'sold' && c.sold_at);
+
   /** Sold cars for the month currently selected, newest first. */
   function soldRows() {
-    const all = (stats || [])
-      .filter(c => c.status === 'sold' && c.sold_at)
+    const all = everySoldRow()
       .sort((a, b) => new Date(b.sold_at) - new Date(a.sold_at));
     return state.soldMonth === 'all'
       ? all
@@ -3889,7 +4120,7 @@
   }
 
   function soldInsights() {
-    const everySold = (stats || []).filter(c => c.status === 'sold' && c.sold_at);
+    const everySold = everySoldRow();
 
     if (!everySold.length) {
       return `<div class="empty">${icon('car')}<h3>Nothing sold yet</h3>
@@ -3902,7 +4133,8 @@
 
     const rows      = soldRows();
     const withMargin = rows.filter(c => c.margin != null);
-    const missing    = rows.length - withMargin.length;
+    const missing    = rows.filter(c => c.margin == null && !c.px).length;
+    const pxSales    = rows.filter(c => c.px).length;
     const totalMargin = withMargin.reduce((n, c) => n + c.margin, 0);
     const avgMargin   = withMargin.length ? Math.round(totalMargin / withMargin.length) : null;
     const withDays    = rows.filter(c => c.days_in_stock != null);
@@ -3936,8 +4168,10 @@
       const when  = new Date(c.sold_at).toLocaleDateString('en-GB',
         { day: 'numeric', month: 'short', year: 'numeric' });
       const good  = c.margin != null && c.margin >= 0;
-      const flag  = c.margin == null ? '<span class="pill pill--amber">Figure missing</span>'
+      const flag  = c.px_sale ? '<span class="pill pill--blue">Part exchange</span>'
+        : c.margin == null ? '<span class="pill pill--amber">Figure missing</span>'
         : c.prep_cost == null ? '<span class="pill pill--grey">No prep entered</span>' : '';
+      const taken = c.px_from ? '<span class="pill pill--blue">Part ex, covers both cars</span>' : '';
 
       return `<button class="card sold-row" type="button" data-figs="${esc(c.car_id)}">
         <div class="sold-top">
@@ -3947,15 +4181,16 @@
               ${esc(when)}${c.days_in_stock != null ? ' · ' + c.days_in_stock + ' days in stock' : ''}
             </div>
           </div>
-          <div class="sold-margin ${c.margin == null ? 'is-missing' : good ? 'is-good' : 'is-loss'}">
-            ${signed(c.margin)}<small>margin</small>
+          <div class="sold-margin ${c.px ? 'is-px' : c.margin == null ? 'is-missing' : good ? 'is-good' : 'is-loss'}">
+            ${c.px ? 'Part ex<small>profit on their car</small>' : signed(c.margin) + '<small>margin</small>'}
           </div>
         </div>
         <div class="sold-figs">
           <span>Sold for <strong>${c.sale_price != null ? money(c.sale_price) : 'not entered'}</strong></span>
+          ${c.px_sale ? `<span>Cash <strong>${c.px_cash != null ? money(c.px_cash) : 'not entered'}</strong></span>` : ''}
           <span>Paid <strong>${c.purchase_price != null ? money(c.purchase_price) : 'not entered'}</strong></span>
           <span>Prep <strong>${c.prep_cost != null ? money(c.prep_cost) : 'not entered'}</strong></span>
-          ${flag}
+          ${flag}${taken}
           <span class="sold-edit">${icon('edit')} Edit</span>
         </div>
       </button>`;
@@ -3976,7 +4211,7 @@
           <table>
             <thead><tr><th>Month</th><th>Sold</th><th>Margin</th></tr></thead>
             <tbody>${byMonth.slice().reverse().map(d => `<tr><td>${esc(d.long)}</td><td>${d.sold}</td><td>${signed(d.total)}${
-              d.missing || d.noPrep ? `<small>${[d.missing ? d.missing + ' not counted' : '', d.noPrep ? d.noPrep + ' before prep' : ''].filter(Boolean).join(', ')}</small>` : ''}</td></tr>`).join('')}</tbody>
+              d.missing || d.noPrep || d.px ? `<small>${[d.missing ? d.missing + ' not counted' : '', d.px ? d.px + ' part exchange' + (d.px === 1 ? '' : 's') : '', d.noPrep ? d.noPrep + ' before prep' : ''].filter(Boolean).join(', ')}</small>` : ''}</td></tr>`).join('')}</tbody>
           </table>
         </details>
       </div>` : ''}
@@ -4010,6 +4245,11 @@
       ${missing ? `<div class="msg msg--info is-shown" style="margin-bottom:14px">
         <strong>${missing} of these ${missing === 1 ? 'has' : 'have'} no margin figure.</strong>
         Tap the car to fill in what you paid and what it sold for, and it will be counted here.</div>` : ''}
+
+      ${pxSales ? `<div class="msg msg--info is-shown" style="margin-bottom:14px">
+        <strong>${pxSales === 1 ? '1 sale was a part exchange' : pxSales + ' sales were part exchanges'}</strong>, so
+        ${pxSales === 1 ? 'it’s' : 'they’re'} counted as sold but left out of the margin and the average.
+        The profit on the deal shows when their car sells.</div>` : ''}
 
       ${noPrep ? `<div class="msg msg--warn is-shown" style="margin-bottom:14px">
         <strong>${noPrep} ${noPrep === 1 ? 'sale has' : 'sales have'} no prep cost entered</strong>, so
@@ -4081,7 +4321,12 @@
 
   function wireInsightActions() {
     const ec = $('#exportCars');
-    if (ec) ec.onclick = () => downloadCsv('mbu-car-figures', stats);
+    if (ec) ec.onclick = () => downloadCsv('mbu-car-figures', statsWithFigures().map(r => {
+      const out = Object.assign({}, r);
+      out.part_exchange = r.px_sale ? 'sold in one' : r.px_from ? 'taken in on one' : '';
+      delete out.px; delete out.px_sale; delete out.px_from;
+      return out;
+    }));
     const ed = $('#exportDemand');
     if (ed) ed.onclick = () => downloadCsv('mbu-car-requests', demand);
 
@@ -4102,6 +4347,8 @@
         purchase_price: c.purchase_price,
         prep_cost:      c.prep_cost,
         margin:         c.margin,
+        part_exchange:  c.px_sale ? 'sold in one' : c.px_from ? 'taken in on one' : '',
+        px_cash:        c.px_cash,
         days_in_stock:  c.days_in_stock,
         views:          c.views,
         enquiries:      c.enquiries
@@ -4600,7 +4847,11 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     const pool = exact.length ? exact : sameMake;
     if (!pool.length) return null;
 
+    // A part-exchange sale's price is a deal price, and the car taken in has a
+    // worked-out cost and a margin that covers both cars: neither says what
+    // these cars buy and sell for, so they're left out of the money
     const sold = pool.filter(c => c.status === 'sold');
+    const priced = sold.filter(c => !c.px_sale && !c.px_from);
     const avg = (arr, f) => {
       const v = arr.map(f).filter(n => n != null && !isNaN(n));
       return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
@@ -4617,12 +4868,11 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       exact: exact.length > 0,
       total: pool.length,
       soldCount: sold.length,
-      avgBought: avg(pool, c => c.purchase_price),
-      avgSold: avg(sold, c => c.sale_price != null ? c.sale_price : c.price),
+      avgBought: avg(pool.filter(c => !c.px_from), c => c.purchase_price),
+      avgSold: avg(priced, c => c.sale_price != null ? c.sale_price : c.price),
       avgAsking: avg(pool, c => c.price),
       avgDays: days.length ? Math.round(days.reduce((a, b) => a + b, 0) / days.length) : null,
-      avgMargin: avg(sold, c => (c.sale_price != null && c.purchase_price != null)
-        ? c.sale_price - c.purchase_price - (c.prep_cost || 0) : null)
+      avgMargin: avg(priced, carMargin)
     };
   }
 
