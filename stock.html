@@ -134,6 +134,8 @@
               <label class="sr-only" for="fSort">Sort by</label>
               <select class="select" id="fSort">
                 <option value="newest">Newest first</option>
+                <option value="picks">Pick of the stock first</option>
+                <option value="reduced">Recently reduced</option>
                 <option value="price-asc">Price: low to high</option>
                 <option value="price-desc">Price: high to low</option>
                 <option value="miles-asc">Lowest mileage</option>
@@ -234,8 +236,15 @@
     return true;
   }
 
+  const newestFirst = (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0);
+  const isPick = c => !!c.featured && c.status !== 'sold';
   const SORTS = {
-    'newest':     (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
+    'newest':     newestFirst,
+    // The cars ticked Featured in the admin app (the "Pick of the stock" badge)
+    'picks':      (a, b) => isPick(b) - isPick(a) || newestFirst(a, b),
+    // Price dropped in the last fortnight, latest drop first
+    'reduced':    (a, b) => MBU.isReduced(b) - MBU.isReduced(a)
+                  || new Date(b.price_reduced_at || 0) - new Date(a.price_reduced_at || 0) || newestFirst(a, b),
     'price-asc':  (a, b) => (a.price ?? 1e9) - (b.price ?? 1e9),
     'price-desc': (a, b) => (b.price ?? -1) - (a.price ?? -1),
     'miles-asc':  (a, b) => (a.mileage ?? 1e9) - (b.mileage ?? 1e9),
@@ -435,6 +444,12 @@
 
     const makes = MBU.makesIn(cars);
     buildSelect($('#fMake'), makes, null, 'Any make');
+
+    // Only offer a sort that changes something: with no picks, or no price
+    // dropped in the last fortnight, that option would just be "Newest first"
+    const offered = { picks: cars.some(isPick), reduced: cars.some(MBU.isReduced) };
+    [...$('#fSort').options].forEach(o => { if (o.value in offered && !offered[o.value]) o.remove(); });
+    if (![...$('#fSort').options].some(o => o.value === state.sort)) state.sort = 'newest';
 
     // Restore state into the controls
     $('#fSearch').value = state.search;

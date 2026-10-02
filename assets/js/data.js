@@ -354,6 +354,10 @@
     return cachePromise;
   };
 
+  /** Price dropped in the last 14 days (the view stops sending previous_price after that). */
+  MBU.isReduced = car => car.status !== 'sold' && !!car.previous_price && car.price != null
+    && car.previous_price > car.price;
+
   /** Makes in these cars, once each, A to Z. Spelling is already one per make (normalise). */
   MBU.makesIn = cars => [...new Set(cars.map(c => c.make).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, 'en-GB'));

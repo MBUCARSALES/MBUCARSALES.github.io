@@ -458,6 +458,7 @@ p  { text-wrap: pretty; }
 .badge--accent  { background: var(--accent-100); color: var(--accent-600); }
 .badge--grey   { background: var(--surface-3); color: var(--ink-2); }
 .badge--solid  { background: var(--navy-900); color: #fff; }
+.badge svg { width: 13px; height: 13px; flex: none; margin-left: -2px; }
 .badge--dot::before {
   content: ''; width: 6px; height: 6px; border-radius: 50%;
   background: currentColor; flex: none;
@@ -614,6 +615,7 @@ p  { text-wrap: pretty; }
   .car-card-cta    { font-size: var(--fs-xs); }
   .car-card-flags  { gap: 4px; }
   .car-card-flags .badge { font-size: 10px; padding: 3px 7px; }
+  .car-card-flags .badge svg { width: 11px; height: 11px; }
 }
 
 /* --------------------------------------------------------------------------

@@ -244,15 +244,18 @@
     const sub = MBU.fmt.subtitle(car);
     const photos = (car.images || []).length;
 
-    const reduced = !sold && car.previous_price && car.price != null
-                    && car.previous_price > car.price;
+    const reduced = !sold && MBU.isReduced(car);
 
     const flags = [];
     if (sold) flags.push('<span class="badge badge--solid">SOLD</span>');
     else if (reserved) flags.push('<span class="badge badge--amber badge--dot">Reserved</span>');
     if (reduced) flags.push('<span class="badge badge--red">Reduced</span>');
     if (car.featured && !sold && !reduced) flags.push('<span class="badge badge--accent">Pick of the stock</span>');
-    if (car.hpi_status && car.hpi_status !== 'clear' && !sold) {
+    // HPI: a clean history is a selling point, so it says so, the same way a
+    // Cat S or Cat N car says what it is
+    if (car.hpi_status === 'clear' && !sold) {
+      flags.push(`<span class="badge badge--green">${icon('shield')}HPI Clear</span>`);
+    } else if (car.hpi_status && !sold) {
       flags.push(`<span class="badge badge--blue">${esc(MBU.label('hpi', car.hpi_status).split(' (')[0])}</span>`);
     }
 
