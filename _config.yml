@@ -1,0 +1,22 @@
+# ============================================================================
+# GitHub Pages settings. This file only stops folders being published.
+# ----------------------------------------------------------------------------
+# GitHub Pages builds this site with Jekyll, and Jekyll publishes every file in
+# the repository unless it's told not to (files and folders starting with _ or
+# . are already left out, which is why _private/ and .github/ never appear).
+#
+# supabase/ holds the database's SQL: every table, column and security rule.
+# Nothing in it is secret, but it's a map of the database for anyone who looks
+# (it was readable at mbucarsales.co.uk/supabase/schema.sql), and the website
+# never needs it. It stays here in the repo for the admin and future chats.
+#
+# CHECK IT WORKED, a few minutes after pushing (both should say 404):
+#   https://mbucarsales.co.uk/supabase/schema.sql
+#   https://mbucarsales.co.uk/_config.yml
+# And the site itself loads as normal.
+#
+# UNDO: delete this file and push.
+# ============================================================================
+
+exclude:
+  - supabase/
