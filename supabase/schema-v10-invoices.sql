@@ -66,6 +66,7 @@ create policy "Admins manage invoices" on public.invoices
   using (public.is_admin())
   with check (public.is_admin());
 
+-- Supabase gives new tables broad default grants; the public key gets none
 revoke all on public.invoices from anon;
 grant select, insert, update, delete on public.invoices to authenticated;
 grant usage on sequence public.invoices_number_seq to authenticated;

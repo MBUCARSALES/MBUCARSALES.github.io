@@ -685,7 +685,10 @@
 
   $$('#tabbar button').forEach(b => b.onclick = () => go(b.dataset.view));
   $('#backBtn').onclick = () => {
-    if (!state.dirty || !['form', 'quick', 'invoice'].includes(state.view)) { state.dirty = false; return goBack(); }
+    if (!state.dirty || !['form', 'quick', 'invoice'].includes(state.view)) {
+      if (state.view !== 'invprev') state.dirty = false;   // edits made on the preview belong to the invoice
+      return goBack();
+    }
     confirmSheet('Leave without saving?', 'Anything you’ve typed will be lost.',
       'Discard changes', () => { state.dirty = false; goBack(); }, true);
   };
@@ -5875,14 +5878,15 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         <div id="invLines">${(inv.extras || []).map((x, i) => `
           <div class="inv-line" data-i="${i}">
             <input class="in" data-k="extras.${i}.label" aria-label="What it’s for" value="${esc(x.label || '')}" placeholder="${general ? 'e.g. MOT' : 'e.g. Delivery'}" autocapitalize="sentences">
-            <div class="money"><input class="in" data-k="extras.${i}.amount" aria-label="Amount" data-num value="${esc(x.amount ?? '')}" inputmode="decimal" placeholder="0"></div>
+            <button class="inv-sign${x.minus ? ' is-minus' : ''}" type="button" data-sign-line="${i}" aria-label="${x.minus ? 'Takes off the total. Tap to add instead' : 'Adds to the total. Tap to take off instead'}">${x.minus ? '−' : '+'}</button>
+            <div class="money${x.minus ? ' money--minus' : ''}"><input class="in" data-k="extras.${i}.amount" aria-label="Amount" data-num value="${esc(x.amount ?? '')}" inputmode="decimal" placeholder="0"></div>
             <button class="inv-x" type="button" data-del-line="${i}" aria-label="Remove">${icon('close')}</button>
           </div>`).join('')}</div>
         <div class="chips inv-addrow">
           <button class="chip chip--add" type="button" data-add-line="">+ Add a line</button>
           ${general ? '' : ['Delivery', 'Warranty', 'Discount'].map(x => `<button class="chip chip--add" type="button" data-add-line="${x}">+ ${x}</button>`).join('')}
         </div>
-        <p class="hint">${general ? 'Each line prints on the invoice.' : 'A discount is a line with a minus amount, like −100.'}</p>
+        <p class="hint">${general ? 'Each line prints on the invoice. Tap + on a line to make it take off instead (a discount).' : 'Tap + on a line to make it take off instead (a discount): it turns to −.'}</p>
 
         ${general || purchase ? '' : `
         <label class="tickrow" style="margin-top:16px"><input type="checkbox" data-k="px.on" data-redraw${inv.px && inv.px.on ? ' checked' : ''}>
@@ -6012,7 +6016,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     if (amt && document.activeElement !== amt && rows.length && !inv.plan.amount) amt.placeholder = String(rows[0].amount);
     const edited = !!inv.plan.edited;
     $('#invPlan').innerHTML = `
-      ${warn.map(w => `<div class="msg msg--${w.level === 'red' ? 'err' : 'warn'} is-shown" style="margin-top:12px">${w.fca ? '<strong>Check this one.</strong> ' : ''}${esc(w.text)}</div>`).join('')}
+      <div id="invPlanWarn">${planWarnings(warn)}</div>
       ${rows.length ? `<table class="inv-sched"><thead><tr><th>#</th><th>Due</th><th>Amount</th></tr></thead><tbody>
         ${rows.map((r, i) => `<tr${r.paid_on ? ' class="is-paid"' : ''}><td>${i + 1}</td>
           <td>${edited ? `<input class="in in--sm" type="date" data-row="${i}" data-f="due" value="${esc(r.due)}">` : esc(INV.ukDate(r.due))}</td>
@@ -6024,6 +6028,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       r[el.dataset.f] = el.dataset.f === 'amount' ? (num(el.value) || 0) : el.value;
       state.dirty = true;
       refreshInvoiceLive(true);
+      // The rows being typed in stay put; only the warnings above them redraw
+      $('#invPlanWarn').innerHTML = planWarnings(INV.warnings(inv, IV.settings).filter(w => w.field === 'plan'));
     });
     const ed = $('#ipEdit');
     if (ed) ed.onclick = () => {
@@ -6033,6 +6039,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       renderPlan(); renderTerms();
     };
   }
+
+  const planWarnings = warn => warn.map(w => `<div class="msg msg--${w.level === 'red' ? 'err' : 'warn'} is-shown" style="margin-top:12px">${w.fca ? '<strong>Check this one.</strong> ' : ''}${esc(w.text)}</div>`).join('');
 
   function renderTerms() {
     const box = $('#invTerms');
@@ -6071,6 +6079,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       if (isNew) { if (head || text) inv.custom_terms.push({ head, text }); }
       else if (x.custom) Object.assign(inv.custom_terms[+key.split(':')[1]], { head, text });
       else if (head !== x.std.head || text !== x.std.text) inv.terms[key] = Object.assign({}, inv.terms[key], { head, text });
+      else { const off = inv.terms[key] && inv.terms[key].off; inv.terms[key] = off ? { off } : {}; }
       state.dirty = true; closeSheet(); renderTerms();
     };
     const rs = box.querySelector('#tmReset');
@@ -6097,6 +6106,15 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       const el = e.target.closest('[data-k]');
       if (!el || el.type === 'checkbox' || el.tagName === 'SELECT') return;
       setPath(inv, el.dataset.k, readField(el));
+      // The amount boxes keep the number only; a minus typed on a keyboard
+      // turns the line into one that takes off, as the − switch does
+      const line = /^extras\.(\d+)\.amount$/.exec(el.dataset.k);
+      if (line && /[-−–]/.test(el.value) && !inv.extras[+line[1]].minus) {
+        inv.extras[+line[1]].minus = true;
+        const row = el.closest('.inv-line');
+        row.querySelector('.money').classList.add('money--minus');
+        const sw = row.querySelector('.inv-sign'); sw.classList.add('is-minus'); sw.textContent = '−';
+      }
       untouched(el.dataset.k);
       state.dirty = true;
       refreshInvoiceLive(!!el.closest('#invPlan'));
@@ -6129,12 +6147,17 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     });
     box.querySelectorAll('[data-add-line]').forEach(b => b.onclick = () => {
       const label = b.dataset.addLine;
-      inv.extras.push({ label, amount: label === 'Discount' ? '' : '' });
+      inv.extras.push(label === 'Discount' ? { label, amount: '', minus: true } : { label, amount: '' });
       state.dirty = true; renderInvoiceForm();
       const ins = $$('#invLines .inv-line'); const last = ins[ins.length - 1];
       if (last) last.querySelector(label ? '.money input' : 'input').focus();
     });
-    box.querySelectorAll('[data-del-line]').forEach(b => b.onclick = () => { inv.extras.splice(+b.dataset.delLine, 1); state.dirty = true; renderInvoiceForm(); });
+    box.querySelectorAll('[data-del-line]').forEach(b => b.onclick = () => { inv.extras.splice(+b.dataset.delLine, 1); untouched('extras'); state.dirty = true; renderInvoiceForm(); });
+    box.querySelectorAll('[data-sign-line]').forEach(b => b.onclick = () => {
+      const x = inv.extras[+b.dataset.signLine];
+      x.minus = !x.minus;
+      untouched('extras'); state.dirty = true; renderInvoiceForm();
+    });
     box.querySelectorAll('[data-del-pay]').forEach(b => b.onclick = () => { inv.payments.splice(+b.dataset.delPay, 1); state.dirty = true; renderInvoiceForm(); });
     $('#invAddPay').onclick = () => { inv.payments.push({ date: INV.today(), amount: '', method: 'Bank transfer' }); state.dirty = true; renderInvoiceForm(); };
     $('#invPayRest').onclick = () => {
@@ -6246,8 +6269,17 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     };
   }
 
-  async function saveInvoice(quiet) {
+  // One save at a time. A second tap on Save (or Check and send) while the
+  // first is still on its way waits for it, instead of inserting the same
+  // invoice twice under two numbers on a slow signal.
+  function saveInvoice(quiet) {
+    IV.saving = (IV.saving || Promise.resolve()).then(() => saveInvoiceNow(quiet), () => saveInvoiceNow(quiet));
+    return IV.saving;
+  }
+
+  async function saveInvoiceNow(quiet) {
     const inv = IV.cur;
+    if (state.schema.v10 === null) await checkInvoicesTable();
     if (!state.schema.v10) {
       if (!quiet) toast('Can’t keep invoices until schema v10 is run. You can still send this one.');
       return false;
@@ -6258,12 +6290,15 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     else res = await sb.from('invoices').insert(row).select().single();
     if (res.error) { toast('Couldn’t save: ' + res.error.message); return false; }
     const saved = res.data || {};
-    if (!inv.id) { inv.id = saved.id; inv.number = saved.number; inv.created_at = saved.created_at; }
+    const wasNew = !inv.id;
+    if (wasNew) { inv.id = saved.id; inv.number = saved.number; inv.created_at = saved.created_at; }
     const listed = IV.list.findIndex(x => x.id === inv.id);
     const item = Object.assign({}, saved, row, { id: inv.id, number: inv.number });
     if (listed >= 0) IV.list[listed] = item; else IV.list.unshift(item);
     state.dirty = false;
-    $('#topTitle').textContent = INV.numberLabel(inv.number) || 'Invoice';
+    if (state.view === 'invoice' || state.view === 'invprev') $('#topTitle').textContent = INV.numberLabel(inv.number) || 'Invoice';
+    // Now it has a number it can be copied, voided or deleted from here too
+    if (wasNew && state.view === 'invoice' && IV.cur === inv) renderInvoiceForm();
     if (!quiet) toast('Saved as ' + INV.numberLabel(inv.number), 'ok');
     return true;
   }
@@ -6301,9 +6336,11 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       <p class="hint" style="text-align:center;margin-top:8px">Tap the page to read it full size.</p>
       <div class="section-card" style="margin-top:14px">
         <h2>The email</h2>
-        <div class="f"><label>To</label><input class="in" id="emTo" type="email" inputmode="email" autocapitalize="off" value="${esc(inv.email.to)}" placeholder="Their email address"></div>
-        <div class="f"><label>Subject</label><input class="in" id="emSubject" value="${esc(inv.email.subject)}"></div>
-        <div class="f" style="margin-bottom:0"><label>Message</label><textarea class="ta" id="emBody" rows="10">${esc(inv.email.body)}</textarea></div>
+        <div class="f"><label for="emTo">To</label>
+          <div class="em-to"><input class="in" id="emTo" type="email" inputmode="email" autocapitalize="off" value="${esc(inv.email.to)}" placeholder="Their email address">
+          <button class="btn btn--outline btn--sm" type="button" id="emCopy">Copy</button></div></div>
+        <div class="f"><label for="emSubject">Subject</label><input class="in" id="emSubject" value="${esc(inv.email.subject)}"></div>
+        <div class="f" style="margin-bottom:0"><label for="emBody">Message</label><textarea class="ta" id="emBody" rows="10">${esc(inv.email.body)}</textarea></div>
         <p class="hint" style="margin-top:10px">${canShare
           ? '<strong>Email it</strong> opens your phone’s share sheet with the PDF attached and this message written. Pick Gmail or Mail, then paste their address into To (it’s copied for you).'
           : '<strong>Email it</strong> downloads the PDF and opens your email with the address and message filled in. Attach the PDF from Downloads.'}</p>
@@ -6316,6 +6353,14 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       inv.email = { to: $('#emTo').value.trim(), subject: $('#emSubject').value, body: $('#emBody').value, edited: true };
       state.dirty = true;
     });
+    // Belt and braces: Email it copies the address too, but if the phone
+    // doesn't allow that alongside the share sheet, this always works
+    $('#emCopy').onclick = () => {
+      const to = $('#emTo').value.trim();
+      if (!to) return toast('No email address to copy');
+      if (!navigator.clipboard) return toast('Copying isn’t allowed here: type it into To');
+      navigator.clipboard.writeText(to).then(() => toast('Copied: paste it into To', 'ok'), () => toast('Couldn’t copy it: type it into To'));
+    };
     $('#emReset').onclick = () => { const e = INV.emailText(inv, IV.settings); inv.email = { to: $('#emTo').value.trim(), subject: e.subject, body: e.body }; renderPreview(); };
     $('#prevSendBtn').disabled = $('#prevPrintBtn').disabled = !IV.pdf;
   }
@@ -6338,7 +6383,11 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     });
   }
 
-  async function pdfAssets() {
+  function pdfAssets() {
+    if (!IV.assetsLoading) IV.assetsLoading = loadPdfAssets().catch(err => { IV.assetsLoading = null; throw err; });
+    return IV.assetsLoading;
+  }
+  async function loadPdfAssets() {
     if (IV.assets) return IV.assets;
     if (!(window.jspdf && window.jspdf.jsPDF)) await loadScript(JSPDF.src, JSPDF.sri);
     let logo = null, logoRatio = 698 / 230;
@@ -6459,7 +6508,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     } else msg('#invoicesMsg', '');
     const q = IV.q.trim().toLowerCase().replace(/\s+/g, ' ');
     const today = INV.today();
-    const owed = r => r.status !== 'void' && Number(r.balance) > 0.004;
+    const owed = r => r.status !== 'void' && r.kind !== 'purchase' && Number(r.balance) > 0.004;
+    const owing = r => r.status !== 'void' && r.kind === 'purchase' && Number(r.balance) > 0.004;
     const draft = r => r.status === 'draft';
     $('#nInvOwed').textContent = IV.list.filter(owed).length || '';
     $('#nInvDraft').textContent = IV.list.filter(draft).length || '';
@@ -6477,6 +6527,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       const late = due && due.due < today;
       const status = r.status === 'void' ? '<span class="pill pill--grey">Void</span>'
         : owed(r) ? `<span class="pill pill--${late ? 'red' : 'amber'}">${late ? `${INV.gbp(due.amount)} overdue since ${INV.ukDate(due.due)}` : INV.gbp(r.balance) + ' to come'}</span>`
+        : owing(r) ? `<span class="pill pill--blue">${INV.gbp(r.balance)} still to pay them</span>`
         : '<span class="pill pill--green">Paid</span>';
       return `<button class="inv-row${r.status === 'void' ? ' is-void' : ''}" type="button" data-id="${esc(r.id)}">
         <span class="inv-row-ic">${icon('receipt')}</span>
@@ -6505,7 +6556,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       acts.push({ label: 'Open it', icon: 'eye', sub: 'Check it, email it or print it', run: async () => { await invoiceSettings(); IV.cur = clone(inv); state.dirty = false; openPreview(); } });
       acts.push({ label: 'Change it', icon: 'edit', run: async () => { await invoiceSettings(); openInvoice(clone(inv)); } });
     }
-    if (inv.status !== 'void' && t.balance > 0.004) acts.push({ label: 'Record a payment', icon: 'pound', sub: `${INV.gbp(t.balance)} still to come`, run: () => recordPayment(clone(inv)) });
+    if (inv.status !== 'void' && t.balance > 0.004) acts.push({ label: 'Record a payment', icon: 'pound',
+      sub: inv.kind === 'purchase' ? `${INV.gbp(t.balance)} still to pay them` : `${INV.gbp(t.balance)} still to come`, run: () => recordPayment(clone(inv)) });
     acts.push({ label: 'Make a copy', icon: 'copy', sub: 'Same terms and wording, for a new customer', run: async () => {
       const c = clone(inv);
       ['id', 'number', 'created_at'].forEach(k => delete c[k]);
@@ -6540,14 +6592,17 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     if (error) return toast('Couldn’t delete it: ' + error.message);
     IV.list = IV.list.filter(x => x.id !== inv.id);
     toast('Deleted', 'ok');
-    if (state.view === 'invoices') renderInvoices(); else go('invoices', { back: true });
+    if (state.view === 'invoices') return renderInvoices();
+    state.trail = state.trail.filter(v => v !== 'invoices');
+    go('invoices', { back: true });
   }
 
   function recordPayment(inv) {
     const t = INV.totals(inv);
     const plan = inv.kind === 'instalments' ? INV.planRows(inv) : [];
     const nextAt = plan.findIndex(r => !r.paid_on), next = nextAt >= 0 ? plan[nextAt] : null;
-    const box = sheetHtml('Record a payment', `${INV.numberLabel(inv.number)} · ${invTitle(inv)} · ${INV.gbp(t.balance)} still to come`, `
+    const box = sheetHtml(inv.kind === 'purchase' ? 'Record what you paid them' : 'Record a payment',
+      `${INV.numberLabel(inv.number) || 'Not saved yet'} · ${invTitle(inv)} · ${INV.gbp(t.balance)} ${inv.kind === 'purchase' ? 'still to pay them' : 'still to come'}`, `
       <div class="section-card">
         <div class="f"><label>How much</label><div class="money"><input class="in" id="rpAmount" inputmode="decimal" value="${esc(next ? next.amount : t.balance)}"></div></div>
         <div class="row-2">
@@ -6642,7 +6697,9 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
   // One all-day event per car, a reminder 14 days before. The same UID each
   // time, so adding them again updates the dates rather than doubling up.
   function motIcs(cars) {
-    const esc_ = t => String(t).replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+    const esc_ = t => String(t).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+    // Lines over 75 characters carry on on the next line after a space
+    const fold = l => { let out = ''; while (l.length > 74) { out += l.slice(0, 74) + '\r\n '; l = l.slice(74); } return out + l; };
     const ymd = d => d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
     const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
     const out = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//MBU Car Sales//MOT dates//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:MBU MOT dates'];
@@ -6656,7 +6713,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         'END:VEVENT');
     });
     out.push('END:VCALENDAR');
-    return out.join('\r\n') + '\r\n';
+    return out.map(fold).join('\r\n') + '\r\n';
   }
 
   /* ======================================================= MOT CHECKER
@@ -7070,6 +7127,10 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
   function snap() {
     const cam = $('#pgCam');
     if (cam.classList.contains('is-native')) return $('#pgFile').click();
+    // A double tap would otherwise file the same picture under the next angle too
+    if (PGS.snapping) return;
+    PGS.snapping = true;
+    setTimeout(() => { PGS.snapping = false; }, 700);
     const v = $('#pgVideo');
     const vw = v.videoWidth, vh = v.videoHeight;
     if (!vw || !vh) return toast('The camera isn’t ready yet');
@@ -7096,16 +7157,23 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     nextShot();
   }
 
+  // Each upload carries a token. If the shot has been retaken (or another car
+  // picked) by the time it finishes, it's out of date and is dropped, so an
+  // older photo can never land on top of a newer one, or on the wrong car.
   async function uploadShot(s, blob, local) {
-    PGS.shots[s.key] = { uploading: true, local, blob };
+    const token = PGS.seq = (PGS.seq || 0) + 1;
+    PGS.shots[s.key] = { uploading: true, local, blob, token };
     PGS.busy++;
     if (state.view === 'photos') renderPhotoGuide();
+    const current = () => PGS.shots[s.key] && PGS.shots[s.key].token === token;
     try {
       const photo = await uploadToCloudinary(blob);
-      PGS.shots[s.key] = { photo, local };
+      if (current()) PGS.shots[s.key] = { photo, local };
     } catch (err) {
-      PGS.shots[s.key] = { error: err.message, local, blob };
-      toast(`${s.title} didn’t upload: ${err.message}`);
+      if (current()) {
+        PGS.shots[s.key] = { error: err.message, local, blob, token };
+        toast(`${s.title} didn’t upload: ${err.message}`);
+      }
     }
     PGS.busy--;
     pgSave();
@@ -7185,7 +7253,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
 
   /* =============================================== LEAVE-PAGE WARNING */
   window.addEventListener('beforeunload', e => {
-    if (state.view === 'form' && state.dirty) { e.preventDefault(); e.returnValue = ''; }
+    if ((state.view === 'form' || state.view === 'invoice' || state.view === 'invprev') && state.dirty) { e.preventDefault(); e.returnValue = ''; }
   });
 
   /* ===================================================== SERVICE WORKER */

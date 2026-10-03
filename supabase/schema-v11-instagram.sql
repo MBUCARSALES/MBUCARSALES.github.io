@@ -55,6 +55,10 @@ create policy "Admins can hide posts" on public.instagram_posts
   using (public.is_admin())
   with check (public.is_admin());
 
+-- Supabase gives new tables broad default grants; take them back so the
+-- rules above are the only way in. Reading: everyone. Changing: an admin may
+-- only flip `hidden`. Adding and deleting: the Action's service key only.
+revoke all on public.instagram_posts from anon, authenticated;
 grant select on public.instagram_posts to anon, authenticated;
 grant update (hidden) on public.instagram_posts to authenticated;
 

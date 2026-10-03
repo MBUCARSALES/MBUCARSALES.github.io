@@ -149,11 +149,20 @@
   const kindOf = inv => KINDS[inv && inv.kind] || KINDS.paid;
 
   /* --------------------------------------------------------------- TOTALS */
+  // Kinds whose form has no price box ("anything else" is lines only) or no
+  // part exchange box. What the form doesn't show must never count.
+  const NO_PRICE = ['general'];
+  const NO_PX = ['general', 'purchase'];
+  // A line marked as a discount always takes off, whatever sign was typed
+  // (an iPhone's number pad has no minus key)
+  const lineAmount = x => x.minus ? -Math.abs(Number(x.amount) || 0) : (Number(x.amount) || 0);
+
   function totals(inv) {
-    const extras = (inv.extras || []).filter(x => has(x.label) || Number(x.amount));
-    const price = r2(inv.price);
+    const extras = (inv.extras || []).filter(x => has(x.label) || Number(x.amount))
+      .map(x => Object.assign({}, x, { amount: r2(lineAmount(x)) }));
+    const price = NO_PRICE.includes(inv.kind) ? 0 : r2(inv.price);
     const goods = r2(price + sum(extras, x => x.amount));
-    const px = inv.px && inv.px.on ? r2(inv.px.allowance) : 0;
+    const px = inv.px && inv.px.on && !NO_PX.includes(inv.kind) ? r2(inv.px.allowance) : 0;
     const due = r2(goods - px);
     const payments = (inv.payments || []).filter(p => Number(p.amount));
     const paid = sum(payments, p => p.amount);
@@ -224,7 +233,7 @@
     const firstD = parseDate(rows[0].due);
     const when = frequency === 'weekly' ? 'every week'
       : frequency === 'fortnightly' ? 'every two weeks'
-      : `on the ${ordinal(firstD.getDate())} of each month`;
+      : firstD ? `on the ${ordinal(firstD.getDate())} of each month` : 'on the dates in the schedule';
     return { each: amts[0], allSame: same && !lastDiff, lastDiff: same && lastDiff, last: amts[amts.length - 1], when, count: rows.length };
   }
   const FREQ_WORD = { monthly: 'monthly', weekly: 'weekly', fortnightly: 'fortnightly' };
@@ -263,7 +272,7 @@
     release: { label: 'Car released once paid', when: (inv, t) => t.balance > 0, make: () => ({ head: 'Collection.',
       text: 'The vehicle will be released to the buyer once the balance has been received in cleared funds.' }) },
 
-    px: { label: 'Part exchange', when: inv => inv.px && inv.px.on, make: (inv, t) => {
+    px: { label: 'Part exchange', when: (inv, t) => !!(inv.px && inv.px.on && !NO_PX.includes(inv.kind)), make: (inv, t) => {
       const v = [plate(inv.px.registration), vehicleName(inv.px)].filter(has).join(', ');
       return { head: 'Part exchange.',
         text: `The buyer’s vehicle${v ? ' (' + v + ')' : ''} was accepted in part exchange at an agreed value of ${gbp(t.px)}, deducted from the price. The buyer confirms they own it, that there is no outstanding finance on it unless declared to MBU Sales Limited in writing, and that what they told us about it is accurate.` };
@@ -283,7 +292,7 @@
       const rows = planRows(inv), f = (inv.plan && inv.plan.frequency) || 'monthly';
       const s = planShape(rows, f);
       t = Object.assign({}, t, { balance: planBase(inv) });
-      if (!s) return { head: 'Payments.', text: 'The buyer agrees to pay the balance in line with the schedule above.' };
+      if (!s || rows.some(r => !parseDate(r.due))) return { head: 'Payments.', text: 'The buyer agrees to pay the balance in line with the schedule above.' };
       const word = FREQ_WORD[f] || 'monthly';
       const head = word.charAt(0).toUpperCase() + word.slice(1) + ' payments.';
       if (s.allSame) return { head, text: `The buyer agrees to pay ${gbp(s.each)} ${s.when}, beginning ${ukDate(rows[0].due)}, for ${countWord(s.count)} ${word} instalment${s.count === 1 ? '' : 's'} until the ${gbp(t.balance)} balance is paid in full.` };
@@ -414,12 +423,13 @@
       if (!(base > 0)) out.push({ level: 'red', field: 'plan', text: 'There’s no balance left to pay in instalments.' });
       else if (!rows.length) out.push({ level: 'red', field: 'plan', text: 'Set the number of payments (or the amount of each) and the first date.' });
       else {
+        if (rows.some(r => !parseDate(r.due))) out.push({ level: 'red', field: 'plan', text: 'One of the payments has no date.' });
         const fca = [];
         if (rows.length > 12) fca.push(`${rows.length} payments (the limit is 12)`);
         const sale = parseDate(inv.sale_date || inv.issue_date) || new Date();
         const limit = addMonths(sale, 12, sale.getDate());
-        const last = parseDate(rows[rows.length - 1].due);
-        if (last > limit) fca.push(`the last payment is ${longDate(rows[rows.length - 1].due)}, more than 12 months after the sale`);
+        const last = rows.map(r => parseDate(r.due)).filter(Boolean).sort((a, b) => a - b).pop() || null;
+        if (last && last > limit) fca.push(`the last payment is ${longDate(isoDate(last))}, more than 12 months after the sale`);
         if (planned > base + 0.004) fca.push(`the payments add up to ${gbp(planned)}, ${gbp(planned - base)} more than the balance, which counts as a charge for credit`);
         if (fca.length) out.push({ level: 'red', field: 'plan', fca: true, text: 'Outside the interest-free limits: ' + listWords(fca) + '. ' + FCA_NOTE });
         if (planned < base - 0.004) out.push({ level: 'red', field: 'plan', text: `The payments add up to ${gbp(planned)}, ${gbp(base - planned)} short of the balance.` });
@@ -480,7 +490,6 @@
 
     if (inv.kind === 'general') {
       const lines = t.extras.map(x => [x.label || 'Item', gbp(x.amount)]);
-      if (t.price) lines.unshift([vehicleName(v) || 'Vehicle', gbp(t.price)]);
       blocks.push({ type: 'table', title: 'Items', head: ['Description', 'Amount'], align: ['left', 'right'], widths: [0.7, 0.3], rows: lines });
       row('Total', gbp(t.goods), 'strong');
       if (t.paid) row('Paid', gbp(t.paid));
@@ -488,7 +497,7 @@
       if (t.balance > 0.004) row('Due', dueWords(inv).replace(/^by /, '').replace(/^on collection$/, 'On collection'));
     } else {
       row(purchase ? 'Agreed Purchase Price' : 'Total Agreed Vehicle Price', gbp(t.price));
-      t.extras.forEach(x => row(x.label || (Number(x.amount) < 0 ? 'Discount' : 'Extra'), gbp(x.amount)));
+      t.extras.forEach(x => row(x.label || (x.amount < 0 ? 'Discount' : 'Extra'), gbp(x.amount)));
       if (t.px) row('Part Exchange Allowance' + (has(inv.px.registration) ? ` (${plate(inv.px.registration)})` : ''), gbp(-t.px));
       if (t.extras.length || t.px) row('Total to Pay', gbp(t.due), 'strong');
 
@@ -566,7 +575,10 @@
 
     const footer = [[s.trading_name, s.address, s.email, s.website].filter(has).join('  ·  ')];
     const opts = inv.options || {};
-    if (opts.company && has(s.company_number)) footer.push([`${s.legal_name}. Registered in England and Wales, company no. ${s.company_number}`, has(s.registered_office) ? `Registered office: ${s.registered_office}` : ''].filter(has).join('  ·  '));
+    if (opts.company && has(s.company_number)) {
+      footer.push(`${s.legal_name}. Registered in England and Wales, company no. ${s.company_number}`);
+      if (has(s.registered_office)) footer.push(`Registered office: ${s.registered_office}`);
+    }
     if (s.vat_registered && has(s.vat_number)) footer.push(`VAT registration no. ${s.vat_number}`);
 
     return {
@@ -662,8 +674,14 @@
     assets = assets || {};
     const pdf = new JsPDF({ unit: 'mm', format: 'a4', compress: true });
     pdf.setProperties({ title: pdfSafe(doc.title + (doc.ref ? ' ' + doc.ref : '')), author: 'MBU Sales Limited', creator: 'MBU Admin' });
-    const W = 210, H = 297, M = 15, CW = W - 2 * M, FOOT = 18;
+    const W = 210, H = 297, M = 15, CW = W - 2 * M;
     const PT = 0.3528, LH = 1.38;
+    // The footer grows with its lines (address; company number and office;
+    // VAT), each kept short of the corner where the page number goes
+    const FOOT_W = CW - 34;
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7.4);
+    const footLines = doc.footer.reduce((a, l) => a.concat(pdf.splitTextToSize(pdfSafe(l), FOOT_W)), []);
+    const FOOT = Math.max(18, 9 + footLines.length * 3.4);
     let y = 14;
     const col = c => pdf.setTextColor(c[0], c[1], c[2]);
     const fill = c => pdf.setFillColor(c[0], c[1], c[2]);
@@ -751,6 +769,10 @@
     }
     // A paragraph that starts in bold ("1. Outstanding balance.") and carries
     // on in regular, wrapped word by word across both
+    // Width as drawn. jsPDF's getTextWidth counts kerning (AV, AT, To...)
+    // that text() never applies, so a word measured with it comes out short
+    // and the next word lands on top of it ("VAT.Second")
+    const tw = str => pdf.getStringUnitWidth(str, { doKerning: false }) * pdf.getFontSize() / pdf.internal.scaleFactor;
     function rich(segs, x, width, size) {
       const words = [];
       segs.forEach(sg => pdfSafe(sg.text).split(/(\s+)/).forEach(w => { if (w && !/^\s+$/.test(w)) words.push({ w, bold: sg.bold }); }));
@@ -758,7 +780,7 @@
       let lineW = 0;
       words.forEach(wd => {
         font(wd.bold ? 'bold' : 'normal', size);
-        const ww = pdf.getTextWidth(wd.w), sp = pdf.getTextWidth(' ');
+        const ww = tw(wd.w), sp = tw(' ');
         if (lineW && lineW + sp + ww > width) { lines.push([]); lineW = 0; }
         lines[lines.length - 1].push(wd);
         lineW += (lineW ? sp : 0) + ww;
@@ -768,9 +790,9 @@
         let cx = x;
         ln.forEach((wd, i) => {
           font(wd.bold ? 'bold' : 'normal', size); col(C.ink);
-          if (i) cx += pdf.getTextWidth(' ');
+          if (i) cx += tw(' ');
           pdf.text(wd.w, cx, y + 3.2);
-          cx += pdf.getTextWidth(wd.w);
+          cx += tw(wd.w);
         });
         y += lh(size);
       });
@@ -844,8 +866,8 @@
       pdf.setPage(p);
       stroke(C.line); pdf.setLineWidth(0.3); pdf.line(M, H - FOOT + 3, W - M, H - FOOT + 3);
       font('normal', 7.4); col(C.ink3);
-      doc.footer.forEach((l, i) => pdf.text(pdfSafe(l), W / 2, H - FOOT + 7.5 + i * 3.6, { align: 'center', maxWidth: CW }));
-      if (pages > 1) pdf.text(`Page ${p} of ${pages}`, W - M, H - 5, { align: 'right' });
+      footLines.forEach((l, i) => pdf.text(l, W / 2, H - FOOT + 7.5 + i * 3.4, { align: 'center' }));
+      if (pages > 1) pdf.text(`Page ${p} of ${pages}`, W - M, H - 6, { align: 'right' });
       if (doc.voided) {
         font('bold', 90); pdf.setTextColor(220, 60, 50);
         pdf.text('VOID', W / 2, H / 2, { align: 'center', angle: 30 });

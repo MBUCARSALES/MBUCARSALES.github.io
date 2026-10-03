@@ -1116,7 +1116,17 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
 .inv-x:active { background: var(--line-2); }
 .inv-x svg { width: 20px; height: 20px; }
 
-.inv-line { display: grid; grid-template-columns: 1fr 128px 40px; gap: 8px; align-items: center; margin-bottom: 8px; }
+.inv-line { display: grid; grid-template-columns: minmax(0, 1fr) 40px 118px 40px; gap: 6px; align-items: center; margin-bottom: 8px; }
+/* Adds or takes off: a line switched to − is a discount, whatever was typed */
+.inv-sign {
+  width: 40px; height: 48px; border-radius: var(--r-sm); border: 2px solid var(--line);
+  font-size: 22px; font-weight: 800; line-height: 1; color: var(--green-600); background: #fff;
+}
+.inv-sign.is-minus { color: var(--red-600); border-color: #F1C7C3; background: var(--red-100); }
+.money--minus::before { content: '−£'; color: var(--red-600); }
+.money--minus .in { padding-left: 44px !important; color: var(--red-600); }
+/* Invoice details: who sells, name and number side by side */
+.inv-seller { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px; gap: 8px; align-items: center; margin-bottom: 8px; }
 .inv-line .money .in, .inv-pay .money .in { font-size: 18px; padding-left: 32px; }
 .inv-line .money::before, .inv-pay .money::before { font-size: 18px; left: 13px; }
 
@@ -1309,3 +1319,6 @@ html.pg-locked, html.pg-locked body { overflow: hidden; }
   .pg-cam.is-native .pg-tip { bottom: calc(130px + env(safe-area-inset-bottom)); right: 10px; max-width: none; }
   .pg-cam.is-native .pg-top { max-width: calc(100vw - 20px); }
 }
+
+.em-to { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.inv-seller .in { font-size: 16px; padding-inline: 11px; }

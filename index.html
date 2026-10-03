@@ -364,7 +364,8 @@
     document.getElementById('igSection').hidden = false;
   });
 
-  /* Finance: only with the finance company's details in (config.js) */
+  /* Finance: when switched on in config.js (finance.advert). The small print
+     is the finance company's FCA statement once it's in, an interim line until then. */
   const F = MBU.financeAdvert();
   if (F) {
     const band = document.getElementById('financeBand');
