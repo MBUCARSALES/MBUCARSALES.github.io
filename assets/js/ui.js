@@ -82,6 +82,15 @@
   const igLink = (B.instagram || '').trim();
   const atLink = (B.autotrader || '').trim();
 
+  /* Autotrader's own logo (assets/img/autotrader*.svg, from their media
+     resources, background trimmed, nothing else changed): the full wordmark
+     where there's room (footer, phone menu), and on the small square buttons
+     (header, bottom bar) the red and navy mark on its own, which is how their
+     app icon shows it. The header has no room for the wordmark at any width. */
+  const atLogo = alt => `<img class="at-logo" src="${esc(MBU.link('assets/img/autotrader.svg'))}"
+    alt="${alt ? 'Autotrader' : ''}" width="111" height="14">`;
+  const atMark = `<img class="at-mark" src="${esc(MBU.link('assets/img/autotrader-mark.svg'))}" alt="" width="24" height="18">`;
+
   /* ------------------------------------------------------------------ HEADER */
   function header() {
     return `
@@ -101,8 +110,8 @@
             ${icon('phone')}<span>${esc(B.phone)}</span>
           </a>
           ${atLink ? `<a class="btn btn--at btn--sm" href="${esc(atLink)}"
-             target="_blank" rel="noopener" aria-label="Our cars on Auto Trader">
-            ${icon('car')}<span class="hide-sm">Auto Trader</span>
+             target="_blank" rel="noopener" aria-label="Our cars on Autotrader">
+            ${atMark}
           </a>` : ''}
           <a class="btn btn--wa btn--sm" href="${MBU.waLink('Hi MBU Car Sales, I have a question about a car.')}"
              target="_blank" rel="noopener">
@@ -137,7 +146,7 @@
           </a>
           ${atLink ? `<a class="btn btn--at btn--block" href="${esc(atLink)}"
              target="_blank" rel="noopener">
-            ${icon('car')} See our cars on Auto Trader
+            See our cars on ${atLogo(true)}
           </a>` : ''}
           ${igLink ? `<a class="btn btn--ig btn--block" href="${esc(igLink)}"
              target="_blank" rel="noopener">
@@ -153,7 +162,7 @@
     const socials = [
       B.instagram && { href: B.instagram, icon: 'instagram', label: 'Instagram' },
       B.facebook && { href: B.facebook, icon: 'facebook', label: 'Facebook' },
-      B.autotrader && { href: B.autotrader, icon: 'car', label: 'Our cars on Auto Trader' },
+      B.autotrader && { href: B.autotrader, img: atLogo(), label: 'Our cars on Autotrader', cls: 'social-at' },
       B.whatsapp && { href: MBU.waLink('Hi MBU Car Sales,'), icon: 'whatsapp', label: 'Message us on WhatsApp' }
     ].filter(Boolean);
 
@@ -175,7 +184,7 @@
             </a>
             <p class="footer-blurb">${esc(B.strapline)}</p>
             ${socials.length ? `<div class="social-row">
-              ${socials.map(s => `<a href="${esc(s.href)}" target="_blank" rel="noopener" aria-label="${esc(s.label)}">${icon(s.icon)}</a>`).join('')}
+              ${socials.map(s => `<a href="${esc(s.href)}"${s.cls ? ` class="${s.cls}"` : ''} target="_blank" rel="noopener" aria-label="${esc(s.label)}">${s.img || icon(s.icon)}</a>`).join('')}
             </div>` : ''}
           </div>
 
@@ -225,8 +234,8 @@
         ${icon('instagram')}
       </a>` : ''}
       ${atLink ? `<a class="btn btn--at mobile-bar-icon" href="${esc(atLink)}"
-         target="_blank" rel="noopener" aria-label="Our cars on Auto Trader">
-        ${icon('car')}
+         target="_blank" rel="noopener" aria-label="Our cars on Autotrader">
+        ${atMark}
       </a>` : ''}
     </div>`;
   }

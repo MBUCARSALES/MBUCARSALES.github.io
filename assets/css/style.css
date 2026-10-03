@@ -252,10 +252,17 @@ p  { text-wrap: pretty; }
 .btn--ig       { background: linear-gradient(45deg,#F9CE34 0%,#EE2A7B 52%,#6228D7 100%); color: #fff; box-shadow: var(--sh-1); }
 .btn--ig:hover { filter: brightness(1.07); box-shadow: var(--sh-2); }
 
-/* Auto Trader. Deliberately not their logo or their colours, since that is
-   their trademark. A car icon and their name is clear enough. */
-.btn--at       { background: var(--navy-700); color: #fff; box-shadow: var(--sh-1); }
-.btn--at:hover { background: var(--navy-600); box-shadow: var(--sh-2); }
+/* Autotrader, in their own logo from their media resources (October 2026,
+   Talha's call; it was a plain car icon before). On white, the way their app
+   icon shows it, so their colours are never changed or sat on ours. */
+.btn--at       { background: #fff; border-color: var(--line); color: var(--navy-900); box-shadow: var(--sh-1); }
+.btn--at:hover { border-color: var(--ink-4); box-shadow: var(--sh-2); }
+.btn--at img   { display: block; flex: none; width: auto; }
+.btn--at .at-logo { height: 15px; }
+.btn--at .at-mark { height: 18px; }
+/* The mark is a touch wider than the icons beside it; trimming the padding
+   keeps the header row exactly as wide as it was (it is tight at ~960px) */
+.header-cta .btn--at { padding-inline: 11px; }
 
 .btn--outline  { background: transparent; border-color: var(--line); color: var(--navy-900); }
 .btn--outline:hover { border-color: var(--navy-800); background: var(--surface-2); }
@@ -375,7 +382,6 @@ p  { text-wrap: pretty; }
    room while the media queries think it does — the row overflowed by ~150px on
    a wide screen. The icons carry the meaning on their own and both buttons keep
    their aria-labels; this way the phone number stays on screen instead. */
-.header-cta .btn--at span.hide-sm,
 .header-cta .btn--ig span.hide-sm { display: none; }
 @media (max-width: 940px) {
   .nav, .header-cta .btn span.hide-sm { display: none; }
@@ -853,6 +859,11 @@ p  { text-wrap: pretty; }
 }
 .social-row a:hover { background: rgba(255,255,255,.15); transform: translateY(-2px); }
 .social-row svg { width: 19px; height: 19px; }
+/* Autotrader's logo needs white behind it to keep its own colours, and its
+   wordmark needs a wider tile than the square icons */
+.social-row a.social-at { width: auto; padding-inline: 14px; background: #fff; border-color: #fff; }
+.social-row a.social-at:hover { background: #fff; }
+.social-row .at-logo { height: 15px; width: auto; display: block; }
 
 .footer-bar {
   border-top: 1px solid rgba(255,255,255,.09);
@@ -889,6 +900,7 @@ p  { text-wrap: pretty; }
    Call us keep almost all the width. Equal buttons would squash the labels. */
 .mobile-bar-icon { flex: none !important; width: 54px; padding-inline: 0; }
 .mobile-bar-icon svg { width: 22px; height: 22px; }
+.mobile-bar-icon.btn--at .at-mark { height: 20px; }
 /* With two icon buttons alongside, everything tightens up a notch so the two
    labelled buttons still read properly on a narrow phone. */
 .mobile-bar--4 { gap: 6px; padding-inline: var(--sp-3); }
