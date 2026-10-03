@@ -275,6 +275,9 @@
         return 'I would like to come and have a look round. When are you free?';
       case 'A car I have seen on the website':
         return 'I am interested in one of the cars on your website. Is it still available?';
+      case 'Finance':
+        return car ? `I am interested in ${it} on finance. What would the monthly payments be?`
+                   : 'I am interested in buying a car on finance. What is possible?';
       default:
         return '';
     }
@@ -294,6 +297,12 @@
   }
 
   function buildReasons(list) {
+    // "Finance" only once it's switched on with the finance company's details
+    // (config.js), first when they came from a "Finance available" link
+    if (MBU.financeAdvert() && (!car || MBU.financeOn(car))) {
+      list = list.filter(r => r !== 'Finance');
+      list = MBU.param('subject') === 'Finance' ? ['Finance'].concat(list) : list.concat('Finance');
+    }
     reasonRow.innerHTML = list.map((r, i) =>
       `<button class="chip${i === 0 ? ' is-on' : ''}" type="button" data-value="${esc(r)}">${esc(r)}</button>`
     ).join('');

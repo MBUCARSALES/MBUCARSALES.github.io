@@ -203,6 +203,9 @@
 
     const pool = (ctx.checks || []).filter(pc => {
       if (!pc.typical) return false;
+      // An auction hammer price is a trade price, not what similar cars are
+      // up for on a forecourt (schema-v12)
+      if (pc.source === 'auction') return false;
       if (makeKey(pc.make) !== makeKey(car.make)) return false;
       if (pc.model && car.model && modelKey(pc.model) !== modelKey(car.model)) return false;
       if (!pc.model && car.model) return false;

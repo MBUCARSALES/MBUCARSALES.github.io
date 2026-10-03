@@ -221,6 +221,7 @@
             <a href="${MBU.link('contact')}">Contact</a>
           </div>
         </div>
+        ${MBU.financeAdvert && MBU.financeAdvert() && MBU.financeAdvert().statement ? `<p class="footer-legal">${esc(MBU.financeAdvert().statement)}</p>` : ''}
       </div>
     </footer>
 

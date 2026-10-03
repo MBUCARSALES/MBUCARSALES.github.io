@@ -162,6 +162,12 @@
        Instagram. The enquiry that lands is tagged with the car either way. */
     const enquireHref = MBU.link('contact?car=' + encodeURIComponent(car.id));
 
+    // "Finance available" beside the price on HPI clear cars for sale, when
+    // it's switched on in config.js (finance.advert)
+    const financeHref = MBU.link('contact?car=' + encodeURIComponent(car.id) + '&subject=Finance');
+    const financeBadge = MBU.financeOn(car)
+      ? `<a class="fin-badge" href="${financeHref}" title="${esc(MBU.financeAdvert().small)}">${icon('pound')}Finance available</a>` : '';
+
     const reduced = !sold && car.previous_price && car.price != null
                     && car.previous_price > car.price;
 
@@ -179,8 +185,11 @@
                 ${sold
                   ? `<span class="cpb-price cpb-price--sold">Now sold</span>
                      <span class="cpb-note">Sold recently</span>`
-                  : `<span class="cpb-price">${fmt.price(car.price)}${reduced
-                        ? `<span class="cpb-was">${fmt.price(car.previous_price)}</span>` : ''}</span>
+                  : `<div class="cpb-top">
+                       <span class="cpb-price">${fmt.price(car.price)}${reduced
+                          ? `<span class="cpb-was">${fmt.price(car.previous_price)}</span>` : ''}</span>
+                       ${financeBadge}
+                     </div>
                      <span class="cpb-note">${reduced
                         ? 'Reduced by ' + fmt.price(car.previous_price - car.price) + '. No admin fees.'
                         : 'No admin fees. Part exchange welcome.'}</span>`}
@@ -403,7 +412,7 @@
                     <span class="hint">Rough details are fine. We’ll give you a straight price when you come.</span>
                   </div>
 
-                  ${MBU_CONFIG.finance && MBU_CONFIG.finance.enabled ? `
+                  ${(MBU_CONFIG.finance && MBU_CONFIG.finance.enabled) || MBU.financeOn(car) ? `
                   <div class="span-2">
                     <label class="checkbox">
                       <input type="checkbox" id="cfFinance">
@@ -439,6 +448,7 @@
                   ? `<div class="price" style="font-size:1.6rem;color:#fff">Now sold</div>
                      <div class="price-sub">Sold recently</div>`
                   : `<div class="price">${fmt.price(car.price)}</div>
+                     ${financeBadge ? `<div style="margin-top:10px">${financeBadge.replace('fin-badge', 'fin-badge fin-badge--onDark')}</div>` : ''}
                      ${(car.previous_price && car.price != null && car.previous_price > car.price)
                        ? `<div class="price-sub">
                             <span style="text-decoration:line-through;opacity:.75">${fmt.price(car.previous_price)}</span>

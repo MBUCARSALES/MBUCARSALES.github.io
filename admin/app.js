@@ -71,6 +71,13 @@
     gauge:    `<path ${P} d="M3.5 16a8.5 8.5 0 1 1 17 0"/><line ${P} x1="12" y1="16" x2="15.5" y2="10.5"/>`,
     note:     `<path ${P} d="M14 3.5H7A2 2 0 0 0 5 5.5v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z"/><polyline ${P} points="14 3.5 14 8.5 19 8.5"/><line ${P} x1="8.5" y1="13" x2="15.5" y2="13"/><line ${P} x1="8.5" y1="16.5" x2="13" y2="16.5"/>`,
     tag:      `<path ${P} d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3.5 13.5V3.5h10l7.1 7.1a2 2 0 0 1 0 2.8Z"/><circle ${P} cx="8.2" cy="8.2" r="1.3"/>`,
+    receipt:  `<path ${P} d="M6 3.5h12v17l-2.4-1.6-2.4 1.6-1.2-.8-1.2.8-2.4-1.6L6 20.5Z"/><line ${P} x1="9" y1="8.5" x2="15" y2="8.5"/><line ${P} x1="9" y1="12" x2="15" y2="12"/><line ${P} x1="9" y1="15.5" x2="12.5" y2="15.5"/>`,
+    book:     `<path ${P} d="M4 5.5A2 2 0 0 1 6 3.5h13.5v14H6a2 2 0 0 0-2 2Z"/><path ${P} d="M4 19.5a2 2 0 0 0 2 2h13.5v-4"/><line ${P} x1="8.5" y1="8" x2="15" y2="8"/>`,
+    wrench:   `<path ${P} d="M14.7 6.3a4 4 0 0 0 5 5L21 10a5.5 5.5 0 0 1-7.4 6.2L7 22.8a2.1 2.1 0 0 1-3-3l6.6-6.6A5.5 5.5 0 0 1 16.8 6Z"/>`,
+    sign:     `<path ${P} d="M3 17.5c2.5 0 3.5-6 6-6s1 6 3.5 6 2.5-3 4-3 1.5 3 4.5 3"/><line ${P} x1="3" y1="21" x2="21" y2="21"/>`,
+    print:    `<path ${P} d="M6 9V3.5h12V9"/><rect ${P} x="3" y="9" width="18" height="8" rx="2"/><path ${P} d="M6 14h12v6.5H6Z"/>`,
+    share:    `<path ${P} d="M12 15V3.5"/><polyline ${P} points="7.5 8 12 3.5 16.5 8"/><path ${P} d="M5 12v7.5a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5V12"/>`,
+    plus:     `<line ${P} x1="12" y1="5" x2="12" y2="19"/><line ${P} x1="5" y1="12" x2="19" y2="12"/>`,
     open:     `<path ${P} d="M14 4h6v6"/><line ${P} x1="20" y1="4" x2="11" y2="13"/><path ${P} d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>`
   };
   const icon = n => ICONS[n] ? `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>` : '';
@@ -132,10 +139,10 @@
     dataTab: 'cars',
     soldMonth: 'all',        // 'all' or 'YYYY-MM', for the Sold tab
     marginOpen: false,       // per-car breakdown under the margin figure
-    schema: { v6: null, v7: null, v8: null },   // optional upgrades: true, false, or null = not checked yet
+    schema: { v6: null, v7: null, v8: null, v10: null },   // optional upgrades: true, false, or null = not checked yet
 
     view: 'home',
-    returnTo: 'home',    // where Back goes from a car, a message or the bid tool
+    trail: [],           // the screens Back steps through, newest last (see NAV)
     message: null,       // { kind: 'e' | 'r', id } open in the message view
     homeOpen: new Set(), // Home "Needs you" sections dropped down, by key
     editing: null,       // car being edited (null = new)
@@ -221,6 +228,56 @@
 
   function confirmSheet(title, sub, label, run, danger) {
     sheet(title, sub, [{ label, icon: danger ? 'trash' : 'check', danger, run }]);
+  }
+
+  /* A sheet with its own markup instead of a list of actions: the car
+     picker, the signature pad, the invoice settings. Returns the box to wire
+     up. The Cancel button underneath still closes it. */
+  function sheetHtml(title, sub, html) {
+    $('#sheetTitle').textContent = title;
+    const s = $('#sheetSub');
+    s.textContent = sub || ''; s.style.display = sub ? '' : 'none';
+    const box = $('#sheetActions');
+    box.innerHTML = html;
+    $('#sheet').classList.add('is-open');
+    $('#sheetBack').classList.add('is-open');
+    return box;
+  }
+
+  /**
+   * Pick one of your cars. Search by anything on it; in-stock cars first,
+   * then the most recent sales. `filter` narrows the list (in stock only for
+   * a price check, say), `extra` adds rows above the cars ("A car that isn't
+   * in your stock").
+   */
+  function pickCar({ title, sub, filter, extra, run }) {
+    const order = c => c.status === 'available' || c.status === 'reserved' ? 0 : c.status === 'draft' ? 1 : 2;
+    const cars = state.cars.filter(filter || (() => true)).slice()
+      .sort((a, b) => order(a) - order(b) || new Date(b.sold_at || b.created_at) - new Date(a.sold_at || a.created_at));
+    const row = c => `
+      <button class="pick-car" type="button" data-id="${esc(c.id)}">
+        ${c.images && c.images[0] ? `<img src="${esc(imgUrl(c.images[0], 160))}" alt="" loading="lazy">`
+                                  : `<span class="pick-car-none">${icon('car')}</span>`}
+        <span class="pick-car-txt"><strong>${esc(carTitle(c))}</strong>
+          <small>${esc([c.registration ? fmtReg(c.registration) : '', c.status === 'sold' ? 'Sold' : c.status === 'draft' ? 'Draft' : c.status === 'reserved' ? 'Reserved' : '', c.price ? money(c.sale_price != null && c.status === 'sold' ? c.sale_price : c.price) : ''].filter(Boolean).join(' · '))}</small></span>
+      </button>`;
+    const box = sheetHtml(title, sub, `
+      ${(extra || []).map((x, i) => `<button class="sheet-action" type="button" data-x="${i}">${icon(x.icon || 'plus')}<div><span>${esc(x.label)}</span>${x.sub ? `<small>${esc(x.sub)}</small>` : ''}</div></button>`).join('')}
+      ${cars.length > 6 ? `<label class="search pick-search">${icon('search')}<input type="search" placeholder="Search make, model or plate" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search your cars"></label>` : ''}
+      <div class="pick-list">${cars.map(row).join('') || '<p class="hint" style="padding:8px 4px">No cars to pick from yet.</p>'}</div>`);
+    box.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { closeSheet(); setTimeout(() => extra[+b.dataset.x].run(), 180); });
+    box.querySelectorAll('.pick-car').forEach(b => b.onclick = () => {
+      const car = state.cars.find(c => c.id === b.dataset.id);
+      closeSheet(); setTimeout(() => run(car), 180);
+    });
+    const q = box.querySelector('.pick-search input');
+    if (q) q.oninput = () => {
+      const t = q.value.trim();
+      box.querySelectorAll('.pick-car').forEach(b => {
+        const car = state.cars.find(c => c.id === b.dataset.id);
+        b.hidden = !!t && !matchesQuery(car, t);
+      });
+    };
   }
 
   /* ================================================================ AUTH
@@ -330,7 +387,7 @@
     buildStockTools();
     go('home');
     await Promise.all([loadCars(), loadEnquiries()]);
-    checkSchema();
+    checkSchema().then(() => { if (state.schema.v10) loadInvoices(); });
     // Home's recommendations come from the insight engine, which needs the
     // interest and ageing figures. go('home') above has already asked for
     // them, alongside the stock, and Home redraws when they land.
@@ -364,19 +421,21 @@
     }
 
     // The newer files are upgrades, not setup. Nothing breaks without them, so
-    // they're offered on the More tab rather than shouted about on Stock.
+    // they're offered in Settings rather than shouted about on Stock.
     const has = async run => {
       try {
         const { error } = await run();
         return !(error && /does not exist|schema cache|not find the table/i.test(error.message));
       } catch { return false; }
     };
-    const [v6, v7, v8] = await Promise.all([
+    const [v6, v7, v8, v10, v11] = await Promise.all([
       has(() => sb.from('tracking_status').select('v2_since').limit(1)),
       has(() => sb.from('insight_actions').select('id').limit(1)),
-      has(() => sb.from('cars').select('px_sale').limit(1))
+      has(() => sb.from('cars').select('px_sale').limit(1)),
+      has(() => sb.from('invoices').select('id').limit(1)),
+      has(() => sb.from('instagram_posts').select('id').limit(1))
     ]);
-    state.schema = { v6, v7, v8 };
+    state.schema = { v6, v7, v8, v10, v11 };
     renderUpgrades();
 
     if (!missing.length) return;
@@ -393,7 +452,7 @@
   }
 
   /**
-   * More → "Ready to switch on". Lists the upgrades that are written but not
+   * Settings → "Ready to switch on". Lists the upgrades that are written but not
    * yet turned on, in the order they have to happen, and says what each gets
    * you. Hidden once there's nothing left to do.
    */
@@ -417,6 +476,14 @@
         'Run <strong>schema-v8-part-exchange.sql</strong> in Supabase → SQL Editor. Then a sale can be marked as a part exchange, and it stays out of your margins until their car sells.']);
     }
 
+    if (state.schema.v10 === false) {
+      items.push(['Keep every invoice',
+        'Run <strong>schema-v10-invoices.sql</strong> in Supabase → SQL Editor. Invoices can be made and sent without it, but the list, the numbering (MBU-1001 on), recording payments and sharing Invoice details between the two phones need it.']);
+    }
+    if (state.schema.v11 === false) {
+      items.push(['Instagram posts on the homepage',
+        'Run <strong>schema-v11-instagram.sql</strong>, connect Instagram to Behold (free) and add its feed address to GitHub as <strong>BEHOLD_FEED_URL</strong>. The steps are at the top of <strong>.github/workflows/instagram-posts.yml</strong>.']);
+    }
     $('#upgradesCard').hidden = !items.length;
     $('#upgradesBody').innerHTML = items.map(([title, how]) => `
       <div style="padding:10px 0;border-bottom:1px solid var(--line-2)">
@@ -425,7 +492,7 @@
       </div>`).join('');
   }
 
-  /* ---- More → Auto Trader --------------------------------------------- */
+  /* ---- Settings → Auto Trader ----------------------------------------- */
   function atIntro() {
     if (!AT || !AT.isEnabled()) {
       $('#atStatus').innerHTML = `Not switched on yet. Once Auto Trader approve access, deploy the
@@ -554,59 +621,75 @@
   }
 
   /* ============================================================= NAV
-     Five tabs, and four screens you reach from them: the car form, quick
-     add, one message in full, and the bid tool (which used to be a tab and
-     now lives on Home). Back from any of those goes to the tab you came
-     from, so fixing a car from a Home alert lands you back on Home. */
-  const TABS = ['home', 'stock', 'enq', 'data', 'more'];
-  const LIT_TAB = { value: 'home', msg: 'enq' };   // which tab stays lit on a sub-screen
+     Five tabs, and the screens you reach from them: the car form, quick
+     add, one message in full, the bid tool, settings and every tool. Back
+     retraces your steps one screen at a time (Tools → Invoices → one invoice
+     → Back → Invoices), and always ends on the tab you started from, so
+     fixing a car from a Home alert lands you back on Home.
 
-  function go(view) {
-    if (!TABS.includes(view) && TABS.includes(state.view)) state.returnTo = state.view;
+     The edit screens (car form, quick add) are never stepped back into:
+     once saved there's nothing to return to. */
+  const TABS = ['home', 'stock', 'enq', 'data', 'tools'];
+  const VIEWS = ['home','stock','quick','form','value','enq','msg','data','tools','settings',
+                 'invoices','invoice','invprev','pricebook','motcal','motcheck','photos'];
+  const NO_RETURN = ['form', 'quick'];
+  const TITLES = {
+    home: 'Home', stock: 'Your stock', quick: 'Quick add', enq: 'Inbox', msg: 'Message',
+    value: 'Before you bid', data: 'Insights', tools: 'Tools', settings: 'Settings',
+    invoices: 'Invoices', invoice: 'Invoice', invprev: 'Check and send', pricebook: 'Price book', motcal: 'MOT calendar',
+    motcheck: 'MOT checker', photos: 'Photo guide'
+  };
+  // Screens that redraw themselves each time they're shown (coming back
+  // from a sub-screen included), so a saved invoice is in the list at once
+  const ON_SHOW = {};
+
+  function go(view, opts) {
+    opts = opts || {};
+    if (TABS.includes(view)) state.trail = [];
+    else if (!opts.back && view !== state.view && !NO_RETURN.includes(state.view)) state.trail.push(state.view);
     state.view = view;
-    ['home','stock','quick','form','value','enq','msg','data','more'].forEach(v =>
-      $('#' + v + 'View').classList.toggle('is-hidden', v !== view));
+    VIEWS.forEach(v => { const el = $('#' + v + 'View'); if (el) el.classList.toggle('is-hidden', v !== view); });
 
     const isForm  = view === 'form';
     const isQuick = view === 'quick';
-    const isEdit  = isForm || isQuick;
+    const isEdit  = isForm || isQuick || view === 'invoice' || view === 'invprev';
     const isSub   = !TABS.includes(view);
     $('#tabbar').style.display = isEdit ? 'none' : '';
+    $('#invBar').hidden  = view !== 'invoice';
+    $('#prevBar').hidden = view !== 'invprev';
     $('#addFab').style.display = view === 'stock' ? '' : 'none';
     $('#saveBar').hidden  = !isForm;
     $('#quickBar').hidden = !isQuick;
     $('#backBtn').hidden = !isSub;
+    $('#settingsBtn').hidden = isSub;
     $('#topbarSpacer').style.display = isSub ? 'none' : '';
+    $('#topbarSpacer2').style.display = isSub ? '' : 'none';
 
     $('#topTitle').textContent =
-      isForm ? (state.editing ? 'Edit car' : 'Add a car')
-      : isQuick ? 'Quick add'
-      : view === 'home' ? 'Home'
-      : view === 'enq' ? 'Inbox'
-      : view === 'msg' ? 'Message'
-      : view === 'value' ? 'Before you bid'
-      : view === 'data' ? 'Insights'
-      : view === 'more' ? 'More' : 'Your stock';
+      isForm ? (state.editing ? 'Edit car' : 'Add a car') : (opts.title || TITLES[view] || 'MBU Admin');
 
     // Figures are loaded on demand, and refreshed each time you open the tab
     if (view === 'home') { renderHome(); refreshHomeFigures(); }
     if (view === 'data') loadInsights();
-    if (view === 'more') atIntro();
+    if (view === 'tools') renderTools();
+    if (view === 'settings') atIntro();
+    if (ON_SHOW[view]) ON_SHOW[view](opts);
 
-    const lit = LIT_TAB[view] || view;
+    // A sub-screen keeps lit the tab you came from
+    const lit = TABS.includes(view) ? view : (state.trail.find(v => TABS.includes(v)) || 'home');
     $$('#tabbar button').forEach(b => b.classList.toggle('is-on', b.dataset.view === lit));
     window.scrollTo(0, 0);
   }
 
-  const goBack = () => go(TABS.includes(state.returnTo) ? state.returnTo : 'home');
+  const goBack = () => go(state.trail.pop() || 'home', { back: true });
 
   $$('#tabbar button').forEach(b => b.onclick = () => go(b.dataset.view));
   $('#backBtn').onclick = () => {
-    if (!state.dirty || !['form', 'quick'].includes(state.view)) { state.dirty = false; return goBack(); }
+    if (!state.dirty || !['form', 'quick', 'invoice'].includes(state.view)) { state.dirty = false; return goBack(); }
     confirmSheet('Leave without saving?', 'Anything you’ve typed will be lost.',
       'Discard changes', () => { state.dirty = false; goBack(); }, true);
   };
-  $('#moreValue').onclick = () => go('value');
+  $('#settingsBtn').onclick = () => go('settings');
 
   /* ============================================================ HOME
      What needs doing first, then the money, the stock and the messages.
@@ -775,6 +858,9 @@
         <button class="home-action" type="button" id="hBid">
           ${icon('gauge')}<span><strong>Before you bid</strong><small>History and a max bid</small></span>
         </button>
+        <button class="home-action home-action--wide" type="button" id="hInvoice">
+          ${icon('receipt')}<span><strong>Make an invoice</strong><small>For a sale, a deposit, pay monthly, or anything else</small></span>
+        </button>
       </div>
 
       <h2 class="home-h">Needs you${sections.length ? ` <span class="home-n">${sections.length}</span>` : ''}</h2>
@@ -795,6 +881,7 @@
 
     $('#hAdd').onclick = () => openQuick();
     $('#hBid').onclick = () => go('value');
+    $('#hInvoice').onclick = () => newInvoice();
     $$('#homeBody [data-home]').forEach(b => { b.onclick = () => homeActs[+b.dataset.home](); });
     // Remember which sections are open, so a redraw (a message read, a price
     // changed) doesn't snap them shut
@@ -1383,6 +1470,14 @@
     }
 
     if (car.status !== 'draft') {
+      const made = invoicesForCar(car);
+      acts.push({ label: 'Make an invoice', icon: 'receipt',
+        sub: made.length ? `${made.length} made for this car already (${made.map(r => INV.numberLabel(r.number)).join(', ')})` : car.status === 'reserved' ? 'A deposit receipt, or any other kind' : 'For a sale, a deposit or pay monthly',
+        run: () => made.length ? sheet('Invoices for this car', carTitle(car), [
+            { label: 'A new one', icon: 'plus', run: () => invoiceForCar(car) },
+            ...made.map(r => ({ label: `${INV.numberLabel(r.number)} · ${r.customer_name || 'No name'}`, icon: 'receipt',
+              sub: `${(INV.KINDS[r.kind] || {}).label || ''} · ${INV.gbp(r.total)}`, run: () => invoiceActions(fromRow(r)) }))
+          ]) : invoiceForCar(car) });
       acts.push({ label: 'Listing pack', icon: 'copy',
         sub: 'Ready-to-paste adverts for Facebook, Gumtree, Instagram',
         run: () => showListingPack(car) });
@@ -1587,7 +1682,7 @@
         if (!px && !pxReady()) {
           const note = $('#fgPxNote');
           note.hidden = false;
-          note.innerHTML = 'Part exchange needs a one-off database update first: run <strong>schema-v8-part-exchange.sql</strong> (More → Ready to switch on).';
+          note.innerHTML = 'Part exchange needs a one-off database update first: run <strong>schema-v8-part-exchange.sql</strong> (Settings, the gear at the top right → Ready to switch on).';
           return;
         }
         setPx(!px);
@@ -1611,6 +1706,7 @@
         if (car.status !== 'sold') return;             // didn't save; setStatus has said why
         if (car.px_sale && !pxCarOf(car)) return addPxCar(car);
         if (opts.after) opts.after();
+        else setTimeout(() => offerInvoice(car), 350);
         return;
       }
       const { error } = await sb.from('cars').update(patch).eq('id', car.id);
@@ -4412,7 +4508,8 @@
       ['wanted_requests', 'mbu-car-requests'],
       ['price_checks',    'mbu-price-book'],
       ['price_history',   'mbu-price-changes'],
-      ['car_stats',       'mbu-car-performance']
+      ['car_stats',       'mbu-car-performance'],
+      ['invoices',        'mbu-invoices']
     ];
 
     let done = 0, skipped = [];
@@ -4910,7 +5007,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
   async function loadPriceHistory(make, model) {
     if (!make) return [];
     let q = sb.from('price_checks').select('*')
-      .ilike('make', make).order('created_at', { ascending: false }).limit(6);
+      .ilike('make', make).order('created_at', { ascending: false }).limit(16);
     if (model) q = q.ilike('model', model);
     const { data, error } = await q;
     if (error) { console.warn('price_checks unavailable', error); return null; }
@@ -4994,7 +5091,10 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     const history = await loadPriceHistory(v.make, v.model);
 
     const url = autoTraderSearchUrl(v, mileage);
-    const seen = (history || []).filter(h => h.typical);
+    // Auction results (schema v12) are what these fetch in the trade, a guide
+    // to what you'll pay, never a sell price, so they get their own list
+    const seen = (history || []).filter(h => h.typical && h.source !== 'auction');
+    const hammer = (history || []).filter(h => h.typical && h.source === 'auction');
     const avgSeen = seen.length
       ? Math.round(seen.reduce((n, h) => n + h.typical, 0) / seen.length) : null;
 
@@ -5031,7 +5131,22 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       : `<p class="hint" style="margin-top:12px">
           Nothing recorded for these yet. Check Auto Trader, tap Record, and it'll
           be here next time.
-        </p>`}`;
+        </p>`}
+      ${hammer.length ? `
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line-2)">
+          <div style="font-size:13px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px">
+            Seen at auction
+          </div>
+          <p class="hint" style="margin:0 0 6px">What they fetched in the trade: a guide to what you’ll pay, not what it’ll sell for.</p>
+          ${hammer.slice(0, 4).map(h => `
+            <div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;font-size:14.5px">
+              <span style="color:var(--ink-3)">
+                ${new Date(h.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}
+                ${h.detail && h.detail.house ? ' · ' + esc(h.detail.house) : ''}${h.year ? ' · ' + h.year : ''}${h.mileage ? ' · ' + nf(h.mileage) + ' mi' : ''}
+              </span>
+              <span style="font-weight:700">${money(h.typical)}</span>
+            </div>`).join('')}
+        </div>` : ''}`;
 
     // Query inside `box`, not the document: by the time the await above
     // resolves the user may have tapped "Check another car", leaving this
@@ -5458,6 +5573,1614 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
 
     state.dirty = true;
     toast('Started from the plate. Add photos and a price', 'ok');
+  }
+
+  /* ========================================================= INVOICES
+     Make an invoice in a minute instead of asking ChatGPT for one (3 Oct
+     2026). Pick a kind, the car fills itself in, type the customer, check
+     the figures and the terms, then Check and send: the finished PDF goes
+     out through the phone's share sheet (Gmail, Mail, WhatsApp, Print).
+
+     What goes on an invoice, and every term's wording, is worked out in
+     invoice-doc.js. This is just the screens. Saved invoices live in the
+     `invoices` table (schema-v10); without it everything still works except
+     the history, and the app says so. */
+  const INV = window.MBU_INVOICE || null;
+  const JSPDF = {
+    src: 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js',
+    sri: 'sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg=='
+  };
+  const PAY_METHODS = ['Bank transfer', 'Cash', 'Card', 'Finance company', 'Cheque', 'Other'];
+  const SELLER_KEY = 'mbu_inv_seller';
+  const IV = { list: [], loaded: false, tab: 'all', q: '', settings: null, cur: null, pdf: null, pdfFor: null, assets: null };
+
+  const ukPhone = p => String(p || '').replace(/^\+44\s?/, '0').replace(/^0(\d{4})(\d{6})$/, '0$1 $2');
+  const invTitle = i => (i.customer && i.customer.name) || 'No name yet';
+  const clone = o => JSON.parse(JSON.stringify(o));
+
+  /* ---- Settings: who sells, the business details, VAT ------------------- */
+  function settingsDefaults() {
+    const b = CFG.business || {};
+    const site = String((CFG.options && CFG.options.siteUrl) || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+    return {
+      address: [b.addressLine, b.town, b.postcode].filter(Boolean).join(', ') || INV.DEFAULT_SETTINGS.address,
+      email: b.email || INV.DEFAULT_SETTINGS.email,
+      website: site || INV.DEFAULT_SETTINGS.website,
+      // Both numbers in use: the website's, and the one on Autotrader. Names
+      // go in under Settings → Invoice details.
+      sellers: [{ name: '', phone: ukPhone(b.phone) || '07438 510044' }, { name: '', phone: '07537 123723' }]
+    };
+  }
+
+  async function invoiceSettings() {
+    if (IV.settings) return IV.settings;
+    let saved = null;
+    if (state.schema.v10 !== false) {
+      try {
+        const { data, error } = await sb.from('app_settings').select('value').eq('key', 'invoice').maybeSingle();
+        if (!error && data) saved = data.value;
+      } catch { /* not there yet */ }
+    }
+    if (!saved) { try { saved = JSON.parse(localStorage.getItem('mbu_invoice_settings') || 'null'); } catch { /* none */ } }
+    IV.settings = Object.assign({}, INV.DEFAULT_SETTINGS, settingsDefaults(), saved || {});
+    return IV.settings;
+  }
+
+  async function saveInvoiceSettings(next) {
+    IV.settings = Object.assign({}, IV.settings, next);
+    try { localStorage.setItem('mbu_invoice_settings', JSON.stringify(IV.settings)); } catch { /* fine */ }
+    if (state.schema.v10) {
+      const { error } = await sb.from('app_settings').upsert({ key: 'invoice', value: IV.settings, updated_at: new Date().toISOString() });
+      if (error) return toast('Saved on this phone only: ' + error.message);
+      return toast('Saved for both phones', 'ok');
+    }
+    toast('Saved on this phone. Run schema v10 to share it with the other phone.', 'ok');
+  }
+
+  async function invoiceSettingsSheet() {
+    const s = await invoiceSettings();
+    const sellerRow = (x, i) => `
+      <div class="inv-seller" data-i="${i}">
+        <input class="in" data-s="name" value="${esc(x.name)}" placeholder="Name (e.g. Usman)" autocapitalize="words">
+        <input class="in" data-s="phone" value="${esc(x.phone)}" placeholder="Phone" inputmode="tel">
+        <button class="inv-x" type="button" data-del aria-label="Remove">${icon('close')}</button>
+      </div>`;
+    const box = sheetHtml('Invoice details', 'Printed on every invoice. Shared by both phones once schema v10 is run.', `
+      <div class="section-card">
+        <h2>Who sells</h2>
+        <p class="hint" style="margin:-6px 0 12px">Each invoice says who dealt with it and their number. Pick one when you make it.</p>
+        <div id="isSellers">${s.sellers.map(sellerRow).join('')}</div>
+        <button class="btn btn--ghost" type="button" id="isAddSeller">${icon('plus')} Add someone</button>
+      </div>
+      <div class="section-card">
+        <h2>The business</h2>
+        <div class="f"><label>Trading address</label><input class="in" id="isAddress" value="${esc(s.address)}"></div>
+        <div class="row-2">
+          <div class="f"><label>Email</label><input class="in" id="isEmail" value="${esc(s.email)}" inputmode="email"></div>
+          <div class="f"><label>Website</label><input class="in" id="isWebsite" value="${esc(s.website)}"></div>
+        </div>
+      </div>
+      <div class="section-card">
+        <h2>Company details</h2>
+        <p class="hint" style="margin:-6px 0 12px">A limited company has to show its number and registered office on its invoices. From Companies House.</p>
+        <div class="row-2">
+          <div class="f"><label>Company number</label><input class="in" id="isCoNo" value="${esc(s.company_number)}" inputmode="numeric"></div>
+          <div class="f"><label>Registered name</label><input class="in" id="isLegal" value="${esc(s.legal_name)}"></div>
+        </div>
+        <div class="f"><label>Registered office</label><input class="in" id="isOffice" value="${esc(s.registered_office)}"></div>
+        <label class="tickrow"><input type="checkbox" id="isCoDefault"${s.company_default ? ' checked' : ''}>
+          <div><strong>Tick it on every new invoice</strong><small>You can still untick it on any one.</small></div></label>
+      </div>
+      <div class="section-card">
+        <h2>VAT</h2>
+        <label class="tickrow"><input type="checkbox" id="isVat"${s.vat_registered ? ' checked' : ''}>
+          <div><strong>MBU Sales Limited is VAT registered</strong><small>Adds the VAT number and the margin scheme wording. Leave off if not.</small></div></label>
+        <div class="f" style="margin-top:12px"><label>VAT number</label><input class="in" id="isVatNo" value="${esc(s.vat_number)}" placeholder="GB 123 4567 89"></div>
+      </div>
+      <div class="section-card">
+        <h2>Bank details</h2>
+        <p class="hint" style="margin:-6px 0 12px">Printed on every invoice (under the money when something's owed), with the invoice number as the reference, and in the email. Kept in your database, not in the website's code.</p>
+        <div class="f"><label for="isBankName">Account name</label><input class="in" id="isBankName" value="${esc(s.bank_name)}" autocapitalize="words"></div>
+        <div class="row-2">
+          <div class="f"><label for="isBankSort">Sort code</label><input class="in" id="isBankSort" value="${esc(s.bank_sort)}" inputmode="numeric" placeholder="00-00-00"></div>
+          <div class="f"><label for="isBankAcc">Account number</label><input class="in" id="isBankAcc" value="${esc(s.bank_account)}" inputmode="numeric" placeholder="8 digits"></div>
+        </div>
+        <div class="f" style="margin:16px 0 0"><label for="isPay">Anything else about paying <span class="opt">(optional)</span></label>
+          <textarea class="ta" id="isPay" rows="2" placeholder="e.g. Cash on collection is fine too">${esc(s.pay_details)}</textarea></div>
+      </div>
+      <button class="btn btn--accent btn--block" type="button" id="isSave">Save</button>`);
+    const sellers = () => $$('#isSellers .inv-seller').map(r => ({ name: r.querySelector('[data-s=name]').value.trim(), phone: r.querySelector('[data-s=phone]').value.trim() }))
+      .filter(x => x.name || x.phone);
+    const wireDel = () => box.querySelectorAll('[data-del]').forEach(b => b.onclick = () => b.closest('.inv-seller').remove());
+    wireDel();
+    $('#isAddSeller').onclick = () => { $('#isSellers').insertAdjacentHTML('beforeend', sellerRow({ name: '', phone: '' }, 99)); wireDel(); };
+    $('#isSave').onclick = async () => {
+      closeSheet();
+      await saveInvoiceSettings({
+        sellers: sellers(), address: $('#isAddress').value.trim(), email: $('#isEmail').value.trim(), website: $('#isWebsite').value.trim(),
+        company_number: $('#isCoNo').value.trim(), legal_name: $('#isLegal').value.trim() || 'MBU Sales Limited',
+        registered_office: $('#isOffice').value.trim(), company_default: $('#isCoDefault').checked,
+        vat_registered: $('#isVat').checked, vat_number: $('#isVatNo').value.trim(), pay_details: $('#isPay').value.trim(),
+        bank_name: $('#isBankName').value.trim(), bank_sort: sortCode($('#isBankSort').value), bank_account: $('#isBankAcc').value.replace(/\D/g, '')
+      });
+      if (state.view === 'invoice') renderInvoiceForm();
+      if (state.view === 'invprev') renderPreview();
+    };
+  }
+  $('#invoiceSettingsBtn').onclick = () => invoiceSettingsSheet();
+  // "305466" or "30 54 66" → "30-54-66"
+  const sortCode = v => { const d = String(v || '').replace(/\D/g, ''); return d.length === 6 ? d.replace(/(\d\d)(\d\d)(\d\d)/, '$1-$2-$3') : String(v || '').trim(); };
+
+  /* ---- A new invoice ---------------------------------------------------- */
+  function sellerLabel(x) { return [x.name, x.phone].filter(Boolean).join(' · ') || 'No name'; }
+
+  async function blankInvoice(kind) {
+    const s = await invoiceSettings();
+    const pick = remembered(SELLER_KEY, '');
+    const seller = s.sellers.find(x => sellerLabel(x) === pick) || s.sellers[0] || { name: '', phone: '' };
+    return {
+      kind: kind || 'paid', issue_date: INV.today(), sale_date: INV.today(), status: 'draft',
+      vehicle: {}, customer: {}, seller: { name: seller.name, phone: seller.phone },
+      price: null, extras: [], px: { on: false }, payments: [], deposit_nonrefundable: true,
+      balance_due_date: '', plan: { count: '', amount: '', first: '', frequency: 'monthly' },
+      terms: {}, extra_terms: [], custom_terms: [], notes: '',
+      options: { company: !!s.company_default }, signatures: {}, sent: []
+    };
+  }
+
+  function vehicleFromCar(car) {
+    return { registration: car.registration || '', make: car.make ? (MK.makeName(car.make) || car.make) : '', model: car.model || '',
+      variant: car.variant || '', year: car.year || '', mileage: car.mileage || '', colour: car.colour || '' };
+  }
+
+  /** An invoice for one of your cars, filled in from what the app knows. */
+  async function invoiceForCar(car, kind) {
+    kind = kind || (car.status === 'reserved' ? 'deposit' : 'paid');
+    const inv = await blankInvoice(kind);
+    inv.car_id = car.id;
+    inv.vehicle = vehicleFromCar(car);
+    inv.price = car.status === 'sold' && car.sale_price != null ? car.sale_price : car.price;
+    if (car.sold_at) inv.sale_date = INV.isoDate(new Date(car.sold_at));
+    if (car.px_sale && car.px_cash != null && car.sale_price != null) {
+      const theirs = pxCarOf(car);
+      inv.px = { on: true, allowance: Math.max(0, car.sale_price - car.px_cash),
+        registration: theirs ? theirs.registration : '', make: theirs ? [MK.makeName(theirs.make) || theirs.make, theirs.model].filter(Boolean).join(' ') : '' };
+    }
+    seedPayments(inv);
+    openInvoice(inv);
+  }
+
+  // The usual starting payments for a kind: all of it for paid in full, a
+  // deposit row for a deposit, what they put down for pay monthly. Marked
+  // `auto` until someone types in them, so changing the kind swaps them for
+  // the new kind's rather than leaving "paid £7,000" on a pay monthly plan.
+  function seedPayments(inv) {
+    inv.payments = (inv.payments || []).filter(p => !p.auto);
+    if (inv.payments.length) return;
+    const due = INV.totals(inv).due;
+    if (inv.kind === 'paid' && due > 0) inv.payments = [{ date: inv.sale_date || INV.today(), amount: due, method: 'Bank transfer', auto: true }];
+    if (inv.kind === 'deposit') inv.payments = [{ date: INV.today(), amount: '', method: 'Bank transfer', deposit: true, auto: true }];
+    if (inv.kind === 'instalments') {
+      inv.payments = [{ date: inv.sale_date || INV.today(), amount: '', method: 'Cash', auto: true }];
+      if (!inv.plan.first) { const d = new Date(); d.setMonth(d.getMonth() + 1); inv.plan.first = INV.isoDate(d); }
+    }
+  }
+
+  function newInvoice() {
+    pickCar({
+      title: 'New invoice', sub: 'Which car is it for?',
+      filter: c => c.status !== 'draft',
+      extra: [
+        { label: 'A car that isn’t in your stock', sub: 'Type its details in', icon: 'car', run: async () => openInvoice(await blankInvoice('paid')) },
+        { label: 'No car: anything else', sub: 'Delivery, an MOT, repairs, a part', icon: 'receipt', run: async () => openInvoice(await blankInvoice('general')) }
+      ],
+      run: car => invoiceForCar(car)
+    });
+  }
+  $('#invNew').onclick = () => newInvoice();
+
+  function openInvoice(inv) {
+    IV.cur = inv;
+    IV.pdf = null;
+    state.dirty = false;
+    go('invoice', { title: inv.number ? INV.numberLabel(inv.number) : 'New invoice' });
+    renderInvoiceForm();
+  }
+
+  /* ---- Reading and writing the form ------------------------------------- */
+  function setPath(obj, path, value) {
+    const parts = path.split('.');
+    let o = obj;
+    parts.slice(0, -1).forEach((p, i) => {
+      if (o[p] == null || typeof o[p] !== 'object') o[p] = /^\d+$/.test(parts[i + 1]) ? [] : {};
+      o = o[p];
+    });
+    o[parts[parts.length - 1]] = value;
+  }
+  function getPath(obj, path) {
+    return path.split('.').reduce((o, p) => (o == null ? undefined : o[p]), obj);
+  }
+  function readField(el) {
+    if (el.type === 'checkbox') return el.checked;
+    if (el.dataset.num != null) { const n = num(el.value); return n == null ? '' : n; }
+    return el.value;
+  }
+
+  const fid = k => 'if-' + k.replace(/\./g, '-');
+  const F = {
+    text: (label, k, o = {}) => `<div class="f${o.cls ? ' ' + o.cls : ''}"><label for="${fid(k)}">${esc(label)}${o.opt ? ' <span class="opt">(optional)</span>' : ''}</label>
+      <input class="in" id="${fid(k)}" data-k="${k}" value="${esc(getPath(IV.cur, k) ?? '')}" type="${o.type || 'text'}"${o.mode ? ` inputmode="${o.mode}"` : ''}${o.ph ? ` placeholder="${esc(o.ph)}"` : ''}${o.cap ? ` autocapitalize="${o.cap}"` : ''}${o.auto ? ` autocomplete="${o.auto}"` : ''}></div>`,
+    money: (label, k, o = {}) => `<div class="f${o.cls ? ' ' + o.cls : ''}"><label for="${fid(k)}">${esc(label)}</label>
+      <div class="money"><input class="in" id="${fid(k)}" data-k="${k}" data-num value="${esc(getPath(IV.cur, k) ?? '')}" inputmode="decimal" placeholder="0"></div></div>`,
+    date: (label, k, o = {}) => `<div class="f${o.cls ? ' ' + o.cls : ''}"><label for="${fid(k)}">${esc(label)}</label>
+      <input class="in" type="date" id="${fid(k)}" data-k="${k}" value="${esc(getPath(IV.cur, k) || '')}"></div>`
+  };
+
+  /* ---- The builder ------------------------------------------------------ */
+  function renderInvoiceForm() {
+    const inv = IV.cur, s = IV.settings || INV.DEFAULT_SETTINGS;
+    if (!inv) return;
+    const k = INV.KINDS[inv.kind];
+    const purchase = inv.kind === 'purchase', general = inv.kind === 'general';
+    const v = inv.vehicle || {};
+    const carLine = [v.year, v.make, v.model].filter(Boolean).join(' ');
+    const enquirers = inv.car_id ? state.enquiries.filter(e => String(e.car_id) === String(inv.car_id) && (e.name || e.phone || e.email)) : [];
+    const sellers = s.sellers || [];
+    const sellerIdx = sellers.findIndex(x => x.name === (inv.seller || {}).name && x.phone === (inv.seller || {}).phone);
+
+    $('#invForm').innerHTML = `
+      ${state.schema.v10 === false ? `<div class="msg msg--warn is-shown">Invoices aren’t being kept yet. You can make, send and print this one, but it won’t be in the list afterwards until <strong>schema-v10-invoices.sql</strong> is run (Settings → Ready to switch on).</div>` : ''}
+      <div class="section-card">
+        <h2>What’s it for?</h2>
+        <div class="chips" id="invKinds">${INV.KIND_ORDER.map(key => `<button class="chip${inv.kind === key ? ' is-on' : ''}" type="button" data-kind="${key}">${esc(INV.KINDS[key].label)}</button>`).join('')}</div>
+        <p class="hint" style="margin-top:10px">${esc(k.help)}</p>
+        <details class="inv-more"${inv.title || inv.subtitle ? ' open' : ''}>
+          <summary>Change the heading</summary>
+          <div class="f" style="margin-top:12px"><label for="if-title">Heading</label><input class="in" id="if-title" data-k="title" value="${esc(inv.title || '')}" placeholder="${esc(k.title)}"></div>
+          <div class="f" style="margin-bottom:0"><label for="if-subtitle">Line under it</label><input class="in" id="if-subtitle" data-k="subtitle" value="${esc(inv.subtitle || '')}" placeholder="${esc(k.subtitle || 'Nothing')}"></div>
+        </details>
+      </div>
+
+      <div class="section-card">
+        <h2>${general ? 'The car <span class="opt">(if there is one)</span>' : 'The car'}</h2>
+        ${carLine || v.registration ? `<div class="inv-car">
+            <div><strong>${esc(carLine || 'Car')}</strong><small>${esc(v.registration ? fmtReg(v.registration) : 'No plate')}</small></div>
+            <button class="btn btn--sm btn--outline" type="button" id="invPickCar">Change</button>
+          </div>` : `<button class="btn btn--outline btn--block" type="button" id="invPickCar">${icon('car')} Pick one of your cars</button>`}
+        <details class="inv-more"${!carLine && !v.registration ? ' open' : ''}>
+          <summary>${carLine || v.registration ? 'Edit the details' : 'Or type them in'}</summary>
+          <div class="row-2" style="margin-top:12px">
+            ${F.text('Registration', 'vehicle.registration', { cap: 'characters', ph: 'AB12 CDE' })}
+            ${F.text('Year', 'vehicle.year', { mode: 'numeric' })}
+          </div>
+          <div class="row-2">${F.text('Make', 'vehicle.make', { cap: 'words' })}${F.text('Model', 'vehicle.model', { cap: 'words' })}</div>
+          <div class="row-2">${F.text('Trim', 'vehicle.variant', { opt: true })}${F.text('Mileage', 'vehicle.mileage', { mode: 'numeric', opt: true })}</div>
+          <div class="row-2">${F.text('Colour', 'vehicle.colour', { opt: true, cap: 'words' })}${F.text('VIN', 'vehicle.vin', { opt: true, cap: 'characters' })}</div>
+        </details>
+      </div>
+
+      <div class="section-card">
+        <h2>${purchase ? 'Who you bought it from' : general ? 'The customer' : 'The buyer'}</h2>
+        ${enquirers.length ? `<div class="chips" style="margin-bottom:14px">${enquirers.slice(0, 4).map((e, i) => `<button class="chip" type="button" data-enq="${i}">Use ${esc(e.name || e.phone || e.email)}’s details</button>`).join('')}</div>` : ''}
+        ${F.text('Name', 'customer.name', { cap: 'words', auto: 'off' })}
+        <div class="row-2">${F.text('Phone', 'customer.phone', { type: 'tel', mode: 'tel', auto: 'off' })}${F.text('Email', 'customer.email', { type: 'email', mode: 'email', auto: 'off', cap: 'off' })}</div>
+        <div class="f" style="margin:16px 0 0"><label for="if-customer-address">Address</label>
+          <textarea class="ta inv-ta" id="if-customer-address" data-k="customer.address" rows="2" placeholder="House, street, town, postcode">${esc(inv.customer.address || '')}</textarea></div>
+      </div>
+
+      <div class="section-card money-card">
+        <h2>The money</h2>
+        ${general ? '' : F.money(purchase ? 'What you’re paying them' : 'Agreed price', 'price')}
+        <div class="lbl inv-lbl">${general ? 'What it’s for' : 'Extras and discounts'}</div>
+        <div id="invLines">${(inv.extras || []).map((x, i) => `
+          <div class="inv-line" data-i="${i}">
+            <input class="in" data-k="extras.${i}.label" aria-label="What it’s for" value="${esc(x.label || '')}" placeholder="${general ? 'e.g. MOT' : 'e.g. Delivery'}" autocapitalize="sentences">
+            <div class="money"><input class="in" data-k="extras.${i}.amount" aria-label="Amount" data-num value="${esc(x.amount ?? '')}" inputmode="decimal" placeholder="0"></div>
+            <button class="inv-x" type="button" data-del-line="${i}" aria-label="Remove">${icon('close')}</button>
+          </div>`).join('')}</div>
+        <div class="chips inv-addrow">
+          <button class="chip chip--add" type="button" data-add-line="">+ Add a line</button>
+          ${general ? '' : ['Delivery', 'Warranty', 'Discount'].map(x => `<button class="chip chip--add" type="button" data-add-line="${x}">+ ${x}</button>`).join('')}
+        </div>
+        <p class="hint">${general ? 'Each line prints on the invoice.' : 'A discount is a line with a minus amount, like −100.'}</p>
+
+        ${general || purchase ? '' : `
+        <label class="tickrow" style="margin-top:16px"><input type="checkbox" data-k="px.on" data-redraw${inv.px && inv.px.on ? ' checked' : ''}>
+          <div><strong>Part exchange</strong><small>Their car comes off the price.</small></div></label>
+        ${inv.px && inv.px.on ? `<div class="inv-px">
+          <div class="row-2">${F.text('Their plate', 'px.registration', { cap: 'characters' })}${F.text('Make and model', 'px.make', { cap: 'words' })}</div>
+          ${F.money('Allowed for it', 'px.allowance', { cls: 'f--tight' })}
+        </div>` : ''}`}
+
+        <div class="lbl inv-lbl" style="margin-top:18px">${purchase ? 'Paid to them' : 'Paid so far'}</div>
+        <div id="invPays">${(inv.payments || []).map((p, i) => `
+          <div class="inv-pay" data-i="${i}">
+            <div class="money"><input class="in" data-k="payments.${i}.amount" aria-label="Amount paid" data-num value="${esc(p.amount ?? '')}" inputmode="decimal" placeholder="0"></div>
+            <select class="sel" data-k="payments.${i}.method" aria-label="How it was paid">${PAY_METHODS.map(m => `<option${p.method === m ? ' selected' : ''}>${m}</option>`).join('')}</select>
+            <input class="in" type="date" data-k="payments.${i}.date" value="${esc(p.date || '')}" aria-label="Date paid">
+            <label class="inv-dep"><input type="checkbox" data-k="payments.${i}.deposit" data-redraw${p.deposit ? ' checked' : ''}> Deposit</label>
+            ${p.instalment ? '<span class="pill pill--blue">Instalment</span>' : ''}
+            <button class="inv-x" type="button" data-del-pay="${i}" aria-label="Remove">${icon('close')}</button>
+          </div>`).join('')}</div>
+        <div class="chips inv-addrow">
+          <button class="chip chip--add" type="button" id="invAddPay">+ Add a payment</button>
+          <button class="chip chip--add" type="button" id="invPayRest">+ The rest, paid now</button>
+        </div>
+        ${INV.totals(inv).deposit > 0 ? `<div class="f" style="margin-top:14px"><label>The deposit</label>
+          <select class="sel" data-k="deposit_nonrefundable" data-bool data-redraw>
+            <option value="1"${inv.deposit_nonrefundable !== false ? ' selected' : ''}>Non-refundable (unless the law says otherwise)</option>
+            <option value="0"${inv.deposit_nonrefundable === false ? ' selected' : ''}>Refundable if they don’t go ahead</option>
+          </select></div>` : ''}
+        ${['deposit', 'balance', 'trade', 'purchase', 'general'].includes(inv.kind) ? `<div class="f" style="margin-top:14px"><label>Anything left to pay is due</label>
+          <div class="row-2"><select class="sel" id="invDueWhen">
+            <option value="collect"${!inv.balance_due_date ? ' selected' : ''}>${purchase ? 'When we collect it' : 'On collection'}</option>
+            <option value="date"${inv.balance_due_date ? ' selected' : ''}>By a date</option></select>
+            <input class="in" type="date" data-k="balance_due_date" value="${esc(inv.balance_due_date || '')}"${inv.balance_due_date ? '' : ' hidden'} id="invDueDate"></div></div>` : ''}
+        <div class="moneyline" id="invTotals"></div>
+      </div>
+
+      ${inv.kind === 'instalments' ? `<div class="section-card" id="invPlanCard">
+        <h2>The instalments</h2>
+        <div class="row-2">
+          <div class="f"><label for="ipCount">How many payments</label><input class="in" id="ipCount" inputmode="numeric" value="${esc(inv.plan.count || '')}" placeholder="4"></div>
+          <div class="f"><label for="ipAmount">Each payment</label><div class="money"><input class="in" id="ipAmount" inputmode="decimal" value="${esc(inv.plan.amount || '')}" placeholder="500"></div></div>
+        </div>
+        <div class="row-2">
+          ${F.date('First payment', 'plan.first')}
+          <div class="f"><label for="if-plan-frequency">How often</label><select class="sel" id="if-plan-frequency" data-k="plan.frequency">
+            ${[['monthly', 'Monthly'], ['fortnightly', 'Fortnightly'], ['weekly', 'Weekly']].map(([val, l]) => `<option value="${val}"${(inv.plan.frequency || 'monthly') === val ? ' selected' : ''}>${l}</option>`).join('')}
+          </select></div>
+        </div>
+        <p class="hint">Type how many payments or how much each, and the other works itself out.</p>
+        <div id="invPlan"></div>
+      </div>` : ''}
+
+      <div class="section-card">
+        <h2>Terms <span class="opt">· tap one to change its wording</span></h2>
+        <div id="invTerms"></div>
+        <div class="chips inv-addrow" style="margin-top:12px">
+          <button class="chip chip--add" type="button" id="invAddTerm">+ Write your own</button>
+          <button class="chip chip--add" type="button" id="invStdTerm">+ Add a standard one</button>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <h2>Anything else to put on it</h2>
+        <textarea class="ta" data-k="notes" rows="3" aria-label="Anything else to put on it" placeholder="e.g. Two keys handed over. V5C to follow by post.">${esc(inv.notes || '')}</textarea>
+        <p class="hint" style="margin-top:6px">Prints under Additional notes. Leave it blank and it doesn’t appear.</p>
+      </div>
+
+      <div class="section-card">
+        <h2>Dates and who sold it</h2>
+        <div class="row-2">${F.date('Date on the invoice', 'issue_date')}${F.date(purchase ? 'Date bought' : general ? 'Date of the work' : 'Date of sale', 'sale_date')}</div>
+        <div class="f" style="margin-top:16px"><label for="invSeller">${purchase ? 'Who bought it' : 'Who sold it'}</label>
+          <select class="sel" id="invSeller">
+            ${sellers.map((x, i) => `<option value="${i}"${i === sellerIdx ? ' selected' : ''}>${esc(sellerLabel(x))}</option>`).join('')}
+            <option value="other"${sellerIdx < 0 ? ' selected' : ''}>Someone else</option>
+          </select>
+        </div>
+        ${sellerIdx < 0 ? `<div class="row-2">${F.text('Name', 'seller.name', { cap: 'words' })}${F.text('Phone', 'seller.phone', { type: 'tel', mode: 'tel' })}</div>` : ''}
+        ${sellers.some(x => !x.name) ? `<p class="hint">Put names to the numbers in <button class="linkish" type="button" id="invNames">Invoice details</button>.</p>` : ''}
+        <label class="tickrow" style="margin-top:14px"><input type="checkbox" data-k="options.company" data-redraw${inv.options && inv.options.company ? ' checked' : ''}>
+          <div><strong>Print the company number and registered office</strong>
+          <small>A limited company is meant to show these on its invoices${s.company_number ? ` (no. ${esc(s.company_number)})` : ''}. Change them in Invoice details.</small></div></label>
+      </div>
+
+      <div class="section-card">
+        <h2>Signatures <span class="opt">(optional)</span></h2>
+        <p class="hint" style="margin:-6px 0 12px">Sign on the screen with a finger. Skip it and the PDF has lines to sign on paper.</p>
+        <div class="inv-sigbtns">${['buyer', 'seller'].map(who => {
+          const sg = (inv.signatures || {})[who];
+          const label = who === 'buyer' ? (purchase ? 'Seller (them)' : general ? 'Customer' : 'Buyer') : (purchase ? 'MBU' : 'Seller (MBU)');
+          return sg && sg.png
+            ? `<div class="inv-signed"><img src="${esc(sg.png)}" alt="Signature"><span>${esc(label)} · signed ${esc(INV.ukDate(sg.date))}</span><button class="btn btn--sm btn--ghost" type="button" data-unsign="${who}">Clear</button></div>`
+            : `<button class="btn btn--outline" type="button" data-sign="${who}">${icon('sign')} ${esc(label)} signs</button>`;
+        }).join('')}</div>
+      </div>
+
+      ${inv.id ? `<button class="btn btn--ghost btn--block" type="button" id="invMoreActs" style="margin-top:14px">More: copy, void${inv.status === 'draft' ? ', delete' : ''}</button>` : ''}`;
+
+    refreshInvoiceLive();
+    wireInvoiceForm(enquirers);
+  }
+
+  // The parts that follow the figures: totals, the schedule, the terms
+  function refreshInvoiceLive(skipPlan) {
+    const inv = IV.cur, t = INV.totals(inv);
+    const purchase = inv.kind === 'purchase';
+    const line = (label, value, cls) => `<div class="ml ${cls || ''}"><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
+    const box = $('#invTotals');
+    if (box) box.innerHTML =
+      (t.extras.length || t.px ? line('Total', INV.gbp(t.goods)) : '') +
+      (t.px ? line('Part exchange', INV.gbp(-t.px)) : '') +
+      line(purchase ? 'To pay them' : 'To pay', INV.gbp(t.due)) +
+      line(purchase ? 'Paid to them' : 'Paid', INV.gbp(t.paid)) +
+      line(t.balance < -0.004 ? 'Paid too much' : 'Left to pay', t.balance > 0.004 ? INV.gbp(t.balance) : t.balance < -0.004 ? INV.gbp(-t.balance) : 'Nothing, paid in full',
+        'ml--total ' + (t.balance < -0.004 ? 'ml--bad' : t.balance > 0.004 ? '' : 'ml--good'));
+
+    if (!skipPlan && $('#invPlan')) renderPlan();
+    renderTerms();
+  }
+
+  function renderPlan() {
+    const inv = IV.cur;
+    const rows = INV.planRows(inv);
+    const warn = INV.warnings(inv, IV.settings).filter(w => w.field === 'plan');
+    // Show the other half of count / amount as it works out
+    const cnt = $('#ipCount'), amt = $('#ipAmount');
+    if (cnt && document.activeElement !== cnt && rows.length && !inv.plan.count) cnt.placeholder = String(rows.length);
+    if (amt && document.activeElement !== amt && rows.length && !inv.plan.amount) amt.placeholder = String(rows[0].amount);
+    const edited = !!inv.plan.edited;
+    $('#invPlan').innerHTML = `
+      ${warn.map(w => `<div class="msg msg--${w.level === 'red' ? 'err' : 'warn'} is-shown" style="margin-top:12px">${w.fca ? '<strong>Check this one.</strong> ' : ''}${esc(w.text)}</div>`).join('')}
+      ${rows.length ? `<table class="inv-sched"><thead><tr><th>#</th><th>Due</th><th>Amount</th></tr></thead><tbody>
+        ${rows.map((r, i) => `<tr${r.paid_on ? ' class="is-paid"' : ''}><td>${i + 1}</td>
+          <td>${edited ? `<input class="in in--sm" type="date" data-row="${i}" data-f="due" value="${esc(r.due)}">` : esc(INV.ukDate(r.due))}</td>
+          <td>${edited ? `<input class="in in--sm" data-row="${i}" data-f="amount" inputmode="decimal" value="${esc(r.amount)}">` : esc(INV.gbp(r.amount))}${r.paid_on ? ` <span class="pill pill--green">Paid</span>` : ''}</td></tr>`).join('')}
+        </tbody></table>
+        <button class="btn btn--ghost btn--sm" type="button" id="ipEdit">${edited ? 'Work them out again' : 'Change a date or amount'}</button>` : ''}`;
+    $$('#invPlan [data-row]').forEach(el => el.oninput = () => {
+      const r = inv.plan.rows[+el.dataset.row];
+      r[el.dataset.f] = el.dataset.f === 'amount' ? (num(el.value) || 0) : el.value;
+      state.dirty = true;
+      refreshInvoiceLive(true);
+    });
+    const ed = $('#ipEdit');
+    if (ed) ed.onclick = () => {
+      if (inv.plan.edited) { inv.plan.edited = false; delete inv.plan.rows; }
+      else { inv.plan.rows = INV.planRows(inv).map(r => ({ due: r.due, amount: r.amount })); inv.plan.edited = true; }
+      state.dirty = true;
+      renderPlan(); renderTerms();
+    };
+  }
+
+  function renderTerms() {
+    const box = $('#invTerms');
+    if (!box) return;
+    const list = INV.termList(IV.cur, IV.settings).filter(x => x.shown);
+    box.innerHTML = list.map(x => `
+      <div class="inv-term${x.on ? '' : ' is-off'}">
+        <input type="checkbox" data-term-on="${esc(x.key)}"${x.on ? ' checked' : ''} aria-label="Include ${esc(x.label)}">
+        <button class="inv-term-body" type="button" data-term-edit="${esc(x.key)}">
+          <strong>${esc(x.head)}</strong> ${esc(x.text)}
+          ${x.edited && !x.custom ? '<em class="pill pill--amber">Reworded</em>' : ''}${x.custom ? '<em class="pill pill--blue">Your own</em>' : ''}
+        </button>
+      </div>`).join('') || '<p class="hint">No terms. Add one below if you want any.</p>';
+    box.querySelectorAll('[data-term-on]').forEach(el => el.onchange = () => {
+      const key = el.dataset.termOn, inv = IV.cur;
+      if (key.startsWith('custom:')) inv.custom_terms[+key.split(':')[1]].off = !el.checked;
+      else { inv.terms[key] = Object.assign({}, inv.terms[key], { off: !el.checked }); if (el.checked) delete inv.terms[key].off; }
+      state.dirty = true; renderTerms();
+    });
+    box.querySelectorAll('[data-term-edit]').forEach(el => el.onclick = () => editTerm(el.dataset.termEdit));
+  }
+
+  function editTerm(key) {
+    const inv = IV.cur;
+    const x = INV.termList(inv, IV.settings).find(t => t.key === key) || { head: '', text: '', custom: true };
+    const isNew = key === 'new';
+    const box = sheetHtml(isNew ? 'Your own term' : x.custom ? 'Your term' : 'Change this term', isNew || x.custom ? 'Prints with the others, numbered in order.'
+      : 'The standard wording fills in the figures for you. Once you change it, it stays as you wrote it.', `
+      <div class="f"><label>Heading</label><input class="in" id="tmHead" value="${esc(x.head)}" placeholder="e.g. Delivery."></div>
+      <div class="f"><label>Wording</label><textarea class="ta" id="tmText" rows="6">${esc(x.text)}</textarea></div>
+      <button class="btn btn--accent btn--block" type="button" id="tmSave">Save</button>
+      ${!isNew && !x.custom && x.edited ? '<button class="btn btn--ghost btn--block" type="button" id="tmReset">Back to the standard wording</button>' : ''}
+      ${!isNew && x.custom ? '<button class="btn btn--ghost btn--block" type="button" id="tmDel" style="color:var(--red-600)">Remove this term</button>' : ''}`);
+    box.querySelector('#tmSave').onclick = () => {
+      const head = $('#tmHead').value.trim(), text = $('#tmText').value.trim();
+      if (isNew) { if (head || text) inv.custom_terms.push({ head, text }); }
+      else if (x.custom) Object.assign(inv.custom_terms[+key.split(':')[1]], { head, text });
+      else if (head !== x.std.head || text !== x.std.text) inv.terms[key] = Object.assign({}, inv.terms[key], { head, text });
+      state.dirty = true; closeSheet(); renderTerms();
+    };
+    const rs = box.querySelector('#tmReset');
+    if (rs) rs.onclick = () => { const off = inv.terms[key] && inv.terms[key].off; inv.terms[key] = off ? { off } : {}; state.dirty = true; closeSheet(); renderTerms(); };
+    const dl = box.querySelector('#tmDel');
+    if (dl) dl.onclick = () => { inv.custom_terms.splice(+key.split(':')[1], 1); state.dirty = true; closeSheet(); renderTerms(); };
+  }
+
+  function wireInvoiceForm(enquirers) {
+    const inv = IV.cur, box = $('#invForm');
+    // A payment row someone has typed in is theirs, not a starting guess
+    const untouched = k => {
+      const m = /^payments\.(\d+)\./.exec(k);
+      if (m && inv.payments[+m[1]]) delete inv.payments[+m[1]].auto;
+      // ...and a starting "paid in full" row keeps up with the price
+      if (inv.kind === 'paid' && /^(price|extras|px)/.test(k)) inv.payments.forEach((p, i) => {
+        if (!p.auto) return;
+        p.amount = INV.totals(Object.assign({}, inv, { payments: [] })).due;
+        const f = box.querySelector(`[data-k="payments.${i}.amount"]`);
+        if (f) f.value = p.amount;
+      });
+    };
+    box.oninput = e => {
+      const el = e.target.closest('[data-k]');
+      if (!el || el.type === 'checkbox' || el.tagName === 'SELECT') return;
+      setPath(inv, el.dataset.k, readField(el));
+      untouched(el.dataset.k);
+      state.dirty = true;
+      refreshInvoiceLive(!!el.closest('#invPlan'));
+    };
+    box.onchange = e => {
+      const el = e.target.closest('[data-k]');
+      if (!el || !(el.type === 'checkbox' || el.tagName === 'SELECT')) return;
+      setPath(inv, el.dataset.k, el.dataset.bool != null ? el.value === '1' : readField(el));
+      untouched(el.dataset.k);
+      state.dirty = true;
+      if (el.dataset.redraw != null) renderInvoiceForm(); else refreshInvoiceLive();
+    };
+    box.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => {
+      inv.kind = b.dataset.kind;
+      seedPayments(inv);
+      state.dirty = true;
+      renderInvoiceForm();
+    });
+    $('#invPickCar').onclick = () => pickCar({ title: 'Which car?', filter: c => c.status !== 'draft',
+      extra: inv.vehicle && (inv.vehicle.registration || inv.vehicle.make) ? [{ label: 'No car on this one', icon: 'close', run: () => { inv.vehicle = {}; inv.car_id = null; renderInvoiceForm(); } }] : [],
+      run: car => {
+        inv.car_id = car.id; inv.vehicle = vehicleFromCar(car);
+        if (!inv.price) inv.price = car.status === 'sold' && car.sale_price != null ? car.sale_price : car.price;
+        state.dirty = true; renderInvoiceForm();
+      } });
+    box.querySelectorAll('[data-enq]').forEach(b => b.onclick = () => {
+      const e = enquirers[+b.dataset.enq];
+      inv.customer = Object.assign({}, inv.customer, { name: e.name || inv.customer.name, phone: e.phone || inv.customer.phone, email: e.email || inv.customer.email });
+      state.dirty = true; renderInvoiceForm();
+    });
+    box.querySelectorAll('[data-add-line]').forEach(b => b.onclick = () => {
+      const label = b.dataset.addLine;
+      inv.extras.push({ label, amount: label === 'Discount' ? '' : '' });
+      state.dirty = true; renderInvoiceForm();
+      const ins = $$('#invLines .inv-line'); const last = ins[ins.length - 1];
+      if (last) last.querySelector(label ? '.money input' : 'input').focus();
+    });
+    box.querySelectorAll('[data-del-line]').forEach(b => b.onclick = () => { inv.extras.splice(+b.dataset.delLine, 1); state.dirty = true; renderInvoiceForm(); });
+    box.querySelectorAll('[data-del-pay]').forEach(b => b.onclick = () => { inv.payments.splice(+b.dataset.delPay, 1); state.dirty = true; renderInvoiceForm(); });
+    $('#invAddPay').onclick = () => { inv.payments.push({ date: INV.today(), amount: '', method: 'Bank transfer' }); state.dirty = true; renderInvoiceForm(); };
+    $('#invPayRest').onclick = () => {
+      const left = INV.totals(inv).balance;
+      if (!(left > 0)) return toast('Nothing left to pay');
+      inv.payments.push({ date: INV.today(), amount: left, method: 'Bank transfer' }); state.dirty = true; renderInvoiceForm();
+    };
+    const dueWhen = $('#invDueWhen');
+    if (dueWhen) dueWhen.onchange = () => {
+      const d = $('#invDueDate');
+      d.hidden = dueWhen.value !== 'date';
+      if (dueWhen.value !== 'date') inv.balance_due_date = ''; else d.focus();
+      state.dirty = true; refreshInvoiceLive();
+    };
+    const cnt = $('#ipCount'), amt = $('#ipAmount');
+    if (cnt) cnt.oninput = e => { e.stopPropagation(); inv.plan.count = int(cnt.value) || ''; inv.plan.amount = ''; amt.value = ''; inv.plan.edited = false; state.dirty = true; refreshInvoiceLive(); };
+    if (amt) amt.oninput = e => { e.stopPropagation(); inv.plan.amount = num(amt.value) || ''; inv.plan.count = ''; cnt.value = ''; inv.plan.edited = false; state.dirty = true; refreshInvoiceLive(); };
+    $('#invAddTerm').onclick = () => editTerm('new');
+    $('#invStdTerm').onclick = () => {
+      const others = INV.otherTerms(inv);
+      sheet('Add a standard term', 'From the other kinds of invoice. Its wording fills in your figures.', others.map(o => ({
+        label: o.label, icon: 'plus', run: () => { inv.extra_terms.push(o.key); state.dirty = true; renderTerms();
+          if (!INV.termList(inv, IV.settings).find(t => t.key === o.key).shown) toast('Added. It shows once it applies (e.g. once there’s a deposit).'); }
+      })));
+    };
+    $('#invSeller').onchange = () => {
+      const val = $('#invSeller').value, list = (IV.settings && IV.settings.sellers) || [];
+      if (val === 'other') inv.seller = { name: '', phone: '' };
+      else { inv.seller = { name: list[+val].name, phone: list[+val].phone }; remember(SELLER_KEY, sellerLabel(list[+val])); }
+      state.dirty = true; renderInvoiceForm();
+    };
+    const nm = $('#invNames');
+    if (nm) nm.onclick = () => invoiceSettingsSheet();
+    box.querySelectorAll('[data-sign]').forEach(b => b.onclick = () => signaturePad(b.dataset.sign));
+    box.querySelectorAll('[data-unsign]').forEach(b => b.onclick = () => { delete inv.signatures[b.dataset.unsign]; state.dirty = true; renderInvoiceForm(); });
+    const more = $('#invMoreActs');
+    if (more) more.onclick = () => invoiceActions(inv, true);
+  }
+
+  /* ---- Signing with a finger ------------------------------------------- */
+  function signaturePad(who) {
+    const inv = IV.cur;
+    const name = who === 'buyer' ? (inv.customer.name || (inv.kind === 'purchase' ? 'the seller' : 'the buyer')) : (inv.seller.name || 'MBU');
+    const box = sheetHtml(`${name} signs here`, 'With a finger, inside the box.', `
+      <div class="sigpad"><canvas id="sigCanvas"></canvas><span class="sigpad-line"></span></div>
+      <div class="row-2" style="margin-top:12px">
+        <button class="btn btn--outline" type="button" id="sigClear">Clear</button>
+        <button class="btn btn--accent" type="button" id="sigDone">Done</button>
+      </div>`);
+    const cv = box.querySelector('#sigCanvas');
+    const ratio = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    const w = cv.clientWidth, h = cv.clientHeight;
+    cv.width = w * ratio; cv.height = h * ratio;
+    const ctx = cv.getContext('2d');
+    ctx.scale(ratio, ratio);
+    ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0A1830';
+    let drawing = false, any = false, last = null;
+    const at = e => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    cv.onpointerdown = e => { drawing = true; any = true; last = at(e); try { cv.setPointerCapture(e.pointerId); } catch { /* fine without */ } ctx.beginPath(); ctx.arc(last.x, last.y, 1.1, 0, Math.PI * 2); ctx.fillStyle = '#0A1830'; ctx.fill(); e.preventDefault(); };
+    cv.onpointermove = e => {
+      if (!drawing) return;
+      const p = at(e);
+      ctx.beginPath(); ctx.moveTo(last.x, last.y);
+      ctx.quadraticCurveTo(last.x, last.y, (last.x + p.x) / 2, (last.y + p.y) / 2);
+      ctx.lineTo(p.x, p.y); ctx.stroke();
+      last = p; e.preventDefault();
+    };
+    cv.onpointerup = cv.onpointercancel = () => { drawing = false; };
+    box.querySelector('#sigClear').onclick = () => { ctx.clearRect(0, 0, w, h); any = false; };
+    box.querySelector('#sigDone').onclick = () => {
+      if (!any) return toast('Nothing signed yet');
+      inv.signatures = inv.signatures || {};
+      inv.signatures[who] = { png: trimmedSignature(cv), date: INV.today() };
+      state.dirty = true; closeSheet(); renderInvoiceForm();
+    };
+  }
+
+  // Cut the empty space from round a signature so it sits on the line
+  function trimmedSignature(cv) {
+    const ctx = cv.getContext('2d');
+    const { width: w, height: h } = cv;
+    const px = ctx.getImageData(0, 0, w, h).data;
+    let x0 = w, y0 = h, x1 = 0, y1 = 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (px[(y * w + x) * 4 + 3] > 10) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
+    const pad = 8;
+    x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(w, x1 + pad); y1 = Math.min(h, y1 + pad);
+    // A fixed shape (the space the PDF gives it), the signature centred in it
+    const out = document.createElement('canvas');
+    out.width = 960; out.height = 200;
+    const cw = x1 - x0, ch = y1 - y0, scale = Math.min(out.width / cw, out.height / ch);
+    out.getContext('2d').drawImage(cv, x0, y0, cw, ch, (out.width - cw * scale) / 2, (out.height - ch * scale) / 2, cw * scale, ch * scale);
+    return out.toDataURL('image/png');
+  }
+
+  /* ---- Saving ------------------------------------------------------------ */
+  function invoiceRow(inv) {
+    const t = INV.totals(inv);
+    const data = clone(inv);
+    ['id', 'number', 'status', 'created_at'].forEach(k => delete data[k]);
+    return {
+      kind: inv.kind, status: inv.status || 'draft', issue_date: inv.issue_date || INV.today(),
+      car_id: inv.car_id || null, registration: (inv.vehicle && inv.vehicle.registration ? String(inv.vehicle.registration).toUpperCase().replace(/\s+/g, '') : null),
+      customer_name: (inv.customer && inv.customer.name) || null,
+      total: t.due, paid: t.paid, balance: t.balance, data,
+      sent_at: inv.sent && inv.sent.length ? inv.sent[inv.sent.length - 1].at : null,
+      updated_at: new Date().toISOString()
+    };
+  }
+
+  async function saveInvoice(quiet) {
+    const inv = IV.cur;
+    if (!state.schema.v10) {
+      if (!quiet) toast('Can’t keep invoices until schema v10 is run. You can still send this one.');
+      return false;
+    }
+    const row = invoiceRow(inv);
+    let res;
+    if (inv.id) res = await sb.from('invoices').update(row).eq('id', inv.id).select().single();
+    else res = await sb.from('invoices').insert(row).select().single();
+    if (res.error) { toast('Couldn’t save: ' + res.error.message); return false; }
+    const saved = res.data || {};
+    if (!inv.id) { inv.id = saved.id; inv.number = saved.number; inv.created_at = saved.created_at; }
+    const listed = IV.list.findIndex(x => x.id === inv.id);
+    const item = Object.assign({}, saved, row, { id: inv.id, number: inv.number });
+    if (listed >= 0) IV.list[listed] = item; else IV.list.unshift(item);
+    state.dirty = false;
+    $('#topTitle').textContent = INV.numberLabel(inv.number) || 'Invoice';
+    if (!quiet) toast('Saved as ' + INV.numberLabel(inv.number), 'ok');
+    return true;
+  }
+
+  $('#invSaveBtn').onclick = () => saveInvoice();
+  $('#invPreviewBtn').onclick = () => openPreview();
+
+  /* ---- Check and send ------------------------------------------------------ */
+  async function openPreview() {
+    const inv = IV.cur;
+    if (!INV) return;
+    // Saving first gives it its number, which goes on the PDF
+    if (state.schema.v10 && (state.dirty || !inv.id)) await saveInvoice(true);
+    const e = INV.emailText(inv, IV.settings);
+    if (!inv.email || !inv.email.edited) inv.email = { to: (inv.customer && inv.customer.email) || '', subject: e.subject, body: e.body };
+    else if (!inv.email.to) inv.email.to = (inv.customer && inv.customer.email) || '';
+    IV.pdf = null;
+    go('invprev', { title: INV.numberLabel(inv.number) || 'Check and send' });
+    renderPreview();
+    makePdf();
+  }
+
+  function renderPreview() {
+    const inv = IV.cur;
+    const doc = INV.buildDoc(inv, IV.settings);
+    const warns = INV.warnings(inv, IV.settings);
+    const canShare = !!(navigator.canShare && window.File);
+    $('#invPrev').innerHTML = `
+      ${warns.length ? `<div class="section-card inv-warns">
+        <h2>Worth a look first</h2>
+        ${warns.map(w => `<div class="inv-warn inv-warn--${w.level}">${icon('alert')}<span>${esc(w.text)}</span></div>`).join('')}
+        <p class="hint" style="margin-top:8px">It’ll still send if you’re happy with it. Back to change anything.</p>
+      </div>` : ''}
+      <div class="inv-paper" id="invPaper" role="button" tabindex="0" aria-label="Tap to zoom in or out">${INV.toHtml(doc, '../assets/img/logo.png')}</div>
+      <p class="hint" style="text-align:center;margin-top:8px">Tap the page to read it full size.</p>
+      <div class="section-card" style="margin-top:14px">
+        <h2>The email</h2>
+        <div class="f"><label>To</label><input class="in" id="emTo" type="email" inputmode="email" autocapitalize="off" value="${esc(inv.email.to)}" placeholder="Their email address"></div>
+        <div class="f"><label>Subject</label><input class="in" id="emSubject" value="${esc(inv.email.subject)}"></div>
+        <div class="f" style="margin-bottom:0"><label>Message</label><textarea class="ta" id="emBody" rows="10">${esc(inv.email.body)}</textarea></div>
+        <p class="hint" style="margin-top:10px">${canShare
+          ? '<strong>Email it</strong> opens your phone’s share sheet with the PDF attached and this message written. Pick Gmail or Mail, then paste their address into To (it’s copied for you).'
+          : '<strong>Email it</strong> downloads the PDF and opens your email with the address and message filled in. Attach the PDF from Downloads.'}</p>
+        <button class="btn btn--ghost btn--sm" type="button" id="emReset">Put the standard message back</button>
+      </div>
+      ${inv.sent && inv.sent.length ? `<p class="hint" style="margin:12px 4px 0">${inv.sent.slice(-3).map(x => `${x.via === 'print' ? 'Printed or saved' : 'Shared'} ${esc(ago(x.at))}${x.to ? ' · ' + esc(x.to) : ''}`).join('<br>')}</p>` : ''}`;
+    fitPaper();
+    $('#invPaper').onclick = () => { $('#invPaper').classList.toggle('is-zoomed'); fitPaper(); };
+    ['emTo', 'emSubject', 'emBody'].forEach(id => $('#' + id).oninput = () => {
+      inv.email = { to: $('#emTo').value.trim(), subject: $('#emSubject').value, body: $('#emBody').value, edited: true };
+      state.dirty = true;
+    });
+    $('#emReset').onclick = () => { const e = INV.emailText(inv, IV.settings); inv.email = { to: $('#emTo').value.trim(), subject: e.subject, body: e.body }; renderPreview(); };
+    $('#prevSendBtn').disabled = $('#prevPrintBtn').disabled = !IV.pdf;
+  }
+
+  // The page is drawn at A4's real width and zoomed to fit the screen
+  function fitPaper() {
+    const box = $('#invPaper'), page = box && box.querySelector('.inv-page');
+    if (!page) return;
+    page.style.zoom = box.classList.contains('is-zoomed') ? '1' : String(Math.min(1, box.clientWidth / 794));
+  }
+  window.addEventListener('resize', () => { if (state.view === 'invprev') fitPaper(); });
+
+  function loadScript(src, integrity) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src; s.async = true;
+      if (integrity) { s.integrity = integrity; s.crossOrigin = 'anonymous'; }
+      s.onload = resolve; s.onerror = () => reject(new Error('Couldn’t load ' + src));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function pdfAssets() {
+    if (IV.assets) return IV.assets;
+    if (!(window.jspdf && window.jspdf.jsPDF)) await loadScript(JSPDF.src, JSPDF.sri);
+    let logo = null, logoRatio = 698 / 230;
+    try {
+      const blob = await (await fetch('../assets/img/logo.png')).blob();
+      logo = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+      const img = new Image(); img.src = logo; await img.decode(); logoRatio = img.naturalWidth / img.naturalHeight;
+    } catch { /* no logo: the PDF just starts with the title */ }
+    IV.assets = { logo, logoRatio };
+    return IV.assets;
+  }
+
+  // Made as soon as the preview opens, so tapping Email it can open the share
+  // sheet at once: iPhones only allow that straight after a tap
+  async function makePdf() {
+    const inv = IV.cur;
+    try {
+      const assets = await pdfAssets();
+      const pdf = INV.toPdf(INV.buildDoc(inv, IV.settings), window.jspdf.jsPDF, assets);
+      IV.pdf = new File([pdf.output('blob')], INV.fileName(inv), { type: 'application/pdf' });
+    } catch (err) {
+      console.error(err);
+      IV.pdf = null;
+      toast('Couldn’t make the PDF. Check the signal and try again.');
+    }
+    if (state.view === 'invprev') $('#prevSendBtn').disabled = $('#prevPrintBtn').disabled = !IV.pdf;
+  }
+
+  async function recordSent(via, to) {
+    const inv = IV.cur;
+    inv.sent = (inv.sent || []).concat({ at: new Date().toISOString(), via, to: to || '' });
+    if (inv.status === 'draft') inv.status = 'issued';
+    await saveInvoice(true);
+    renderPreview();
+  }
+
+  function download(file) {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url; a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  $('#prevSendBtn').onclick = async () => {
+    const inv = IV.cur, file = IV.pdf;
+    if (!file) return;
+    const e = inv.email || {};
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      if (e.to && navigator.clipboard) navigator.clipboard.writeText(e.to).then(() => toast('Their address is copied: paste it into To'), () => {});
+      try {
+        await navigator.share({ files: [file], title: e.subject, text: e.body });
+        recordSent('email', e.to);
+      } catch (err) {
+        if (err && err.name !== 'AbortError') toast('Couldn’t open the share sheet: ' + err.message);
+      }
+      return;
+    }
+    // A laptop without sharing: the PDF to Downloads, and the email app opened
+    download(file);
+    const q = new URLSearchParams({ subject: e.subject || '', body: e.body || '' }).toString().replace(/\+/g, '%20');
+    const a = document.createElement('a');
+    a.href = `mailto:${encodeURIComponent(e.to || '')}?${q}`;
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('PDF downloaded. Attach it to the email.', 'ok');
+    recordSent('email', e.to);
+  };
+
+  $('#prevPrintBtn').onclick = async () => {
+    const file = IV.pdf;
+    if (!file) return;
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); recordSent('print'); }
+      catch (err) { if (err && err.name !== 'AbortError') toast('Couldn’t open the share sheet: ' + err.message); }
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const w = window.open(url, '_blank');
+    if (!w) download(file);
+    recordSent('print');
+  };
+
+  /* ---- The list ------------------------------------------------------------ */
+  async function loadInvoices() {
+    if (state.schema.v10 === null) await checkInvoicesTable();
+    if (!state.schema.v10) { IV.loaded = true; IV.list = []; return; }
+    const { data, error } = await sb.from('invoices').select('*').order('created_at', { ascending: false }).limit(1000);
+    if (error) { msg('#invoicesMsg', 'Couldn’t load your invoices: ' + esc(error.message), 'err'); return; }
+    IV.list = data || [];
+    IV.loaded = true;
+  }
+  async function checkInvoicesTable() {
+    try {
+      const { error } = await sb.from('invoices').select('id').limit(1);
+      state.schema.v10 = !(error && /does not exist|schema cache|not find the table/i.test(error.message));
+    } catch { state.schema.v10 = false; }
+  }
+
+  const fromRow = r => Object.assign({}, r.data || {}, { id: r.id, number: r.number, status: r.status, created_at: r.created_at, kind: r.kind,
+    car_id: r.car_id || (r.data || {}).car_id || null });
+
+  function nextDue(r) {
+    if (r.kind !== 'instalments' || !(Number(r.balance) > 0)) return null;
+    const left = INV.planRows(fromRow(r)).filter(x => !x.paid_on);
+    return left[0] || null;
+  }
+
+  ON_SHOW.invoices = async () => {
+    await invoiceSettings();
+    if (!IV.loaded) { $('#invList').innerHTML = `<div class="card"><div class="skel" style="height:72px"></div></div>`.repeat(3); await loadInvoices(); }
+    renderInvoices();
+  };
+
+  function renderInvoices() {
+    if (!state.schema.v10) {
+      msg('#invoicesMsg', `<strong>Invoices aren’t kept yet.</strong> You can make and send them now; to keep a list of every one, run
+        <strong>schema-v10-invoices.sql</strong> in Supabase → SQL Editor (Settings → Ready to switch on).`, 'warn');
+    } else msg('#invoicesMsg', '');
+    const q = IV.q.trim().toLowerCase().replace(/\s+/g, ' ');
+    const today = INV.today();
+    const owed = r => r.status !== 'void' && Number(r.balance) > 0.004;
+    const draft = r => r.status === 'draft';
+    $('#nInvOwed').textContent = IV.list.filter(owed).length || '';
+    $('#nInvDraft').textContent = IV.list.filter(draft).length || '';
+    $$('#invTabs button').forEach(b => b.classList.toggle('is-on', b.dataset.tab === IV.tab));
+    const rows = IV.list.filter(r => IV.tab === 'owed' ? owed(r) : IV.tab === 'draft' ? draft(r) : true).filter(r => {
+      if (!q) return true;
+      const d = r.data || {}, v = d.vehicle || {};
+      const hay = [INV.numberLabel(r.number), r.number, r.customer_name, r.registration, v.make, v.model, (d.customer || {}).phone, (d.customer || {}).email]
+        .filter(Boolean).join(' ').toLowerCase();
+      return q.split(' ').every(w => hay.includes(w) || String(r.registration || '').toLowerCase().includes(w.replace(/\s/g, '')));
+    });
+    $('#invList').innerHTML = rows.length ? `<div class="card">${rows.map(r => {
+      const d = r.data || {}, v = d.vehicle || {};
+      const due = nextDue(r);
+      const late = due && due.due < today;
+      const status = r.status === 'void' ? '<span class="pill pill--grey">Void</span>'
+        : owed(r) ? `<span class="pill pill--${late ? 'red' : 'amber'}">${late ? `${INV.gbp(due.amount)} overdue since ${INV.ukDate(due.due)}` : INV.gbp(r.balance) + ' to come'}</span>`
+        : '<span class="pill pill--green">Paid</span>';
+      return `<button class="inv-row${r.status === 'void' ? ' is-void' : ''}" type="button" data-id="${esc(r.id)}">
+        <span class="inv-row-ic">${icon('receipt')}</span>
+        <span class="inv-row-txt">
+          <strong>${esc(INV.numberLabel(r.number))} · ${esc(r.customer_name || 'No name')}</strong>
+          <small>${esc([[v.year, v.make, v.model].filter(Boolean).join(' '), r.registration ? fmtReg(r.registration) : ''].filter(Boolean).join(' · ') || ((d.extras || [])[0] || {}).label || '')}</small>
+          <small>${esc((INV.KINDS[r.kind] || {}).short || '')} · ${esc(INV.ukDate(r.issue_date))}${draft(r) ? ' · not sent yet' : r.sent_at ? ' · sent ' + esc(ago(r.sent_at)) : ''}${due && !late ? ' · next ' + esc(INV.ukDate(due.due)) : ''}</small>
+          <span class="inv-row-pill">${status}</span>
+        </span>
+        <span class="inv-row-end"><b>${esc(INV.gbp(r.total))}</b></span>
+      </button>`;
+    }).join('')}</div>`
+      : `<div class="empty">${icon('receipt')}<h3>${IV.list.length ? 'None match' : 'No invoices yet'}</h3><p>${IV.list.length ? 'Try a name, a plate or a number.' : 'Tap New invoice, or Make an invoice on any car.'}</p></div>`;
+    $$('#invList .inv-row').forEach(b => b.onclick = () => {
+      const r = IV.list.find(x => x.id === b.dataset.id);
+      if (r) invoiceActions(fromRow(r));
+    });
+  }
+  $$('#invTabs button').forEach(b => b.onclick = () => { IV.tab = b.dataset.tab; renderInvoices(); });
+  $('#invSearch').oninput = () => { IV.q = $('#invSearch').value; renderInvoices(); };
+
+  function invoiceActions(inv, fromForm) {
+    const t = INV.totals(inv);
+    const acts = [];
+    if (!fromForm) {
+      acts.push({ label: 'Open it', icon: 'eye', sub: 'Check it, email it or print it', run: async () => { await invoiceSettings(); IV.cur = clone(inv); state.dirty = false; openPreview(); } });
+      acts.push({ label: 'Change it', icon: 'edit', run: async () => { await invoiceSettings(); openInvoice(clone(inv)); } });
+    }
+    if (inv.status !== 'void' && t.balance > 0.004) acts.push({ label: 'Record a payment', icon: 'pound', sub: `${INV.gbp(t.balance)} still to come`, run: () => recordPayment(clone(inv)) });
+    acts.push({ label: 'Make a copy', icon: 'copy', sub: 'Same terms and wording, for a new customer', run: async () => {
+      const c = clone(inv);
+      ['id', 'number', 'created_at'].forEach(k => delete c[k]);
+      Object.assign(c, { status: 'draft', customer: {}, signatures: {}, sent: [], email: null, issue_date: INV.today(), sale_date: INV.today() });
+      c.payments = (c.payments || []).filter(p => !p.instalment);
+      await invoiceSettings(); openInvoice(c);
+    } });
+    if (inv.car_id) {
+      const car = state.cars.find(c => String(c.id) === String(inv.car_id));
+      if (car) acts.push({ label: 'The car: ' + carTitle(car), icon: 'car', run: () => carActions(car) });
+    }
+    const sentEver = inv.sent && inv.sent.length;
+    if (inv.status === 'draft' && !sentEver) acts.push({ label: 'Delete it', icon: 'trash', danger: true, sub: 'Never sent, so nothing is lost',
+      run: () => confirmSheet('Delete this invoice?', INV.numberLabel(inv.number) + ' was never sent.', 'Yes, delete it', () => deleteInvoice(inv), true) });
+    else if (inv.status !== 'void') acts.push({ label: 'Void it', icon: 'close', danger: true, sub: 'Made in error. It stays in the list marked VOID, so the numbers stay unbroken',
+      run: () => confirmSheet('Void this invoice?', 'It stays in the list, marked VOID. You can make a corrected one with Make a copy.', 'Void it', () => setInvoiceStatus(inv, 'void'), true) });
+    else acts.push({ label: 'Un-void it', icon: 'check', run: () => setInvoiceStatus(inv, 'issued') });
+    sheet(`${INV.numberLabel(inv.number)} · ${invTitle(inv)}`, `${(INV.KINDS[inv.kind] || {}).label || ''} · ${INV.gbp(t.due)}`, acts);
+  }
+
+  async function setInvoiceStatus(inv, status) {
+    const { error } = await sb.from('invoices').update({ status, updated_at: new Date().toISOString() }).eq('id', inv.id);
+    if (error) return toast('Couldn’t change it: ' + error.message);
+    const r = IV.list.find(x => x.id === inv.id); if (r) r.status = status;
+    if (IV.cur && IV.cur.id === inv.id) IV.cur.status = status;
+    toast(status === 'void' ? 'Voided' : 'Back in use', 'ok');
+    if (state.view === 'invoices') renderInvoices(); else goBack();
+  }
+
+  async function deleteInvoice(inv) {
+    const { error } = await sb.from('invoices').delete().eq('id', inv.id);
+    if (error) return toast('Couldn’t delete it: ' + error.message);
+    IV.list = IV.list.filter(x => x.id !== inv.id);
+    toast('Deleted', 'ok');
+    if (state.view === 'invoices') renderInvoices(); else go('invoices', { back: true });
+  }
+
+  function recordPayment(inv) {
+    const t = INV.totals(inv);
+    const plan = inv.kind === 'instalments' ? INV.planRows(inv) : [];
+    const nextAt = plan.findIndex(r => !r.paid_on), next = nextAt >= 0 ? plan[nextAt] : null;
+    const box = sheetHtml('Record a payment', `${INV.numberLabel(inv.number)} · ${invTitle(inv)} · ${INV.gbp(t.balance)} still to come`, `
+      <div class="section-card">
+        <div class="f"><label>How much</label><div class="money"><input class="in" id="rpAmount" inputmode="decimal" value="${esc(next ? next.amount : t.balance)}"></div></div>
+        <div class="row-2">
+          <div class="f"><label>When</label><input class="in" type="date" id="rpDate" value="${INV.today()}"></div>
+          <div class="f"><label>How</label><select class="sel" id="rpMethod">${PAY_METHODS.map(m => `<option>${m}</option>`).join('')}</select></div>
+        </div>
+        ${next ? `<p class="hint" style="margin-top:12px">Instalment ${nextAt + 1} of ${plan.length} ${next.due < INV.today() ? 'was' : 'is'} due ${esc(INV.ukDate(next.due))}. Paying it ticks it off the schedule.</p>` : ''}
+      </div>
+      <button class="btn btn--accent btn--block" type="button" id="rpSave">Save the payment</button>`);
+    box.querySelector('#rpSave').onclick = async () => {
+      const amount = num($('#rpAmount').value);
+      if (!(amount > 0)) return toast('Put in how much they paid');
+      inv.payments = (inv.payments || []).concat({ date: $('#rpDate').value || INV.today(), amount, method: $('#rpMethod').value, instalment: inv.kind === 'instalments' || undefined });
+      closeSheet();
+      IV.cur = inv;
+      await invoiceSettings();
+      if (!(await saveInvoice(true))) return;
+      const left = INV.totals(inv).balance;
+      toast(left > 0.004 ? `Saved. ${INV.gbp(left)} still to come.` : 'Saved. All paid.', 'ok');
+      if (state.view === 'invoices') renderInvoices();
+      sheet('Send them a receipt?', 'The same invoice, updated with this payment' + (inv.kind === 'instalments' ? ' and the schedule ticked off.' : '.'), [
+        { label: 'Check and send it', icon: 'mail', run: () => { inv.email = null; openPreview(); } }
+      ]);
+    };
+  }
+
+  /* ---- From a car, Home and Mark as sold ------------------------------------ */
+  function invoicesForCar(car) {
+    return IV.list.filter(r => String(r.car_id) === String(car.id) && r.status !== 'void');
+  }
+
+  function offerInvoice(car) {
+    sheet('Make the invoice now?', `${carTitle(car)} is marked as sold.`, [
+      { label: 'Invoice: paid in full', icon: 'receipt', sub: 'Or a deposit that was paid before', run: () => invoiceForCar(car, 'paid') },
+      { label: 'Pay monthly agreement', icon: 'calendar', sub: 'They pay the rest in instalments', run: () => invoiceForCar(car, 'instalments') },
+      { label: 'Balance to pay', icon: 'pound', sub: 'Part paid, the rest on collection', run: () => invoiceForCar(car, 'balance') }
+    ]);
+  }
+
+  /* ====================================================== MOT CALENDAR
+     Every car you still own (in stock, reserved, drafts), by the month its
+     MOT runs out, the run-out ones first. Add them to the phone's own
+     calendar in one go, each with a reminder two weeks before. */
+  ON_SHOW.motcal = () => renderMotCal();
+
+  function renderMotCal() {
+    const owned = state.cars.filter(c => ['available', 'reserved', 'draft'].includes(c.status));
+    const dated = owned.filter(c => motDays(c) != null).sort((a, b) => motDays(a) - motDays(b));
+    const none = owned.filter(c => motDays(c) == null);
+    const groups = [];
+    dated.forEach(c => {
+      const d = motDays(c);
+      const key = d < 0 ? 'out' : String(c.mot_expiry).slice(0, 7);
+      let g = groups.find(x => x.key === key);
+      if (!g) {
+        const label = key === 'out' ? 'Run out' : new Date(key + '-01T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+        groups.push(g = { key, label, cars: [] });
+      }
+      g.cars.push(c);
+    });
+    const row = c => {
+      const d = motDays(c), lvl = d == null ? 'grey' : motLevel(c) || 'green';
+      return `<button class="mot-row" type="button" data-id="${esc(c.id)}">
+        <i class="dot dot--${lvl}"></i>
+        <span class="mot-row-txt"><strong>${esc(carTitle(c))}</strong>
+          <small>${esc([c.registration ? fmtReg(c.registration) : '', c.status === 'draft' ? 'Draft' : c.status === 'reserved' ? 'Reserved' : ''].filter(Boolean).join(' · '))}</small></span>
+        <span class="mot-row-end"><b>${d == null ? '' : esc(new Date(String(c.mot_expiry).slice(0, 10) + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))}</b>
+          <small>${esc(d == null ? 'Add the date' : d < 0 ? `${plural(-d, 'day')} ago` : d === 0 ? 'Today' : `in ${plural(d, 'day')}`)}</small></span>
+      </button>`;
+    };
+    $('#motcalBody').innerHTML = `
+      ${dated.length ? `<button class="btn btn--outline btn--block" type="button" id="mcIcs" style="margin-bottom:14px">${icon('calendar')} Add them to my phone’s calendar</button>` : ''}
+      ${groups.map(g => `<h2 class="home-h">${esc(g.label)} <span class="home-n">${g.cars.length}</span></h2>
+        <div class="card">${g.cars.map(row).join('')}</div>`).join('')}
+      ${none.length ? `<h2 class="home-h">No MOT date <span class="home-n">${none.length}</span></h2>
+        <div class="card">${none.map(row).join('')}</div>` : ''}
+      ${!owned.length ? `<div class="empty">${icon('calendar')}<h3>No cars in stock</h3><p>Their MOT dates show here once they’re in.</p></div>` : ''}
+      <p class="note" style="margin:14px 4px 0">Red: under ${MOT_RED_DAYS} days or run out. Amber: under ${MOT_AMBER_DAYS} days. Sold cars aren’t listed: their MOT is the buyer’s.</p>`;
+    $$('#motcalBody .mot-row').forEach(b => b.onclick = () => {
+      const car = state.cars.find(c => String(c.id) === b.dataset.id);
+      if (!car) return;
+      if (motDays(car) == null) openForm(car, '#fMot'); else carActions(car);
+    });
+    const ics = $('#mcIcs');
+    if (ics) ics.onclick = () => {
+      const file = new File([motIcs(dated)], 'mbu-mot-dates.ics', { type: 'text/calendar' });
+      download(file);
+      toast('Open the file to add them to your calendar', 'ok');
+    };
+  }
+
+  // One all-day event per car, a reminder 14 days before. The same UID each
+  // time, so adding them again updates the dates rather than doubling up.
+  function motIcs(cars) {
+    const esc_ = t => String(t).replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+    const ymd = d => d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+    const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+    const out = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//MBU Car Sales//MOT dates//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:MBU MOT dates'];
+    cars.forEach(c => {
+      const day = new Date(String(c.mot_expiry).slice(0, 10) + 'T00:00:00');
+      const next = new Date(day); next.setDate(next.getDate() + 1);
+      out.push('BEGIN:VEVENT', `UID:mot-${c.id}@mbucarsales.co.uk`, `DTSTAMP:${stamp}`,
+        `DTSTART;VALUE=DATE:${ymd(day)}`, `DTEND;VALUE=DATE:${ymd(next)}`,
+        `SUMMARY:${esc_('MOT runs out: ' + carTitle(c) + (c.registration ? ' (' + fmtReg(c.registration) + ')' : ''))}`,
+        'BEGIN:VALARM', 'TRIGGER:-P14D', 'ACTION:DISPLAY', `DESCRIPTION:${esc_('MOT runs out in two weeks: ' + carTitle(c))}`, 'END:VALARM',
+        'END:VEVENT');
+    });
+    out.push('END:VCALENDAR');
+    return out.join('\r\n') + '\r\n';
+  }
+
+  /* ======================================================= MOT CHECKER
+     Any plate's full MOT history, on GOV.UK's own service: free, official,
+     and needs no keys (the DVLA/MOT lookups behind the bid tool aren't
+     switched on). Your own cars one tap each; the last few plates kept. */
+  const MC_KEY = 'mbu_mot_checked';
+  const govMot = p => 'https://www.check-mot.service.gov.uk/results?registration=' + encodeURIComponent(p) + '&checkRecalls=true';
+  const cleanPlate = p => String(p || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  ON_SHOW.motcheck = () => renderMotCheck();
+
+  function checkedPlates() { try { return JSON.parse(localStorage.getItem(MC_KEY) || '[]'); } catch { return []; } }
+
+  function motCheck(plate) {
+    const p = cleanPlate(plate);
+    if (p.length < 2) { toast('Type the number plate first'); return; }
+    try { localStorage.setItem(MC_KEY, JSON.stringify([p].concat(checkedPlates().filter(x => x !== p)).slice(0, 8))); } catch { /* fine */ }
+    window.open(govMot(p), '_blank', 'noopener');
+    renderMotCheck();
+  }
+  $('#mcGo').onclick = () => motCheck($('#mcReg').value);
+  $('#mcReg').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); motCheck($('#mcReg').value); } };
+
+  function renderMotCheck() {
+    const recent = checkedPlates();
+    const mine = state.cars.filter(c => ['available', 'reserved', 'draft'].includes(c.status) && c.registration);
+    $('#mcBody').innerHTML = `
+      ${recent.length ? `<div class="section-card"><h2>Checked lately</h2><div class="chips">
+        ${recent.map(p => `<button class="chip" type="button" data-plate="${esc(p)}">${esc(fmtReg(p))}</button>`).join('')}</div></div>` : ''}
+      ${mine.length ? `<h2 class="home-h">Your stock</h2><div class="card">${mine.map(c => `
+        <button class="mot-row" type="button" data-plate="${esc(c.registration)}">
+          <i class="dot dot--${motLevel(c) || (motDays(c) == null ? 'grey' : 'green')}"></i>
+          <span class="mot-row-txt"><strong>${esc(carTitle(c))}</strong><small>${esc(fmtReg(c.registration))} · ${esc(motWords(c))}</small></span>
+          ${icon('open')}
+        </button>`).join('')}</div>` : ''}
+      <button class="btn btn--ghost btn--block" type="button" id="mcBid" style="margin-top:14px">Buying it? The full check before you bid ${icon('right')}</button>`;
+    $$('#mcBody [data-plate]').forEach(b => b.onclick = () => motCheck(b.dataset.plate));
+    $('#mcBid').onclick = () => {
+      const p = cleanPlate($('#mcReg').value);
+      go('value');
+      if (p && $('#vReg')) { $('#vReg').value = p; runValuation(); }
+    };
+  }
+
+  /* ========================================================= PRICE BOOK
+     What cars actually went for, in one place:
+       · auction results you've seen (BCA and the like): trade prices
+       · your own sales, straight from the cars (part exchanges left out,
+         their price is a deal price)
+       · what similar cars were advertised at (the bid tool's price checks)
+     Auction results are typed in here and never count as an advertised
+     price anywhere else (schema-v12). */
+  const PB = { rows: null, tab: 'all', q: '' };
+  const HOUSES = ['BCA', 'Manheim', 'Aston Barclay', 'Motorway', 'Other'];
+
+  ON_SHOW.pricebook = async () => {
+    if (PB.rows == null) {
+      $('#pbList').innerHTML = `<div class="card"><div class="skel" style="height:70px"></div></div>`.repeat(3);
+      const { data, error } = await sb.from('price_checks').select('*').order('created_at', { ascending: false }).limit(2000);
+      PB.rows = data || [];
+      PB.error = error && /does not exist|schema cache|not find the table/i.test(error.message) ? 'v3' : null;
+    }
+    renderPriceBook();
+  };
+
+  function priceBookEntries() {
+    const out = [];
+    PB.rows.forEach(r => {
+      if (!r.typical) return;
+      const auction = r.source === 'auction';
+      const d = r.detail || {};
+      out.push({ kind: auction ? 'auction' : 'advert', make: r.make, model: r.model, year: r.year, mileage: r.mileage,
+        price: r.typical, low: auction ? null : r.low, high: auction ? null : r.high, when: r.created_at, row: r,
+        note: auction ? [d.house, d.hpi && d.hpi !== 'clear' ? LABEL.hpi[d.hpi] : null, d.grade ? 'Grade ' + d.grade : null].filter(Boolean).join(' · ')
+                      : r.source === 'own_judgement' ? 'Your own judgement' : 'Advertised' + (r.sample_size ? `, ${r.sample_size} cars` : '') });
+    });
+    state.cars.filter(c => c.status === 'sold' && c.sale_price != null && !c.px_sale).forEach(c => {
+      out.push({ kind: 'ours', make: c.make, model: c.model, year: c.year, mileage: c.mileage, price: c.sale_price, when: c.sold_at || c.updated_at, car: c,
+        note: [c.price && c.price !== c.sale_price ? `Advertised at ${money(c.price)}` : '', c.hpi_status && c.hpi_status !== 'clear' ? LABEL.hpi[c.hpi_status] : ''].filter(Boolean).join(' · ') });
+    });
+    return out.sort((a, b) => new Date(b.when || 0) - new Date(a.when || 0));
+  }
+
+  function renderPriceBook() {
+    if (PB.error === 'v3') { msg('#pbMsg', 'The price book isn’t set up yet: run <strong>schema-v3-price-book.sql</strong> in Supabase.', 'warn'); }
+    const fold = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const q = fold(PB.q.trim());
+    const all = priceBookEntries();
+    const match = e => !q || q.split(/\s+/).every(w => fold([e.make, MK.makeName(e.make), e.model, e.year].join(' ')).includes(w)
+      || (MK.knownMake(w) && keyOf(w) === keyOf(e.make)));
+    const found = all.filter(match);
+    const shown = found.filter(e => PB.tab === 'all' || e.kind === PB.tab);
+    $$('#pbTabs button').forEach(b => b.classList.toggle('is-on', b.dataset.tab === PB.tab));
+
+    const KIND = { auction: ['Auction', 'amber'], ours: ['Our sale', 'green'], advert: ['Advertised', 'blue'] };
+    const avg = xs => xs.length ? Math.round(xs.reduce((n, x) => n + x, 0) / xs.length) : null;
+    const sumLine = kind => {
+      const xs = found.filter(e => e.kind === kind).map(e => e.price);
+      if (!xs.length) return '';
+      return `<div class="pb-sum"><span class="pill pill--${KIND[kind][1]}">${KIND[kind][0]}</span>
+        <b>${money(avg(xs))}</b><small>average of ${xs.length}${xs.length > 1 ? ` · ${money(Math.min(...xs))} to ${money(Math.max(...xs))}` : ''}</small></div>`;
+    };
+    $('#pbSummary').innerHTML = q && found.length ? `<div class="section-card pb-sums">${['auction', 'ours', 'advert'].map(sumLine).join('')}
+      <p class="hint" style="margin-top:8px">Auction prices are trade prices: what you’d pay. Our sales and adverts are what they sell for.</p></div>` : '';
+
+    $('#pbList').innerHTML = shown.length ? `<div class="card">${shown.slice(0, 200).map((e, i) => `
+      <button class="pb-row" type="button" data-i="${all.indexOf(e)}">
+        <span class="pb-row-txt"><strong>${esc([e.year, MK.makeName(e.make) || e.make, e.model].filter(Boolean).join(' '))}</strong>
+          <small>${esc([e.mileage ? nf(e.mileage) + ' mi' : '', e.note, e.when ? new Date(e.when).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }) : ''].filter(Boolean).join(' · '))}</small></span>
+        <span class="pb-row-end"><b>${e.low && e.high && e.low !== e.high ? `${money(e.low)}–${money(e.high).replace('£', '')}` : money(e.price)}</b>
+          <span class="pill pill--${KIND[e.kind][1]}">${KIND[e.kind][0]}</span></span>
+      </button>`).join('')}</div>`
+      : `<div class="empty">${icon('book')}<h3>${all.length ? 'Nothing matches' : 'Nothing in it yet'}</h3>
+          <p>${all.length ? 'Try just the make, or just the model.' : 'Add what you see cars go for at auction, and your own sales appear here by themselves.'}</p></div>`;
+    $$('#pbList .pb-row').forEach(b => b.onclick = () => {
+      const e = all[+b.dataset.i];
+      if (e.kind === 'ours') return carActions(e.car);
+      sheet([e.year, e.make, e.model].filter(Boolean).join(' '), `${money(e.price)} · ${e.note}`, [
+        ...(e.kind === 'auction' ? [{ label: 'Add another like this', icon: 'plus', run: () => auctionSheet(e.row) }] : []),
+        { label: 'Delete this entry', icon: 'trash', danger: true, run: () => confirmSheet('Delete this entry?', 'It comes out of the price book for good.', 'Delete it', async () => {
+          const { error } = await sb.from('price_checks').delete().eq('id', e.row.id);
+          if (error) return toast('Couldn’t delete it: ' + error.message);
+          PB.rows = PB.rows.filter(r => r.id !== e.row.id); renderPriceBook(); toast('Deleted', 'ok');
+        }, true) }
+      ]);
+    });
+  }
+  $$('#pbTabs button').forEach(b => b.onclick = () => { PB.tab = b.dataset.tab; renderPriceBook(); });
+  $('#pbSearch').oninput = () => { PB.q = $('#pbSearch').value; renderPriceBook(); };
+  $('#pbAdd').onclick = () => auctionSheet();
+
+  function auctionSheet(like) {
+    like = like || {};
+    const d = like.detail || {};
+    const box = sheetHtml('Add an auction result', 'What it went for, so the price book knows next time.', `
+      <div class="section-card">
+        <div class="row-2">
+          <div class="f"><label for="auMake">Make</label><input class="in" id="auMake" list="auMakes" value="${esc(like.make || '')}" autocapitalize="words" placeholder="Ford"></div>
+          <div class="f"><label for="auModel">Model</label><input class="in" id="auModel" list="auModels" value="${esc(like.model || '')}" autocapitalize="words" placeholder="Fiesta"></div>
+        </div>
+        <datalist id="auMakes">${knownMakes().map(m => `<option value="${esc(m)}">`).join('')}</datalist>
+        <datalist id="auModels"></datalist>
+        <div class="row-2" style="margin-top:16px">
+          <div class="f"><label for="auYear">Year</label><input class="in" id="auYear" inputmode="numeric" value="${esc(like.year || '')}" placeholder="2016"></div>
+          <div class="f"><label for="auMiles">Mileage</label><input class="in" id="auMiles" inputmode="numeric" placeholder="72000"></div>
+        </div>
+        <div class="row-2" style="margin-top:16px">
+          <div class="f"><label for="auPrice">Hammer price</label><div class="money"><input class="in" id="auPrice" inputmode="decimal" placeholder="0"></div></div>
+          <div class="f"><label for="auDate">Sale date</label><input class="in" type="date" id="auDate" value="${INV ? INV.today() : ''}"></div>
+        </div>
+        <div class="f" style="margin-top:16px"><div class="lbl">Where</div><div class="chips" id="auHouse">${HOUSES.map(h => `<button class="chip${(d.house || 'BCA') === h ? ' is-on' : ''}" type="button" data-v="${h}">${h}</button>`).join('')}</div></div>
+        <div class="f"><div class="lbl">History</div><div class="chips" id="auHpi">${[['clear', 'Clear'], ['cat_n', 'Cat N'], ['cat_s', 'Cat S']].map(([v, l]) => `<button class="chip${(d.hpi || 'clear') === v ? ' is-on' : ''}" type="button" data-v="${v}">${l}</button>`).join('')}</div></div>
+        <div class="f" style="margin-bottom:0"><label for="auNotes">Notes <span class="opt">(optional)</span></label><input class="in" id="auNotes" placeholder="Grade 3, two keys, no service history"></div>
+      </div>
+      <button class="btn btn--accent btn--block" type="button" id="auSave">Save it</button>`);
+    const one = sel => box.querySelectorAll(sel + ' .chip').forEach(c => c.onclick = () => { box.querySelectorAll(sel + ' .chip').forEach(x => x.classList.remove('is-on')); c.classList.add('is-on'); });
+    one('#auHouse'); one('#auHpi');
+    const models = () => { $('#auModels').innerHTML = knownModels($('#auMake').value).map(m => `<option value="${esc(m)}">`).join(''); };
+    $('#auMake').oninput = models; models();
+    $('#auSave').onclick = async () => {
+      const make = canonicalMake($('#auMake').value.trim()), price = num($('#auPrice').value);
+      if (!make || !(price > 0)) return toast('Put in at least the make and the hammer price');
+      const model = $('#auModel').value.trim() ? canonicalModel(make, $('#auModel').value.trim()) : null;
+      const date = $('#auDate').value;
+      const row = { make, model, year: int($('#auYear').value), mileage: int($('#auMiles').value), typical: Math.round(price), source: 'auction',
+        notes: $('#auNotes').value.trim() || null,
+        detail: { house: (box.querySelector('#auHouse .is-on') || {}).dataset ? box.querySelector('#auHouse .is-on').dataset.v : null,
+                  hpi: box.querySelector('#auHpi .is-on') ? box.querySelector('#auHpi .is-on').dataset.v : 'clear' },
+        created_at: date ? new Date(date + 'T12:00:00').toISOString() : new Date().toISOString() };
+      const { data, error } = await sb.from('price_checks').insert(row).select().single();
+      if (error) {
+        if (/price_checks_source_check|detail/i.test(error.message)) return toast('Auction results need schema-v12-auction-prices.sql run in Supabase → SQL Editor first');
+        return toast('Couldn’t save: ' + error.message);
+      }
+      closeSheet();
+      if (PB.rows) PB.rows.unshift(data || row);
+      renderPriceBook();
+      toast('Added to the price book', 'ok');
+    };
+  }
+
+  /* ======================================================== PHOTO GUIDE
+     Every car photographed the same way: the same shots in the same order,
+     each with an outline on the camera to line the car up against, like We
+     Buy Any Car's app (3 Oct 2026). The photos upload as you go and are
+     saved onto the car in that order, the first one as the main photo.
+
+     The camera is the browser's own (getUserMedia), cropped to 4:3
+     landscape, which is the shape the website shows cars in. If the camera
+     can't be opened (permission refused, an old phone), each shot falls
+     back to the phone's normal camera, with the outline shown first.
+
+     Shots taken are kept on this phone (localStorage) until saved to the
+     car, so closing the app halfway loses nothing that had uploaded. */
+  const PG_KEY = 'mbu_photo_guide';
+
+  // The outlines, drawn on a 400 × 300 frame (4:3). A side view and a
+  // three-quarter view are each drawn once and mirrored for the other side.
+  const G = {
+    ground: '<line x1="10" y1="246" x2="390" y2="246" stroke-dasharray="6 7"/>',
+    side: `<path d="M38 216 L38 186 Q40 171 68 166 L148 158 Q170 121 202 111 L286 111 Q316 119 341 156 L362 162 Q371 170 369 190 L369 216 L336 216 A33 33 0 0 0 266 216 L141 216 A33 33 0 0 0 71 216 Z"/>
+      <path d="M160 157 L203 119 L282 119 L330 155 Z"/><line x1="242" y1="119" x2="242" y2="157"/>
+      <circle cx="106" cy="218" r="27"/><circle cx="301" cy="218" r="27"/>`,
+    front: `<path d="M78 232 L78 172 Q83 151 108 146 L134 96 Q140 85 156 85 L244 85 Q260 85 266 96 L292 146 Q317 151 322 172 L322 232 Z"/>
+      <path d="M140 141 L157 99 L243 99 L260 141 Z"/><rect x="92" y="160" width="46" height="15" rx="6"/><rect x="262" y="160" width="46" height="15" rx="6"/>
+      <rect x="164" y="170" width="72" height="24" rx="5"/><rect x="84" y="232" width="34" height="16" rx="4"/><rect x="282" y="232" width="34" height="16" rx="4"/>`,
+    rear: `<path d="M78 232 L78 170 Q83 150 108 146 L136 100 Q142 88 158 88 L242 88 Q258 88 264 100 L292 146 Q317 150 322 170 L322 232 Z"/>
+      <path d="M146 140 L160 103 L240 103 L254 140 Z"/><rect x="88" y="158" width="52" height="18" rx="5"/><rect x="260" y="158" width="52" height="18" rx="5"/>
+      <rect x="168" y="182" width="64" height="16" rx="3"/><rect x="84" y="232" width="34" height="16" rx="4"/><rect x="282" y="232" width="34" height="16" rx="4"/>`,
+    corner: `<path d="M46 224 L46 180 Q50 164 78 159 L134 152 L178 112 Q186 104 200 103 L300 103 Q318 104 330 118 L352 150 Q366 156 368 172 L368 214 L342 216 A27 27 0 0 0 288 216 L160 220 A30 30 0 0 0 100 222 Z"/>
+      <path d="M140 150 L180 114 L214 113 L190 150 Z"/><path d="M198 149 L222 113 L298 113 L330 149 Z"/>
+      <ellipse cx="130" cy="223" rx="25" ry="28"/><ellipse cx="315" cy="217" rx="21" ry="25"/>`,
+    cornerFront: '<path d="M56 170 L92 166 L96 177 L58 181 Z"/><rect x="100" y="172" width="34" height="14" rx="3"/>',
+    cornerRear: '<path d="M54 166 L94 162 L96 178 L56 181 Z"/><rect x="104" y="186" width="30" height="10" rx="2"/>',
+    wheel: '<circle cx="200" cy="150" r="108"/><circle cx="200" cy="150" r="74"/><circle cx="200" cy="150" r="16"/>' +
+      [0, 72, 144, 216, 288].map(a => `<line x1="200" y1="150" x2="${(200 + 70 * Math.cos(a * Math.PI / 180)).toFixed(1)}" y2="${(150 + 70 * Math.sin(a * Math.PI / 180)).toFixed(1)}"/>`).join(''),
+    dash: '<path d="M14 150 Q200 96 386 150"/><circle cx="128" cy="196" r="62"/><circle cx="128" cy="196" r="16"/><rect x="176" y="116" width="54" height="38" rx="5"/><path d="M14 150 L14 280 M386 150 L386 280"/><line x1="40" y1="30" x2="360" y2="30" stroke-dasharray="5 6"/>',
+    seats: '<path d="M70 270 L76 120 Q78 92 106 90 L160 90 Q186 92 188 120 L184 270"/><rect x="104" y="54" width="54" height="30" rx="12"/>' +
+           '<path d="M216 270 L212 120 Q214 92 240 90 L294 90 Q322 92 324 120 L330 270"/><rect x="242" y="54" width="54" height="30" rx="12"/>',
+    rearSeats: '<path d="M40 250 L44 120 Q46 96 76 94 L324 94 Q354 96 356 120 L360 250 Z"/><line x1="148" y1="96" x2="146" y2="250"/><line x1="252" y1="96" x2="254" y2="250"/>' +
+               '<rect x="72" y="62" width="50" height="26" rx="10"/><rect x="175" y="62" width="50" height="26" rx="10"/><rect x="278" y="62" width="50" height="26" rx="10"/>',
+    boot: '<path d="M60 80 L340 80 L372 258 L28 258 Z"/><path d="M96 112 L304 112 L326 232 L74 232 Z"/>',
+    cluster: '<rect x="40" y="70" width="320" height="160" rx="70"/><circle cx="130" cy="150" r="52"/><circle cx="270" cy="150" r="52"/><rect x="172" y="186" width="56" height="24" rx="4"/>',
+    screen: '<rect x="70" y="60" width="260" height="170" rx="14"/><rect x="88" y="78" width="224" height="134" rx="6"/>',
+    engine: '<path d="M30 70 L370 70 L340 262 L60 262 Z"/><rect x="120" y="110" width="160" height="96" rx="8"/><circle cx="90" cy="120" r="16"/><rect x="292" y="104" width="44" height="34" rx="4"/>',
+    keys: '<rect x="60" y="80" width="160" height="200" rx="8"/><line x1="80" y1="120" x2="200" y2="120"/><line x1="80" y1="148" x2="200" y2="148"/>' +
+          '<rect x="262" y="96" width="70" height="110" rx="26"/><path d="M297 206 L297 270 M297 236 L315 236 M297 254 L311 254"/>'
+  };
+  const mirror = g => `<g transform="translate(400 0) scale(-1 1)">${g}</g>`;
+  const SHOTS = [
+    { key: 'front-driver', group: 'Outside', title: 'Front corner, driver’s side', tip: 'The main photo. Stand off the front right corner, about four big steps away, phone at headlight height. Wheels turned slightly out looks best.', svg: () => G.ground + mirror(G.corner + G.cornerFront) },
+    { key: 'front', group: 'Outside', title: 'Straight on, front', tip: 'In line with the middle of the car, at headlight height. Whole car in the outline, a little space round it.', svg: () => G.ground + G.front },
+    { key: 'front-passenger', group: 'Outside', title: 'Front corner, passenger side', tip: 'Off the front left corner, same distance and height as the first one.', svg: () => G.ground + G.corner + G.cornerFront },
+    { key: 'side-passenger', group: 'Outside', title: 'Passenger side', tip: 'Square on to the middle of the car, both wheels in the circles.', svg: () => G.ground + G.side },
+    { key: 'rear-passenger', group: 'Outside', title: 'Rear corner, passenger side', tip: 'Off the back left corner, at light height.', svg: () => G.ground + mirror(G.corner + G.cornerRear) },
+    { key: 'rear', group: 'Outside', title: 'Straight on, back', tip: 'In line with the middle, number plate level in the frame.', svg: () => G.ground + G.rear },
+    { key: 'rear-driver', group: 'Outside', title: 'Rear corner, driver’s side', tip: 'Off the back right corner.', svg: () => G.ground + G.corner + G.cornerRear },
+    { key: 'side-driver', group: 'Outside', title: 'Driver’s side', tip: 'Square on to the middle of the car.', svg: () => G.ground + mirror(G.side) },
+    { key: 'wheel', group: 'Outside', title: 'A wheel', tip: 'The best-looking alloy, filling the circles, crouched level with the hub.', svg: () => G.wheel },
+    { key: 'dash', group: 'Inside', title: 'Dashboard', tip: 'From the middle of the back seat, so the whole dash and both front seats are in.', svg: () => G.dash },
+    { key: 'front-seats', group: 'Inside', title: 'Front seats', tip: 'From the open driver’s door, seat and steering wheel in.', svg: () => G.seats },
+    { key: 'rear-seats', group: 'Inside', title: 'Back seats', tip: 'From an open back door, the whole bench in.', svg: () => G.rearSeats },
+    { key: 'boot', group: 'Inside', title: 'Boot', tip: 'Boot open, from behind, floor and sides in.', svg: () => G.boot },
+    { key: 'mileage', group: 'Inside', title: 'Mileage', tip: 'Ignition on, no warning lights, the mileage readable.', svg: () => G.cluster },
+    { key: 'screen', group: 'Inside', title: 'Screen', tip: 'Sat nav or the main menu showing. Skip it if there’s no screen.', optional: true, svg: () => G.screen },
+    { key: 'engine', group: 'Inside', title: 'Engine bay', tip: 'Bonnet up, from the front, the whole bay in.', svg: () => G.engine },
+    { key: 'keys', group: 'Inside', title: 'Keys and book', tip: 'Both keys and the service book on the seat. Skip if not.', optional: true, svg: () => G.keys }
+  ];
+  const guideSvg = (shot, cls) => `<svg class="${cls || 'pg-guide'}" viewBox="0 0 400 300" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shot.svg()}</svg>`;
+
+  const PGS = { car: null, shots: {}, at: 0, stream: null, busy: 0 };
+
+  function pgLoad(carId) {
+    try { const all = JSON.parse(localStorage.getItem(PG_KEY) || '{}'); return (all[carId] || {}).shots || {}; } catch { return {}; }
+  }
+  function pgSave() {
+    if (!PGS.car) return;
+    try {
+      const all = JSON.parse(localStorage.getItem(PG_KEY) || '{}');
+      const keep = {};
+      Object.entries(PGS.shots).forEach(([k, s]) => { if (s.photo) keep[k] = { photo: s.photo }; });
+      all[PGS.car.id] = { at: Date.now(), shots: keep };
+      localStorage.setItem(PG_KEY, JSON.stringify(all));
+    } catch { /* no storage: still works, just not across a restart */ }
+  }
+  function pgForget(carId) {
+    try { const all = JSON.parse(localStorage.getItem(PG_KEY) || '{}'); delete all[carId]; localStorage.setItem(PG_KEY, JSON.stringify(all)); } catch { /* fine */ }
+  }
+
+  ON_SHOW.photos = () => renderPhotoGuide();
+
+  function pgPickCar() {
+    pickCar({ title: 'Which car are you photographing?', filter: c => c.status !== 'sold',
+      run: car => { PGS.car = car; PGS.shots = pgLoad(car.id); PGS.at = 0; renderPhotoGuide(); } });
+  }
+
+  function renderPhotoGuide() {
+    const car = PGS.car;
+    if (!car) {
+      $('#pgBody').innerHTML = `
+        <div class="section-card">
+          <h2>Same angles, every car</h2>
+          <p style="font-size:15.5px;line-height:1.55;color:var(--ink-2)">${SHOTS.length} shots in the same order every time, with an outline on the camera
+          for each one to line the car up against. They upload as you go and save onto the car in order, the first one as its main photo.</p>
+          <button class="btn btn--accent btn--block" type="button" id="pgPick" style="margin-top:16px">${icon('car')} Pick the car</button>
+          <p class="hint" style="margin-top:12px">Add it with Quick add first if it isn’t in yet. Hold the phone sideways for every shot.</p>
+        </div>
+        <div class="pg-grid pg-grid--preview">${SHOTS.map(s => `<div class="pg-tile">${guideSvg(s)}<span>${esc(s.title)}</span></div>`).join('')}</div>`;
+      $('#pgPick').onclick = pgPickCar;
+      return;
+    }
+    const done = SHOTS.filter(s => PGS.shots[s.key] && PGS.shots[s.key].photo).length;
+    const busy = SHOTS.filter(s => PGS.shots[s.key] && PGS.shots[s.key].uploading).length;
+    const failed = SHOTS.filter(s => PGS.shots[s.key] && PGS.shots[s.key].error).length;
+    const next = SHOTS.findIndex(s => !(PGS.shots[s.key] && (PGS.shots[s.key].photo || PGS.shots[s.key].uploading || PGS.shots[s.key].skipped)));
+    $('#pgBody').innerHTML = `
+      <div class="section-card">
+        <div class="inv-car">
+          <div><strong>${esc(carTitle(car))}</strong><small>${esc([car.registration ? fmtReg(car.registration) : '', (car.images || []).length ? `${car.images.length} photos on it now` : 'No photos yet'].filter(Boolean).join(' · '))}</small></div>
+          <button class="btn btn--sm btn--outline" type="button" id="pgChange">Change</button>
+        </div>
+        <button class="btn btn--accent btn--block" type="button" id="pgStart" style="margin-top:16px">${icon('camera')} ${done ? (next < 0 ? 'Retake any of them' : `Carry on: ${SHOTS[next].title}`) : 'Start the camera'}</button>
+        <p class="hint" style="margin-top:10px">${done} of ${SHOTS.length} taken${busy ? ` · ${busy} uploading` : ''}${failed ? ` · ${failed} didn’t upload, tap to retry` : ''}. Tap any shot to take or retake it.</p>
+      </div>
+      ${['Outside', 'Inside'].map(group => `<h2 class="home-h">${group}</h2>
+        <div class="pg-grid">${SHOTS.map((s, i) => s.group !== group ? '' : (() => {
+          const st = PGS.shots[s.key] || {};
+          const pic = st.local || (st.photo ? imgUrl(st.photo, 300) : '');
+          return `<button class="pg-tile${pic ? ' has-photo' : ''}${st.skipped ? ' is-skipped' : ''}" type="button" data-i="${i}">
+            ${pic ? `<img src="${esc(pic)}" alt="">` : guideSvg(s)}
+            <span>${esc(s.title)}</span>
+            ${st.uploading ? '<em class="pg-state">Uploading</em>' : st.error ? '<em class="pg-state pg-state--err">Retry</em>' : st.photo ? `<em class="pg-state pg-state--ok">${icon('check')}</em>` : st.skipped ? '<em class="pg-state">Skipped</em>' : ''}
+          </button>`;
+        })()).join('')}</div>`).join('')}
+      ${done || busy ? `<div class="pg-save">
+        <button class="btn btn--green btn--block" type="button" id="pgSaveBtn"${done && !busy ? '' : ' disabled'}>${icon('check')} Save ${done || ''} photo${done === 1 ? '' : 's'} to the car</button>
+        ${busy ? '<p class="hint" style="text-align:center;margin-top:8px">Waiting for the uploads to finish…</p>' : ''}
+      </div>` : ''}`;
+    $('#pgChange').onclick = pgPickCar;
+    $('#pgStart').onclick = () => openCamera(next < 0 ? 0 : next);
+    $$('#pgBody .pg-tile[data-i]').forEach(b => b.onclick = () => {
+      const s = SHOTS[+b.dataset.i], st = PGS.shots[s.key] || {};
+      if (st.error && st.blob) return uploadShot(s, st.blob, st.local);
+      openCamera(+b.dataset.i);
+    });
+    if ($('#pgSaveBtn')) $('#pgSaveBtn').onclick = savePhotoGuide;
+  }
+
+  /* ---- The camera ------------------------------------------------------- */
+  async function openCamera(i) {
+    PGS.at = i;
+    let cam = $('#pgCam');
+    if (!cam) {
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="pg-cam" id="pgCam" role="dialog" aria-label="Camera">
+          <div class="pg-stage" id="pgStage">
+            <video id="pgVideo" playsinline muted autoplay></video>
+            <div class="pg-overlay" id="pgOverlay"></div>
+            <div class="pg-flash" id="pgFlash"></div>
+          </div>
+          <div class="pg-top">
+            <button class="pg-btn" type="button" id="pgClose" aria-label="Done">${icon('close')}</button>
+            <div class="pg-title"><small id="pgCount"></small><strong id="pgShot"></strong></div>
+          </div>
+          <p class="pg-tip" id="pgTip"></p>
+          <div class="pg-controls">
+            <button class="pg-btn pg-btn--text" type="button" id="pgPrev">${icon('left')}</button>
+            <button class="pg-shutter" type="button" id="pgSnap" aria-label="Take the photo"></button>
+            <button class="pg-btn pg-btn--text" type="button" id="pgSkip">Skip</button>
+          </div>
+          <button class="pg-native" type="button" id="pgNative">Use the phone’s camera</button>
+          <input type="file" accept="image/*" capture="environment" id="pgFile" hidden>
+          <div class="pg-rotate" id="pgRotate">${icon('camera')}<strong>Turn your phone sideways</strong><span>Every shot is landscape, the shape the website shows them in.</span>
+            <button class="btn btn--outline btn--sm" type="button" id="pgRotNative" style="margin-top:14px;background:transparent;color:#fff;border-color:rgba(255,255,255,.35)">Screen won’t turn? Use the phone’s camera</button></div>
+        </div>`);
+      cam = $('#pgCam');
+      $('#pgClose').onclick = closeCamera;
+      $('#pgSnap').onclick = snap;
+      $('#pgSkip').onclick = () => { const s = SHOTS[PGS.at]; PGS.shots[s.key] = Object.assign({}, PGS.shots[s.key], { skipped: true }); nextShot(); };
+      $('#pgPrev').onclick = () => { if (PGS.at > 0) { PGS.at--; drawShot(); } };
+      $('#pgNative').onclick = () => $('#pgFile').click();
+      $('#pgRotNative').onclick = () => $('#pgFile').click();
+      $('#pgFile').onchange = async () => {
+        const f = $('#pgFile').files[0]; $('#pgFile').value = '';
+        if (!f) return;
+        try {
+          const { blob } = await compress(f, 1800, 0.85);
+          takeShot(blob);
+        } catch (e) { toast(e.message); }
+      };
+    }
+    cam.classList.add('is-open');
+    document.documentElement.classList.add('pg-locked');
+    drawShot();
+    if (!PGS.stream) {
+      try {
+        PGS.stream = await navigator.mediaDevices.getUserMedia({ audio: false,
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 3264 }, height: { ideal: 2448 }, aspectRatio: { ideal: 4 / 3 } } });
+        const v = $('#pgVideo');
+        v.srcObject = PGS.stream;
+        await v.play().catch(() => {});
+        cam.classList.remove('is-native');
+      } catch (err) {
+        console.warn('Camera unavailable', err);
+        cam.classList.add('is-native');
+        toast('The camera didn’t open here, so each shot uses the phone’s own camera');
+      }
+    }
+  }
+
+  function drawShot() {
+    const s = SHOTS[PGS.at];
+    $('#pgOverlay').innerHTML = guideSvg(s, 'pg-outline');
+    $('#pgCount').textContent = `${s.group} · ${PGS.at + 1} of ${SHOTS.length}${s.optional ? ' · optional' : ''}`;
+    $('#pgShot').textContent = s.title;
+    $('#pgTip').textContent = s.tip;
+    $('#pgPrev').disabled = PGS.at === 0;
+  }
+
+  function nextShot() {
+    pgSave();
+    const after = SHOTS.findIndex((s, i) => i > PGS.at && !(PGS.shots[s.key] && (PGS.shots[s.key].photo || PGS.shots[s.key].uploading)));
+    if (after < 0) { closeCamera(); toast('That’s every shot. Check them, then Save', 'ok'); return; }
+    PGS.at = after;
+    drawShot();
+  }
+
+  // The 4:3 middle of what the camera sees (which is exactly the box shown
+  // on screen), at most 1800 wide, as a JPEG
+  function snap() {
+    const cam = $('#pgCam');
+    if (cam.classList.contains('is-native')) return $('#pgFile').click();
+    const v = $('#pgVideo');
+    const vw = v.videoWidth, vh = v.videoHeight;
+    if (!vw || !vh) return toast('The camera isn’t ready yet');
+    let cw = vw, ch = vh;
+    if (vw / vh > 4 / 3) cw = Math.round(vh * 4 / 3); else ch = Math.round(vw * 3 / 4);
+    const sx = (vw - cw) / 2, sy = (vh - ch) / 2;
+    const scale = Math.min(1, 1800 / cw);
+    const c = document.createElement('canvas');
+    c.width = Math.round(cw * scale); c.height = Math.round(ch * scale);
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(v, sx, sy, cw, ch, 0, 0, c.width, c.height);
+    const flash = $('#pgFlash');
+    flash.classList.remove('is-on'); void flash.offsetWidth; flash.classList.add('is-on');
+    c.toBlob(b => b ? takeShot(b) : toast('Couldn’t take that one, try again'), 'image/jpeg', 0.86);
+  }
+
+  function takeShot(blob) {
+    const s = SHOTS[PGS.at];
+    const old = PGS.shots[s.key];
+    if (old && old.local) URL.revokeObjectURL(old.local);
+    const local = URL.createObjectURL(blob);
+    uploadShot(s, blob, local);
+    nextShot();
+  }
+
+  async function uploadShot(s, blob, local) {
+    PGS.shots[s.key] = { uploading: true, local, blob };
+    PGS.busy++;
+    if (state.view === 'photos') renderPhotoGuide();
+    try {
+      const photo = await uploadToCloudinary(blob);
+      PGS.shots[s.key] = { photo, local };
+    } catch (err) {
+      PGS.shots[s.key] = { error: err.message, local, blob };
+      toast(`${s.title} didn’t upload: ${err.message}`);
+    }
+    PGS.busy--;
+    pgSave();
+    if (state.view === 'photos') renderPhotoGuide();
+  }
+
+  function closeCamera() {
+    const cam = $('#pgCam');
+    if (cam) cam.classList.remove('is-open');
+    document.documentElement.classList.remove('pg-locked');
+    if (PGS.stream) { PGS.stream.getTracks().forEach(t => t.stop()); PGS.stream = null; }
+    pgSave();
+    renderPhotoGuide();
+  }
+
+  /* ---- Onto the car -------------------------------------------------------- */
+  function savePhotoGuide() {
+    const car = PGS.car;
+    const taken = SHOTS.map(s => PGS.shots[s.key] && PGS.shots[s.key].photo).filter(Boolean);
+    if (!taken.length) return;
+    const existing = car.images || [];
+    const write = async images => {
+      const { error } = await sb.from('cars').update({ images, updated_at: new Date().toISOString() }).eq('id', car.id);
+      if (error) return toast('Couldn’t save: ' + error.message);
+      car.images = images;
+      pgForget(car.id);
+      Object.values(PGS.shots).forEach(st => { if (st.local) URL.revokeObjectURL(st.local); });
+      PGS.shots = {};
+      renderStock();
+      toast(`${taken.length} photos saved to the ${carTitle(car)}`, 'ok');
+      renderPhotoGuide();
+    };
+    if (!existing.length) return write(taken);
+    sheet('It has photos already', `${existing.length} on the ${carTitle(car)} now.`, [
+      { label: 'Replace them with these', icon: 'camera', sub: `Just the ${taken.length} new ones, in the guide’s order`, run: () => write(taken) },
+      { label: 'Put these first, keep the old ones after', icon: 'copy', sub: `${taken.length + existing.length} photos`, run: () => write(taken.concat(existing)) }
+    ]);
+  }
+
+  /* ============================================================ TOOLS
+     Every tool in the app on one screen (3 Oct 2026). Some are new screens,
+     some are the tools that already lived on a car's menu, reached here by
+     picking the car first. */
+  function toolList() {
+    const inStockCar = c => c.status === 'available' || c.status === 'reserved';
+    return [
+      { key: 'invoice', icon: 'receipt', title: 'Invoices', sub: 'Make, send and print', primary: true,
+        run: () => go('invoices') },
+      { key: 'bid', icon: 'gauge', title: 'Before you bid', sub: 'History and a max bid',
+        run: () => go('value') },
+      { key: 'price', icon: 'search', title: 'Price check', sub: AT && AT.isEnabled() ? 'Auto Trader on a stock car' : 'What similar cars are up for',
+        run: () => pickCar({ title: 'Check the market price', sub: 'Which car?', filter: inStockCar, run: car => checkMarket(car) }) },
+      { key: 'pricebook', icon: 'book', title: 'Price book', sub: 'Auction and sold prices',
+        run: () => go('pricebook') },
+      { key: 'motcheck', icon: 'checkCirc', title: 'MOT checker', sub: 'Any plate’s MOT history',
+        run: () => go('motcheck') },
+      { key: 'motcal', icon: 'calendar', title: 'MOT calendar', sub: 'When stock MOTs run out',
+        run: () => go('motcal') },
+      { key: 'photos', icon: 'camera', title: 'Photo guide', sub: 'Same angles, every car',
+        run: () => go('photos') },
+      { key: 'pack', icon: 'copy', title: 'Listing pack', sub: 'Adverts to paste anywhere',
+        run: () => pickCar({ title: 'Listing pack', sub: 'Which car?', filter: inStockCar, run: car => showListingPack(car) }) }
+    ].filter(t => !TOOL_OFF.has(t.key));
+  }
+  // Tools whose screens aren't built yet stay off the list, rather than
+  // showing a tile that goes nowhere
+  const TOOL_OFF = new Set([]);
+
+  function renderTools() {
+    const tools = toolList();
+    $('#toolGrid').innerHTML = tools.map((t, i) => `
+      <button class="tool${t.primary ? ' tool--primary' : ''}" type="button" data-t="${i}">
+        ${icon(t.icon)}<strong>${esc(t.title)}</strong><small>${esc(t.sub)}</small>
+      </button>`).join('');
+    $$('#toolGrid .tool').forEach(b => b.onclick = () => tools[+b.dataset.t].run());
   }
 
   /* =============================================== LEAVE-PAGE WARNING */

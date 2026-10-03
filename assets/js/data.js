@@ -50,13 +50,29 @@
     doc:      `<path ${P} d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><polyline ${P} points="14 3 14 8 19 8"/><line ${P} x1="9" y1="13" x2="15" y2="13"/><line ${P} x1="9" y1="17" x2="13" y2="17"/>`,
     plus:     `<line ${P} x1="12" y1="5" x2="12" y2="19"/><line ${P} x1="5" y1="12" x2="19" y2="12"/>`,
     filter:   `<path ${P} d="M3 5h18l-7 8v6l-4 2v-8Z"/>`,
-    heart:    `<path ${P} d="M12 20.5s-7.5-4.6-7.5-9.7A4.3 4.3 0 0 1 12 8a4.3 4.3 0 0 1 7.5 2.8c0 5.1-7.5 9.7-7.5 9.7Z"/>`
+    heart:    `<path ${P} d="M12 20.5s-7.5-4.6-7.5-9.7A4.3 4.3 0 0 1 12 8a4.3 4.3 0 0 1 7.5 2.8c0 5.1-7.5 9.7-7.5 9.7Z"/>`,
+    play:     `<path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.9l10.2-6.5a1 1 0 0 0 0-1.8L9.5 4.6A1 1 0 0 0 8 5.5Z"/>`,
+    images:   `<rect ${P} x="7" y="7" width="14" height="14" rx="2.5"/><path ${P} d="M17 7V5.5A2.5 2.5 0 0 0 14.5 3h-9A2.5 2.5 0 0 0 3 5.5v9A2.5 2.5 0 0 0 5.5 17H7"/>`,
+    pound:    `<path ${P} d="M17 19.5H7c1.4-1 2.2-2.6 2.2-4.5V8.8A3.8 3.8 0 0 1 13 5a3.9 3.9 0 0 1 3.6 2.4"/><line ${P} x1="6.5" y1="12.5" x2="14" y2="12.5"/>`
   };
 
   MBU.icon = function (name, cls) {
     const d = PATHS[name];
     if (!d) return '';
     return `<svg viewBox="0 0 24 24" ${cls ? `class="${cls}"` : ''} aria-hidden="true">${d}</svg>`;
+  };
+
+  /* Five stars filled to a rating (4.9 fills four and nine-tenths), drawn
+     grey underneath and gold on top, the gold cut off at the rating. */
+  let starN = 0;
+  MBU.stars = function (rating) {
+    const r = Math.max(0, Math.min(5, Number(rating) || 0));
+    const id = 'stars' + (++starN);
+    const star = i => `<path transform="translate(${i * 24} 0)" d="M12 2.4l2.9 5.9 6.5.95-4.7 4.6 1.1 6.5L12 17.3l-5.8 3.05 1.1-6.5L2.6 9.25l6.5-.95Z"/>`;
+    const five = [0, 1, 2, 3, 4].map(star).join('');
+    return `<svg class="stars" viewBox="0 0 120 24" role="img" aria-label="${r} out of 5 stars">
+      <defs><clipPath id="${id}"><rect width="${(r / 5 * 120).toFixed(1)}" height="24"/></clipPath></defs>
+      <g fill="#DADEE6">${five}</g><g fill="#F2A900" clip-path="url(#${id})">${five}</g></svg>`;
   };
 
   /* ==========================================================================
@@ -188,7 +204,8 @@
       card:  'c_fill,g_auto,w_720,h_540,q_auto:good,f_auto,dpr_auto',
       hero:  'c_fill,g_auto,w_1400,h_900,q_auto:good,f_auto,dpr_auto',
       full:  'c_limit,w_1800,q_auto:best,f_auto',
-      blur:  'c_fill,w_40,h_30,e_blur:600,q_auto:low,f_auto'
+      blur:  'c_fill,w_40,h_30,e_blur:600,q_auto:low,f_auto',
+      square:'c_fill,g_auto,w_600,h_600,q_auto:good,f_auto,dpr_auto'
     };
     const t = T[size] || T.card;
 
@@ -433,6 +450,40 @@
   /* ==========================================================================
      ENQUIRIES
      ========================================================================== */
+  /**
+   * The latest Instagram posts for the homepage (schema v11, filled once a
+   * day by the "Instagram posts" GitHub Action). Photos are on Cloudinary
+   * like the cars', so nothing here loads from Instagram. An empty list if
+   * the table isn't there yet or anything goes wrong: the section just hides.
+   */
+  MBU.getInstagram = async () => {
+    if (!hasBackend) return [];
+    try {
+      const r = await fetch(restUrl('instagram_posts?select=id,permalink,media_type,caption,alt_text,image_id,width,height&order=position.asc&limit=6'),
+        { headers: restHeaders() });
+      if (!r.ok) return [];
+      const rows = await r.json();
+      return Array.isArray(rows) ? rows.filter(p => p.image_id && /^https:\/\/(www\.)?instagram\.com\//.test(p.permalink || '')) : [];
+    } catch { return []; }
+  };
+
+  /**
+   * "Finance available", when it's switched on (config.js, finance.advert).
+   * Otherwise null, and every place that would mention finance stays quiet.
+   * `small` is the line under it: the finance company's FCA statement once
+   * it's filled in, the interim "subject to status" line until then.
+   */
+  MBU.financeAdvert = () => {
+    const a = CFG.finance && CFG.finance.advert;
+    if (!a || !a.enabled) return null;
+    const statement = String(a.statement || '').trim();
+    return Object.assign({}, a, { statement, small: statement || String(a.interim || '').trim() });
+  };
+  MBU.financeOn = car => {
+    const a = MBU.financeAdvert();
+    return !!(a && car && car.status !== 'sold' && (!a.clearOnly || car.hpi_status === 'clear'));
+  };
+
   MBU.submitEnquiry = async function (payload) {
     const record = Object.assign({ created_at: new Date().toISOString() }, payload);
     let savedToDb = false;

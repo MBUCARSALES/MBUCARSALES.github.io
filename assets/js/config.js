@@ -157,7 +157,68 @@ window.MBU_CONFIG = {
      Take proper advice before you act on any of these enquiries.
      ------------------------------------------------------------------- */
   finance: {
-    enabled: false
+    // The "I'd be interested in finance" tick on car enquiries
+    enabled: false,
+
+    /* "Finance available on HPI clear cars" on the website (October 2026).
+
+       ON since 3 October 2026, before the finance company's details are in
+       (Talha's call, to get the word out). Until they are, it shows a short
+       "subject to status" line and no FCA statement.
+
+       ⚠️ Advertising finance from a lender or broker is only legal for a firm
+       that is FCA authorised, or an appointed representative of one, and the
+       FCA expects the firm's name and status on the advert. Fill in firmName,
+       fcaNumber and statement EXACTLY as the finance company gives them, as
+       soon as you have them: the statement then shows under the advert and in
+       the footer of every page. To take it down, set enabled to false.
+
+       Where it shows: a band on the homepage under Featured stock, a "Finance
+       available" badge beside the price of every HPI clear car for sale, a
+       Finance reason on the contact form, and the finance tick on enquiries. */
+    advert: {
+      enabled:    true,
+      headline:   'Finance available on HPI clear cars',
+      detail:     'Spread the cost with monthly payments. Ask us and we’ll tell you what’s possible.',
+      clearOnly:  true,     // only on HPI clear cars (finance companies won't lend on Cat S / Cat N)
+      firmName:   '',       // the finance company or broker, e.g. 'Example Motor Finance Ltd'
+      fcaNumber:  '',       // its FCA firm reference number
+      // Until the statement is in, this shows instead (keep it short and true):
+      interim:    'Finance is subject to status and affordability. Ask us for details.',
+      // Exactly as the finance company gives it you. Typically:
+      // 'MBU Sales Limited is an appointed representative of <firm>, which is
+      //  authorised and regulated by the Financial Conduct Authority (FRN 123456).
+      //  We are a credit broker, not a lender. Finance is subject to status.'
+      statement:  ''
+    }
+  },
+
+  /* ---------------------------------------------------------------------
+     4e. REVIEWS  ::  the Autotrader score, and a couple of picked reviews
+     ---------------------------------------------------------------------
+     Shown on the homepage. Autotrader has no way for the site to read them,
+     so these are copied by hand from the dealer page. Update `rating` and
+     `count` when they change (check the date in `checked`).
+
+     Keep the picked ones word for word (shortening with … is fine, changing
+     what someone said isn't), and always next to the overall score and a
+     link to all of them: showing only the good ones without that would be
+     misleading, and the law on fake and misleading reviews is strict.
+     Delete `picks` to show just the score and the link.
+     ------------------------------------------------------------------- */
+  reviews: {
+    enabled: true,
+    source:  'Autotrader',
+    url:     'https://www.autotrader.co.uk/dealers/northumberland/newcastle-upon-tyne/mbu-sales-limited-10050768',
+    rating:  4.9,
+    count:   18,
+    checked: '3 October 2026',
+    picks: [
+      { name: 'Syed A.', stars: 5, when: 'September 2026', title: 'Excellent service and salesmen',
+        quote: 'Usman and his father were very accommodating… Would highly recommend.' },
+      { name: 'Mastan S.', stars: 5, when: 'September 2026', title: 'Excellent Experience – Returning Customer!',
+        quote: 'The car was in perfect condition—exactly as described with zero issues. Fantastic service overall.' }
+    ]
   },
 
   /* ---------------------------------------------------------------------

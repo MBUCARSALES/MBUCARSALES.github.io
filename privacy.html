@@ -45,6 +45,12 @@
           <li>If you ask us to find you a car: what you are looking for and your budget</li>
         </ul>
         <p>
+          If you buy a car from us, or sell one to us, we also take your address (and your email
+          address if you want the paperwork emailed) for the invoice or receipt, and your signature
+          if you sign it on our phone. Invoices are kept privately in our own system, never on this
+          website.
+        </p>
+        <p>
           We do not use advertising cookies, tracking pixels or analytics that identify you personally.
         </p>
 
@@ -89,6 +95,11 @@
           an email address, may be forwarded to our own business inbox. Photographs on this website
           are hosted by Cloudinary. These providers process data on our behalf and do not use it for
           their own purposes.
+        </p>
+        <p>
+          Our homepage shows our latest Instagram posts. The pictures are copied to the same place as
+          our other photos, so nothing loads from Instagram while you are on this site. Tapping a post
+          takes you to Instagram, where their own privacy policy applies.
         </p>
         <p>
           We do not sell, rent or share your details with anyone else for marketing. If a sale
@@ -149,8 +160,9 @@
 <script src="assets/js/data.js"></script>
 <script src="assets/js/ui.js"></script>
 <script>
-  document.getElementById('updated').textContent =
-    new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  // The date this page last actually changed. Change it when the wording
+  // changes (it used to show the current month, whatever had changed).
+  document.getElementById('updated').textContent = '3 October 2026';
   const e = document.getElementById('emailLink');
   e.href = 'mailto:' + MBU_CONFIG.business.email; e.textContent = MBU_CONFIG.business.email;
   const p = document.getElementById('phoneLink');

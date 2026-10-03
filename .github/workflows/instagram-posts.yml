@@ -1,0 +1,119 @@
+# ============================================================================
+# INSTAGRAM POSTS ON THE HOMEPAGE
+# ----------------------------------------------------------------------------
+# Once a day: read the six latest posts from Behold's feed of @mbusalesltd,
+# copy any new photo into Cloudinary (where the car photos live), and save
+# the posts in the `instagram_posts` table. The homepage reads that table,
+# so visitors never load anything from Instagram or Behold (no cookies, no
+# new company in the privacy policy), and Behold's free plan (1,200 views a
+# month) only ever sees this one request a day.
+#
+# ONE-TIME SETUP:
+#   1. Run supabase/schema-v11-instagram.sql in Supabase → SQL Editor.
+#   2. Instagram app → Settings → Account type: Business or Creator (free).
+#   3. behold.so → sign up free → connect the Instagram account →
+#      + Add Feed → JSON → copy the feed URL (https://feeds.behold.so/...).
+#      Leave "Domain whitelist" empty, or this job's request is refused.
+#   4. GitHub repo → Settings → Secrets and variables → Actions → New secret
+#        BEHOLD_FEED_URL       the feed URL from step 3
+#      (SUPABASE_URL and SUPABASE_SERVICE_KEY are already there for the
+#       weekly summary.)
+#   5. Actions tab → Instagram posts → Run workflow, to fill it straight away.
+#
+# Cloudinary's cloud name and upload preset are read from assets/js/config.js.
+# ============================================================================
+
+name: Instagram posts
+
+on:
+  schedule:
+    - cron: '30 6 * * *'     # every morning, 06:30 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy the latest posts
+        env:
+          BEHOLD_FEED_URL: ${{ secrets.BEHOLD_FEED_URL }}
+          SUPABASE_URL:    ${{ secrets.SUPABASE_URL }}
+          SERVICE_KEY:     ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          if [ -z "${BEHOLD_FEED_URL:-}" ] || [ -z "${SUPABASE_URL:-}" ] || [ -z "${SERVICE_KEY:-}" ]; then
+            echo "BEHOLD_FEED_URL, SUPABASE_URL or SUPABASE_SERVICE_KEY not set: skipping."
+            exit 0
+          fi
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+
+          const { BEHOLD_FEED_URL, SUPABASE_URL, SERVICE_KEY } = process.env;
+          const config = fs.readFileSync('assets/js/config.js', 'utf8');
+          const pick = key => (new RegExp(key + "\\s*:\\s*'([^']*)'").exec(config) || [])[1] || '';
+          const cloud = pick('cloudName'), preset = pick('uploadPreset');
+          if (!cloud || !preset) throw new Error('Cloudinary cloudName / uploadPreset not found in config.js');
+
+          const db = (path, init = {}) => fetch(`${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/${path}`, Object.assign({}, init, {
+            headers: Object.assign({ apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' }, init.headers || {})
+          }));
+
+          // 1. The feed
+          const res = await fetch(BEHOLD_FEED_URL);
+          if (!res.ok) throw new Error(`Behold feed answered ${res.status}. Check the URL and that its domain whitelist is empty.`);
+          const feed = await res.json();
+          const posts = (Array.isArray(feed) ? feed : feed.posts || []).slice(0, 6);
+          console.log(`${posts.length} posts in the feed`);
+          if (!posts.length) process.exit(0);
+
+          // 2. What we already have, so each photo is copied once
+          const have = await db('instagram_posts?select=id,image_id,width,height');
+          if (!have.ok) throw new Error(`Supabase: ${have.status} ${await have.text()} (has schema-v11-instagram.sql been run?)`);
+          const known = Object.fromEntries((await have.json()).map(r => [r.id, r]));
+
+          // Instagram's own JPEG is the most widely accepted by the upload
+          // preset; Behold's resized WebP if that's missing (or for a video,
+          // its cover image).
+          const source = p => p.mediaType === 'VIDEO'
+            ? (p.thumbnailUrl || (p.sizes && (p.sizes.large || p.sizes.full || p.sizes.medium) || {}).mediaUrl)
+            : (p.mediaUrl || (p.sizes && (p.sizes.full || p.sizes.large) || {}).mediaUrl);
+
+          const rows = [];
+          for (const [i, p] of posts.entries()) {
+            let img = known[p.id];
+            if (!img || !img.image_id) {
+              const url = source(p);
+              if (!url) { console.log(`Skipping ${p.permalink}: no image`); continue; }
+              const form = new FormData();
+              form.set('file', url);
+              form.set('upload_preset', preset);
+              form.set('folder', 'mbu-instagram');
+              form.set('tags', 'instagram');
+              const up = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`, { method: 'POST', body: form });
+              const j = await up.json();
+              if (!up.ok || !j.public_id) { console.log(`::warning::Couldn't copy ${p.permalink} to Cloudinary: ${JSON.stringify(j.error || j)}`); continue; }
+              img = { image_id: j.public_id, width: j.width, height: j.height };
+              console.log(`Copied ${p.permalink} → ${j.public_id}`);
+            }
+            rows.push({
+              id: String(p.id), permalink: p.permalink, media_type: p.mediaType || null,
+              caption: (p.prunedCaption || p.caption || '').slice(0, 1000) || null,
+              alt_text: p.altText || null, taken_at: p.timestamp || null,
+              image_id: img.image_id, width: img.width || null, height: img.height || null,
+              position: i, updated_at: new Date().toISOString()
+            });
+          }
+          if (!rows.length) throw new Error('No posts could be copied');
+
+          // 3. Save them, and drop the ones that have fallen off the feed
+          const save = await db('instagram_posts?on_conflict=id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify(rows) });
+          if (!save.ok) throw new Error(`Saving: ${save.status} ${await save.text()}`);
+          const keep = rows.map(r => `"${r.id}"`).join(',');
+          const drop = await db(`instagram_posts?id=not.in.(${keep})`, { method: 'DELETE' });
+          if (!drop.ok) throw new Error(`Tidying: ${drop.status} ${await drop.text()}`);
+          console.log(`Saved ${rows.length} posts.`);
+          JS

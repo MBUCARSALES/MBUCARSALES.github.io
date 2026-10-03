@@ -170,6 +170,11 @@
     </div>
   </section>
 
+  <!-- ================================================== FINANCE
+       config.js → finance.advert. On since 3 Oct 2026; the finance company's
+       FCA statement goes under it once it's filled in (HANDOVER §1.6). -->
+  <section class="section section--snug" id="financeBand" hidden></section>
+
   <!-- ================================================== WHY US -->
   <section class="section section--tint">
     <div class="container">
@@ -179,8 +184,31 @@
         <p>There is no sales team here and nobody works on commission. Our name is on every car that leaves the yard, and word of mouth round Newcastle is what keeps us going.</p>
       </div>
       <div class="grid grid--4" id="promiseGrid"></div>
+
+      <!-- The Autotrader score, a couple of reviews picked from there, and a
+           link to every one (config.js → reviews). -->
+      <div class="reviews" id="reviewsBox" hidden></div>
     </div>
   </section>
+
+  <!-- ================================================== INSTAGRAM
+       The six latest posts, copied once a day into the database by the
+       "Instagram posts" GitHub Action, photos on Cloudinary. Hidden until
+       there are some. Nothing loads from Instagram itself. -->
+  <section class="section" id="igSection" hidden>
+    <div class="container">
+      <div class="stock-toolbar" style="align-items:flex-end;margin-bottom:28px">
+        <div class="section-head" style="margin-bottom:0">
+          <span class="eyebrow">On Instagram</span>
+          <h2>Just driven away</h2>
+          <p>New arrivals, and the people picking theirs up. The latest from <span id="igHandle">us</span>.</p>
+        </div>
+        <a class="btn btn--ig" id="igFollow" href="#" target="_blank" rel="noopener">Follow us on Instagram</a>
+      </div>
+      <div class="ig-grid" id="igGrid"></div>
+    </div>
+  </section>
+
 
   <!-- ================================================== HOW IT WORKS -->
   <section class="section">
@@ -291,6 +319,63 @@
       <h3>${MBU.esc(p.title)}</h3>
       <p>${MBU.esc(p.text)}</p>
     </div>`).join('');
+
+  /* Reviews: the score, a link to all of them, a couple picked */
+  const R = MBU_CONFIG.reviews;
+  if (R && R.enabled && R.rating && R.url) {
+    const box = document.getElementById('reviewsBox');
+    box.innerHTML = `
+      <a class="reviews-score" href="${MBU.esc(R.url)}" target="_blank" rel="noopener">
+        <span class="reviews-num">${MBU.esc(R.rating.toFixed(1))}</span>
+        ${MBU.stars(R.rating)}
+        <span class="reviews-count">from ${MBU.esc(R.count)} reviews on</span>
+        <img class="reviews-at" src="assets/img/autotrader.svg" alt="${MBU.esc(R.source || 'Autotrader')}" width="120" height="26">
+        <span class="reviews-all">Read them all
+          <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="13 6 19 12 13 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></span>
+      </a>
+      ${(R.picks || []).slice(0, 2).map(p => `
+        <figure class="review">
+          ${MBU.stars(p.stars || 5)}
+          ${p.title ? `<p class="review-title">${MBU.esc(p.title)}</p>` : ''}
+          <blockquote>“${MBU.esc(p.quote)}”</blockquote>
+          <figcaption>${MBU.esc(p.name)}${p.when ? ` · ${MBU.esc(p.when)}` : ''} · on ${MBU.esc(R.source || 'Autotrader')}</figcaption>
+        </figure>`).join('')}`;
+    box.hidden = false;
+  }
+
+  /* Instagram: hidden unless the daily copy has run */
+  const igUrl = (B.instagram || '').trim();
+  if (igUrl) MBU.getInstagram().then(posts => {
+    if (posts.length < 3) return;
+    const handle = (igUrl.match(/instagram\.com\/([^/?#]+)/) || [])[1];
+    if (handle) document.getElementById('igHandle').textContent = '@' + handle;
+    document.getElementById('igFollow').href = igUrl;
+    const shown = posts.slice(0, posts.length >= 6 ? 6 : 3);
+    document.getElementById('igGrid').innerHTML = shown.map(p => {
+      const words = String(p.alt_text || p.caption || '').trim();
+      const alt = words ? words.slice(0, 140) : 'A post from MBU Car Sales on Instagram';
+      const kind = p.media_type === 'VIDEO' ? 'video' : p.media_type === 'CAROUSEL_ALBUM' ? 'album' : '';
+      return `<a class="ig-tile" href="${MBU.esc(p.permalink)}" target="_blank" rel="noopener">
+        <img src="${MBU.esc(MBU.img(p.image_id, 'square'))}" alt="${MBU.esc(alt)}" loading="lazy" width="600" height="600">
+        ${kind ? `<span class="ig-kind" aria-label="${kind}">${MBU.icon(kind === 'video' ? 'play' : 'images')}</span>` : ''}
+        ${p.caption ? `<span class="ig-cap">${MBU.esc(String(p.caption).slice(0, 120))}</span>` : ''}
+      </a>`;
+    }).join('');
+    document.getElementById('igSection').hidden = false;
+  });
+
+  /* Finance: only with the finance company's details in (config.js) */
+  const F = MBU.financeAdvert();
+  if (F) {
+    const band = document.getElementById('financeBand');
+    band.innerHTML = `<div class="container"><div class="finance-band">
+      <div class="finance-band-icon">${MBU.icon('pound')}</div>
+      <div><h2>${MBU.esc(F.headline)}</h2><p>${MBU.esc(F.detail)}</p>
+        <p class="finance-small">${MBU.esc(F.small)}</p></div>
+      <a class="btn btn--accent" href="contact?subject=Finance">Ask about finance</a>
+    </div></div>`;
+    band.hidden = false;
+  }
 
   /* Featured stock */
   const grid = document.getElementById('featuredGrid');

@@ -69,6 +69,11 @@
     <span class="topbar-spacer" id="topbarSpacer"></span>
     <h1 id="topTitle">Home</h1>
     <button class="topbar-btn topbar-btn--accent" id="topAction" hidden></button>
+    <!-- Settings live behind the gear (3 Oct 2026): the tab that used to be
+         More is Tools now. Shown on the five main tabs; sub-screens have Back. -->
+    <button class="topbar-btn" id="settingsBtn" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/></svg>
+    </button>
     <span class="topbar-spacer" id="topbarSpacer2"></span>
   </header>
 
@@ -474,8 +479,102 @@
     <div id="dataBody"></div>
   </section>
 
+  <!-- ---------------------------------------------- INVOICES
+       History (every invoice, newest first), the builder, and the preview
+       you check before it's emailed or printed. All drawn by app.js; what
+       goes on an invoice is worked out in invoice-doc.js. -->
+  <section class="view is-hidden" id="invoicesView">
+    <div class="msg" id="invoicesMsg" role="status"></div>
+    <button class="btn btn--accent btn--block" id="invNew" type="button" style="margin-bottom:14px">New invoice</button>
+    <div class="list-tools">
+      <label class="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" fill="none"/><line x1="20.5" y1="20.5" x2="16" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input type="search" id="invSearch" placeholder="Name, plate or number"
+               autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search invoices">
+      </label>
+    </div>
+    <div class="segment" id="invTabs">
+      <button data-tab="all" class="is-on">All</button>
+      <button data-tab="owed">To come <span class="seg-n" id="nInvOwed"></span></button>
+      <button data-tab="draft">Not sent <span class="seg-n" id="nInvDraft"></span></button>
+    </div>
+    <div id="invList"></div>
+  </section>
+
+  <section class="view is-hidden" id="invoiceView">
+    <div class="msg" id="invoiceMsg" role="status"></div>
+    <div id="invForm"></div>
+  </section>
+
+  <section class="view is-hidden" id="invprevView">
+    <div id="invPrev"></div>
+  </section>
+
+  <!-- ---------------------------------------------- MOT CALENDAR
+       Every car you still own, by the month its MOT runs out. -->
+  <section class="view is-hidden" id="motcalView">
+    <div class="msg" id="motcalMsg" role="status"></div>
+    <div id="motcalBody"></div>
+  </section>
+
+  <!-- ---------------------------------------------- MOT CHECKER
+       Any plate's MOT history on GOV.UK (free, official, no keys needed). -->
+  <section class="view is-hidden" id="motcheckView">
+    <div class="section-card">
+      <h2>Any plate</h2>
+      <div class="plate-wrap">
+        <span class="plate-holder">
+          <input class="plate-input" id="mcReg" placeholder="AB12 CDE" aria-label="Number plate"
+                 autocomplete="off" autocapitalize="characters" spellcheck="false">
+        </span>
+        <button class="btn btn--primary" id="mcGo" type="button" style="min-width:104px">Check</button>
+      </div>
+      <p class="hint" style="margin-top:10px">Opens its full MOT history on GOV.UK: every test, the mileage each time, failures and advisories.</p>
+    </div>
+    <div id="mcBody"></div>
+  </section>
+
+  <!-- ---------------------------------------------- PRICE BOOK
+       What cars actually went for: auction results you've seen (BCA and the
+       like), your own sales, and what similar cars were advertised at. -->
+  <section class="view is-hidden" id="pricebookView">
+    <div class="msg" id="pbMsg" role="status"></div>
+    <button class="btn btn--accent btn--block" id="pbAdd" type="button" style="margin-bottom:14px">Add an auction result</button>
+    <div class="list-tools">
+      <label class="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" fill="none"/><line x1="20.5" y1="20.5" x2="16" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input type="search" id="pbSearch" placeholder="Make or model, e.g. Golf"
+               autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search the price book">
+      </label>
+    </div>
+    <div class="segment" id="pbTabs">
+      <button data-tab="all" class="is-on">All</button>
+      <button data-tab="auction">Auction</button>
+      <button data-tab="ours">Our sales</button>
+      <button data-tab="advert">Advertised</button>
+    </div>
+    <div id="pbSummary"></div>
+    <div id="pbList"></div>
+  </section>
+
+  <!-- ---------------------------------------------- PHOTO GUIDE
+       The same shots, at the same angles, for every car: an outline on the
+       camera for each one, like We Buy Any Car's app. Drawn by app.js. -->
+  <section class="view is-hidden" id="photosView">
+    <div id="pgBody"></div>
+  </section>
+
   <!-- ---------------------------------------------- SETTINGS -->
-  <section class="view is-hidden" id="moreView">
+  <!-- ---------------------------------------------- TOOLS
+       Every tool the app has, one tap each (3 Oct 2026). The tiles are drawn
+       by renderTools() in app.js so the list lives in one place. -->
+  <section class="view is-hidden" id="toolsView">
+    <div class="tool-grid" id="toolGrid"></div>
+  </section>
+
+  <!-- ---------------------------------------------- SETTINGS
+       What used to be the More tab, now behind the gear at the top right. -->
+  <section class="view is-hidden" id="settingsView">
     <div class="section-card">
       <h2>Signed in as</h2>
       <p style="font-size:17px;font-weight:700" id="whoami"></p>
@@ -483,10 +582,10 @@
     </div>
 
     <div class="section-card">
-      <h2>Tools</h2>
-      <button class="btn btn--outline btn--block" id="moreValue" type="button">Check a car before you bid</button>
+      <h2>Invoices</h2>
+      <p class="hint" style="margin:-6px 0 14px">Who sells, their numbers, the business details printed at the top, and VAT.</p>
+      <button class="btn btn--outline btn--block" id="invoiceSettingsBtn" type="button">Invoice details</button>
     </div>
-
     <div class="section-card">
       <h2>Quick help</h2>
       <div class="sheet-actions">
@@ -541,7 +640,7 @@
       <h2>Back up your data</h2>
       <p class="hint" style="margin:-6px 0 14px">
         Downloads the lot as spreadsheets: cars, enquiries, car requests, your
-        price book and price history. Worth doing before year end.
+        price book, price history and invoices. Worth doing before year end.
       </p>
       <button class="btn btn--outline btn--block" id="exportAll">Export everything</button>
       <div id="exportStatus" class="hint" style="margin-top:10px"></div>
@@ -554,7 +653,8 @@
 
   <!-- ---------------------------------------------- TAB BAR -->
   <!-- Home sits bottom-left. The bid tool (Value) moved onto Home, so the bar
-       stays at five: six is cramped on a phone. -->
+       stays at five: six is cramped on a phone. More became Tools on 3 Oct
+       2026; its settings moved behind the gear in the top bar. -->
   <nav class="tabbar" id="tabbar">
     <button data-view="home" class="is-on">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.8l8.5 6.8"/><path d="M5.5 9v10a1.5 1.5 0 0 0 1.5 1.5h3.5v-6h3v6H17a1.5 1.5 0 0 0 1.5-1.5V9"/></svg>
@@ -573,9 +673,9 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="20" x2="21" y2="20"/><rect x="5" y="11" width="3.6" height="9" rx="1"/><rect x="10.2" y="6" width="3.6" height="14" rx="1"/><rect x="15.4" y="14" width="3.6" height="6" rx="1"/></svg>
       Insights
     </button>
-    <button data-view="more">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/></svg>
-      More
+    <button data-view="tools">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.8"/><path d="M17 13.5v7M13.5 17h7"/></svg>
+      Tools
     </button>
   </nav>
 
@@ -588,6 +688,16 @@
   <div class="savebar" id="saveBar" hidden>
     <button class="btn btn--outline" id="saveDraftBtn">Save draft</button>
     <button class="btn btn--accent" id="publishBtn">Publish</button>
+  </div>
+
+  <!-- Sticky bars for the invoice builder and its preview -->
+  <div class="savebar" id="invBar" hidden>
+    <button class="btn btn--outline" id="invSaveBtn">Save</button>
+    <button class="btn btn--accent" id="invPreviewBtn">Check and send</button>
+  </div>
+  <div class="savebar" id="prevBar" hidden>
+    <button class="btn btn--outline" id="prevPrintBtn">Print or save</button>
+    <button class="btn btn--accent" id="prevSendBtn">Email it</button>
   </div>
 
   <!-- Sticky save bar for the quick add screen -->
@@ -629,6 +739,7 @@
 <script src="../assets/js/autotrader-adapter.js"></script>
 <script src="insights-engine.js"></script>
 <script src="verses.js"></script>
+<script src="invoice-doc.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

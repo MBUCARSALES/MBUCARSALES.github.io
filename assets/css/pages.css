@@ -920,3 +920,18 @@
   width: 6px; height: 6px; border-radius: 50%; background: var(--accent-500);
 }
 .prose a { color: var(--navy-600); font-weight: 600; text-decoration: underline; }
+
+/* "Finance available" beside the price (October 2026). A link: it opens the
+   contact form with Finance picked. */
+.cpb-top { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.cpb-top .cpb-price { display: inline-block; }
+.fin-badge {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  min-height: 34px; padding: 5px 12px 5px 8px; border-radius: var(--r-full);
+  background: var(--green-100); color: var(--green-600); border: 1px solid #BFE3CE;
+  font-size: var(--fs-sm); font-weight: 700; line-height: 1.2; white-space: nowrap;
+}
+.fin-badge svg { width: 18px; height: 18px; padding: 2px; border-radius: 50%; background: var(--green-600); color: #fff; }
+.fin-badge:hover { background: #D3EEDD; }
+.fin-badge--onDark { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.22); color: #fff; }
+.fin-badge--onDark svg { background: #fff; color: var(--navy-900); }

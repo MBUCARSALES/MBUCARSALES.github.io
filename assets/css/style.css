@@ -974,3 +974,91 @@ p  { text-wrap: pretty; }
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1; transform: none; }
 }
+
+/* ==========================================================================
+   REVIEWS, INSTAGRAM, FINANCE (October 2026)
+   ========================================================================== */
+
+/* The Autotrader score beside two picked reviews. White, because
+   Autotrader's logo always sits on white. */
+.reviews {
+  display: grid; grid-template-columns: minmax(220px, 0.8fr) 1fr 1fr; gap: var(--sp-4);
+  margin-top: var(--sp-6);
+}
+.reviews-score, .review {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: var(--sp-5); box-shadow: var(--sh-1);
+}
+.reviews-score {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  color: var(--navy-900); transition: box-shadow .2s, transform .2s;
+}
+.reviews-score:hover { box-shadow: var(--sh-2); transform: translateY(-2px); }
+.reviews-num { font-size: 3rem; font-weight: 800; line-height: 1; letter-spacing: -.03em; }
+.reviews-score .stars { width: 132px; height: 26px; }
+.reviews-count { font-size: var(--fs-sm); color: var(--ink-3); margin-top: 4px; }
+.reviews-at { height: 24px; width: auto; }
+.reviews-all {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: auto; padding-top: var(--sp-3);
+  font-weight: 700; color: var(--accent-600); font-size: var(--fs-sm);
+}
+.reviews-all svg { width: 17px; height: 17px; }
+.review { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.review .stars { width: 92px; height: 18px; }
+.review-title { font-weight: 700; color: var(--navy-900); }
+.review blockquote { margin: 0; font-size: var(--fs-md); line-height: 1.6; color: var(--ink-2); }
+.review figcaption { margin-top: auto; font-size: var(--fs-sm); color: var(--ink-3); }
+@media (max-width: 940px) {
+  .reviews { grid-template-columns: 1fr 1fr; }
+  .reviews-score { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 12px; }
+  .reviews-num { font-size: 2.4rem; }
+  .reviews-all { margin: 0 0 0 auto; padding: 0; }
+}
+@media (max-width: 620px) {
+  .reviews { grid-template-columns: 1fr; }
+  .reviews-all { margin-left: 0; flex-basis: 100%; }
+}
+
+/* Instagram: square tiles, three across at every size */
+.ig-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.ig-tile {
+  position: relative; display: block; aspect-ratio: 1; overflow: hidden;
+  border-radius: var(--r-md); background: var(--surface-3);
+}
+.ig-tile img { width: 100%; height: 100%; object-fit: cover; transition: transform .35s ease; }
+.ig-tile:hover img { transform: scale(1.04); }
+.ig-kind {
+  position: absolute; top: 8px; right: 8px; width: 28px; height: 28px;
+  display: grid; place-items: center; border-radius: 50%;
+  background: rgba(10,24,48,.55); color: #fff;
+}
+.ig-kind svg { width: 15px; height: 15px; }
+.ig-cap {
+  position: absolute; inset: auto 0 0 0; padding: 30px 12px 10px;
+  background: linear-gradient(to top, rgba(10,24,48,.82), rgba(10,24,48,0));
+  color: #fff; font-size: var(--fs-sm); line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  opacity: 0; transition: opacity .25s;
+}
+.ig-tile:hover .ig-cap, .ig-tile:focus-visible .ig-cap { opacity: 1; }
+@media (max-width: 640px) { .ig-grid { gap: 6px; } .ig-tile { border-radius: var(--r-sm); } }
+
+/* Finance, once switched on */
+.section--snug { padding-block: var(--sp-6); }
+.finance-band {
+  display: grid; grid-template-columns: auto 1fr auto; gap: var(--sp-5); align-items: center;
+  padding: var(--sp-5) var(--sp-6); border-radius: var(--r-xl);
+  background: var(--accent-100); border: 1px solid #D3E1F6;
+}
+.finance-band h2 { font-size: var(--fs-xl); margin-bottom: 4px; }
+.finance-band p { color: var(--ink-2); }
+.finance-band-icon { width: 52px; height: 52px; border-radius: 50%; background: #fff; display: grid; place-items: center; color: var(--accent-600); }
+.finance-band-icon svg { width: 26px; height: 26px; }
+.finance-small, .footer-legal { font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.5; margin-top: 8px; }
+.footer-legal { color: #A8B6CC; max-width: 90ch; }
+@media (max-width: 720px) { .finance-band { grid-template-columns: 1fr; padding: var(--sp-5); } .finance-band-icon { display: none; } }
+.finance-line {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 10px;
+  font-weight: 700; color: var(--accent-600); font-size: var(--fs-sm);
+}
+.finance-line svg { width: 18px; height: 18px; }
