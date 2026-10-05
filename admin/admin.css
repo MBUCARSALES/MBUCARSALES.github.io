@@ -227,6 +227,9 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
   font-size: 14.5px; font-weight: 700; color: var(--ink-3);
 }
 .segment button.is-on { background: #fff; color: var(--navy-900); box-shadow: var(--sh-1); }
+/* Invoices can have four tabs (To deliver shows when one's booked): each as
+   wide as its words, so none wraps at phone width */
+#invTabs button { flex: 1 1 auto; padding: 0 7px; white-space: nowrap; }
 
 /* ----------------------------------------------------------------- FORMS */
 .f { margin-bottom: 16px; }
@@ -1105,6 +1108,13 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
 .inv-ta { min-height: 76px; }
 .linkish { color: var(--accent-600); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 
+/* Delivery: marked delivered, in green at the top of its card */
+.inv-delivered { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 14px; border-radius: var(--r-md); background: var(--green-100); color: var(--green-600); }
+.inv-delivered > svg { width: 24px; height: 24px; flex: none; }
+.inv-delivered > div { flex: 1; min-width: 0; }
+.inv-delivered strong { display: block; font-size: 15.5px; color: var(--ink); }
+.inv-delivered small { display: block; font-size: 13px; color: var(--ink-3); }
+
 .inv-car { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
 .inv-car strong { display: block; font-size: 16.5px; }
 .inv-car small { display: block; font-size: 13.5px; color: var(--ink-3); }
@@ -1202,6 +1212,7 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
 .inv-kv--sum td { font-weight: 700; }
 .inv-kv tr.is-blue th, .inv-kv tr.is-blue td { background: #E8EFFA; color: #17305E; }
 .inv-kv tr.is-cream th, .inv-kv tr.is-cream td { background: #FDF3DF; }
+.inv-kv tr.is-green th, .inv-kv tr.is-green td { background: #E0F2E5; color: #15572E; }
 .inv-bar { background: #0F2246; color: #fff; font-weight: 700; font-size: 15px; padding: 7px 11px; margin: 10px -11px 4px; }
 .inv-grid { width: calc(100% - 45px); margin: 0 22px; border-collapse: collapse; }
 .inv-grid th { background: #0F2246; color: #fff; padding: 6px 8px; font-weight: 700; }
@@ -1217,7 +1228,7 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
 .inv-sig-row span:not(.inv-sig-line):not(.inv-sig-date) { grid-column: 2 / -1; }
 .inv-foot { border-top: 1px solid #DCE1E9; margin-top: 26px; padding-top: 10px; text-align: center; font-size: 10.5px; color: #6E7688; line-height: 1.6; }
 .inv-void { position: absolute; top: 40%; left: 0; right: 0; text-align: center; font-size: 140px; font-weight: 800; color: rgba(220,60,50,.28); transform: rotate(-30deg); pointer-events: none; }
-.inv-row-pill { display: block; margin-top: 6px; }
+.inv-row-pill { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 /* Help text on the invoice screens, smaller than the rest of the app's */
 #invoiceView .hint, #invprevView .hint, #sheetActions .section-card .hint { font-size: 13.5px; color: var(--ink-3); line-height: 1.45; }
 /* Date boxes have a wide built-in minimum; let them share a row on a phone */

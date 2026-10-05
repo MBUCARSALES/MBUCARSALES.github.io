@@ -27,12 +27,15 @@
        seller:   { name, phone },                    the MBU person on the deal
        price, extras: [{ label, amount }],           amount < 0 is a discount
        px: { on, registration, make, model, allowance },
+       delivery: { on, charge, address, date, time,      address blank = theirs
+                   done, done_date, done_time, received_by },
        payments: [{ date, amount, method, deposit }],
        deposit_nonrefundable, balance_due_date, balance_on_collection,
        plan: { count, amount, first, frequency, rows: [{ due, amount, paid_on }], edited },
        terms: { [key]: { off } | { head, text } },   changes to standard terms
        extra_terms: [key], custom_terms: [{ head, text }],
        notes, options: { company, vat },
+       updated_on,                                    set when a payment or the delivery is recorded
        signatures: { buyer: { png, name, date }, seller: { png, name, date } } }
    ========================================================================== */
 (function (root, factory) {
@@ -99,49 +102,49 @@
       label: 'Paid in full', short: 'Paid in full',
       title: 'Vehicle Sale Invoice', subtitle: 'Vehicle purchase and full payment confirmation',
       help: 'The car’s sold and paid for. A deposit taken earlier goes in as a payment.',
-      termsTitle: 'Sale & Payment Terms',
-      terms: ['full_payment', 'deposit_part', 'deposit_terms', 'px', 'extras', 'payment_record', 'vat_margin', 'statutory']
+      termsTitle: 'Sale & Payment Terms', mail: 'Invoice',
+      terms: ['full_payment', 'deposit_part', 'deposit_terms', 'px', 'extras', 'delivery', 'payment_record', 'vat_margin', 'statutory']
     },
     deposit: {
       label: 'Deposit taken', short: 'Deposit',
       title: 'Deposit Receipt', subtitle: 'Vehicle reserved on payment of a deposit',
       help: 'The car’s reserved with a deposit and the rest comes later.',
-      termsTitle: 'Deposit Terms',
-      terms: ['deposit_received', 'balance_due', 'reservation', 'deposit_terms', 'px', 'vat_margin', 'statutory']
+      termsTitle: 'Deposit Terms', mail: 'Deposit receipt',
+      terms: ['deposit_received', 'balance_due', 'reservation', 'delivery', 'deposit_terms', 'px', 'vat_margin', 'statutory']
     },
     balance: {
       label: 'Balance to pay', short: 'Balance due',
       title: 'Vehicle Sale Invoice', subtitle: 'Sale invoice with the balance to pay',
       help: 'Sold, part paid, the rest due on collection or by a date. The car goes when it’s paid.',
-      termsTitle: 'Sale & Payment Terms',
-      terms: ['outstanding', 'balance_due', 'release', 'deposit_part', 'deposit_terms', 'px', 'extras', 'vat_margin', 'statutory']
+      termsTitle: 'Sale & Payment Terms', mail: 'Invoice',
+      terms: ['outstanding', 'balance_due', 'release', 'delivery', 'deposit_part', 'deposit_terms', 'px', 'extras', 'vat_margin', 'statutory']
     },
     instalments: {
       label: 'Pay monthly', short: 'Instalments',
       title: 'Vehicle Sale & Instalment Payment Agreement', subtitle: 'Sale invoice and outstanding balance payment schedule',
       help: 'They drive away and pay the rest in instalments, interest free.',
-      termsTitle: 'Payment & Default Terms',
-      terms: ['plan_outstanding', 'plan_payments', 'payment_record', 'plan_failure', 'plan_changes', 'plan_early', 'plan_no_charges', 'plan_settlement', 'px', 'vat_margin', 'statutory']
+      termsTitle: 'Payment & Default Terms', mail: 'Payment agreement',
+      terms: ['plan_outstanding', 'plan_payments', 'payment_record', 'plan_failure', 'plan_changes', 'plan_early', 'plan_no_charges', 'plan_settlement', 'delivery', 'px', 'vat_margin', 'statutory']
     },
     trade: {
       label: 'Trade sale', short: 'Trade',
       title: 'Trade Sale Invoice', subtitle: 'Vehicle sold to the motor trade',
       help: 'Sold to another dealer or trader, as seen.',
-      termsTitle: 'Terms of Sale',
-      terms: ['trade_buyer', 'sold_as_seen', 'trade_payment', 'px', 'vat_margin', 'lawful']
+      termsTitle: 'Terms of Sale', mail: 'Invoice',
+      terms: ['trade_buyer', 'sold_as_seen', 'trade_payment', 'delivery', 'px', 'vat_margin', 'lawful']
     },
     purchase: {
       label: 'We bought a car', short: 'Purchase',
       title: 'Vehicle Purchase Receipt', subtitle: 'Vehicle bought by MBU Sales Limited',
       help: 'Someone sold their car to you. They’re the seller on this one.',
-      termsTitle: 'Terms of Purchase',
+      termsTitle: 'Terms of Purchase', mail: 'Purchase receipt',
       terms: ['buy_owner', 'buy_finance', 'buy_description', 'buy_payment', 'buy_documents']
     },
     general: {
       label: 'Anything else', short: 'Invoice',
       title: 'Invoice', subtitle: '',
       help: 'Any other invoice: delivery, an MOT, repairs, a part. Add each line.',
-      termsTitle: 'Terms',
+      termsTitle: 'Terms', mail: 'Invoice',
       terms: ['general_payment', 'vat_margin', 'statutory']
     }
   };
@@ -153,6 +156,10 @@
   // part exchange box. What the form doesn't show must never count.
   const NO_PRICE = ['general'];
   const NO_PX = ['general', 'purchase'];
+  // Delivery is for a car MBU sells: "anything else" puts a delivery in as
+  // a line, and a car MBU buys is collected
+  const NO_DELIVERY = ['general', 'purchase'];
+  const deliveryOf = inv => inv && inv.delivery && inv.delivery.on && !NO_DELIVERY.includes(inv.kind) ? inv.delivery : null;
   // A line marked as a discount always takes off, whatever sign was typed
   // (an iPhone's number pad has no minus key)
   const lineAmount = x => x.minus ? -Math.abs(Number(x.amount) || 0) : (Number(x.amount) || 0);
@@ -161,14 +168,16 @@
     const extras = (inv.extras || []).filter(x => has(x.label) || Number(x.amount))
       .map(x => Object.assign({}, x, { amount: r2(lineAmount(x)) }));
     const price = NO_PRICE.includes(inv.kind) ? 0 : r2(inv.price);
-    const goods = r2(price + sum(extras, x => x.amount));
+    const d = deliveryOf(inv);
+    const delivery = d ? Math.max(0, r2(d.charge)) : 0;
+    const goods = r2(price + sum(extras, x => x.amount) + delivery);
     const px = inv.px && inv.px.on && !NO_PX.includes(inv.kind) ? r2(inv.px.allowance) : 0;
     const due = r2(goods - px);
     const payments = (inv.payments || []).filter(p => Number(p.amount));
     const paid = sum(payments, p => p.amount);
     const deposit = sum(payments.filter(p => p.deposit), p => p.amount);
     const balance = r2(due - paid);
-    return { price, extras, goods, px, due, payments, paid, deposit, balance };
+    return { price, extras, delivery, goods, px, due, payments, paid, deposit, balance };
   }
 
   /* ------------------------------------------------------------- SCHEDULE
@@ -246,7 +255,7 @@
        make    { head, text } from the invoice's own figures */
   const TERMS = {
     full_payment: { label: 'Paid in full', make: (inv, t) => ({ head: 'Full payment received.',
-      text: `MBU Sales Limited confirms that the total agreed price of ${gbp(t.due)} has been paid in full by the buyer. There is no outstanding balance.` }) },
+      text: `MBU Sales Limited confirms that the ${agreed(t)} has been paid in full by the buyer. There is no outstanding balance.` }) },
 
     deposit_part: { label: 'Deposit was part of the price', when: (inv, t) => t.deposit > 0, make: (inv, t) => ({ head: 'Deposit.',
       text: `A ${gbp(t.deposit)} deposit was paid toward the purchase price and formed part of the total ${gbp(t.paid)} paid. The vehicle was removed from sale and reserved for the buyer following payment of the deposit.` }) },
@@ -256,10 +265,13 @@
       : { head: 'Deposit terms.', text: `The ${gbp(t.deposit)} deposit was agreed as non-refundable if the buyer chose not to proceed with the purchase or otherwise failed to complete the purchase, except where the buyer had a legal right to a refund that could not lawfully be excluded.` } },
 
     deposit_received: { label: 'Deposit received', make: (inv, t) => ({ head: 'Deposit received.',
-      text: `MBU Sales Limited confirms receipt of ${t.deposit > 0 ? 'a ' + gbp(t.deposit) + ' deposit' : gbp(t.paid)} toward the agreed price of ${gbp(t.due)}. The vehicle has been removed from sale and reserved for the buyer.` }) },
+      text: `MBU Sales Limited confirms receipt of ${t.deposit > 0 ? 'a ' + gbp(t.deposit) + ' deposit' : gbp(t.paid)} toward the ${agreed(t)}. The vehicle has been removed from sale and reserved for the buyer.` }) },
 
-    outstanding: { label: 'What’s been paid so far', make: (inv, t) => ({ head: 'Payment so far.',
-      text: `${gbp(t.paid)} has been paid toward the agreed price of ${gbp(t.due)}, leaving ${gbp(t.balance)} to pay.` }) },
+    // Once the last of it's paid (say on delivery) it says so, rather than
+    // "leaving £0.00 to pay"
+    outstanding: { label: 'What’s been paid so far', make: (inv, t) => t.balance > 0.004
+      ? { head: 'Payment so far.', text: `${gbp(t.paid)} has been paid toward the ${agreed(t)}, leaving ${gbp(t.balance)} to pay.` }
+      : { head: 'Paid in full.', text: `The ${agreed(t)} has now been paid in full. There is no outstanding balance.` } },
 
     balance_due: { label: 'When the balance is due', when: (inv, t) => t.balance > 0, make: (inv, t) => ({ head: 'Balance.',
       text: `The remaining balance of ${gbp(t.balance)} is due ${dueWords(inv)}, in cleared funds.` }) },
@@ -269,8 +281,23 @@
 
     // Only when the car hasn't been handed over: keeping it until it's paid
     // for is ordinary. Never on an instalment plan (see plan_settlement).
-    release: { label: 'Car released once paid', when: (inv, t) => t.balance > 0, make: () => ({ head: 'Collection.',
-      text: 'The vehicle will be released to the buyer once the balance has been received in cleared funds.' }) },
+    release: { label: 'Car released once paid', when: (inv, t) => t.balance > 0 && !(deliveryOf(inv) && deliveryOf(inv).done), make: inv => deliveryOf(inv)
+      ? { head: 'Handover.', text: 'The vehicle will be handed over on delivery once the balance has been received in cleared funds.' }
+      : { head: 'Collection.', text: 'The vehicle will be released to the buyer once the balance has been received in cleared funds.' } },
+
+    // Booked, then completed: "Mark as delivered" turns the one into the
+    // other, and the updated invoice goes to the customer. Until it's handed
+    // over the car is at MBU's risk (Consumer Rights Act 2015 s.29).
+    delivery: { label: 'Delivery', when: inv => !!deliveryOf(inv), make: (inv, t) => {
+      const d = deliveryOf(inv);
+      const known = has(d.address) || has((inv.customer || {}).address);
+      const where = known ? 'the delivery address above' : 'an address agreed with the buyer';
+      const cost = t.delivery > 0 ? `The ${gbp(t.delivery)} delivery charge is included in the total above.` : 'Delivery is free of charge.';
+      if (d.done) return { head: 'Delivery completed.',
+        text: `The vehicle was delivered to ${where}${has(d.done_date || d.date) ? ' on ' + longDate(d.done_date || d.date) : ''}${has(d.received_by) ? ' and received by ' + String(d.received_by).trim() : ''}. ${cost}` };
+      return { head: 'Delivery.',
+        text: `MBU Sales Limited will deliver the vehicle ${has(d.date) ? `to ${where} on ${longDate(d.date)}` : known ? `to ${where} on a date agreed with the buyer` : 'to the buyer at an address and on a date agreed with them'}. ${cost} The vehicle remains at MBU Sales Limited’s risk until it is handed over.` };
+    } },
 
     px: { label: 'Part exchange', when: (inv, t) => !!(inv.px && inv.px.on && !NO_PX.includes(inv.kind)), make: (inv, t) => {
       const v = [plate(inv.px.registration), vehicleName(inv.px)].filter(has).join(', ');
@@ -286,7 +313,7 @@
       : { head: 'Payment confirmation.', text: 'This invoice records the agreed sale price and confirms the payments received for the above vehicle.' } },
 
     plan_outstanding: { label: 'Outstanding balance', make: (inv, t) => ({ head: 'Outstanding balance.',
-      text: `The parties confirm that ${gbp(t.balance)} remains outstanding from the agreed ${gbp(t.due)} vehicle price.` }) },
+      text: `The parties confirm that ${gbp(t.balance)} remains outstanding from the ${agreed(t)}.` }) },
 
     plan_payments: { label: 'The payments', make: (inv, t) => {
       const rows = planRows(inv), f = (inv.plan && inv.plan.frequency) || 'monthly';
@@ -359,8 +386,16 @@
 
   function dueWords(inv) {
     if (has(inv.balance_due_date)) return 'by ' + longDate(inv.balance_due_date);
-    return 'on collection';
+    const d = deliveryOf(inv);
+    // Delivered and still owed: it's due now, not "on delivery"
+    return d ? (d.done ? 'now' : 'on delivery') : 'on collection';
   }
+  // The same for the money summary: "20 October 2026", "On delivery", "Now"
+  const dueLabel = inv => dueWords(inv).replace(/^by /, '').replace(/^./, m => m.toUpperCase());
+  // "agreed price of £5,975.00", or "agreed total of £6,125.00" once delivery,
+  // extras or a part exchange make it more (or less) than the car's price, so
+  // the terms never quote a figure the summary above calls something else
+  const agreed = t => `agreed ${t.extras.length || t.px || t.delivery ? 'total' : 'price'} of ${gbp(t.due)}`;
   function listWords(xs) {
     return xs.length <= 1 ? (xs[0] || '') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1];
   }
@@ -438,6 +473,12 @@
       }
     }
     if (inv.px && inv.px.on && !(Number(inv.px.allowance) > 0)) out.push({ level: 'amber', field: 'px', text: 'Part exchange is ticked but has no value.' });
+    const d = deliveryOf(inv);
+    if (d) {
+      if (!has(d.address) && !has(c.address)) out.push({ level: 'amber', field: 'delivery', text: 'It’s being delivered, but there’s no address on it.' });
+      if (t.delivery > 0 && t.extras.some(x => /deliver/i.test(x.label || ''))) out.push({ level: 'red', field: 'money', text: 'Delivery is charged twice: in Delivery and as a line in the money. Take one of them out.' });
+      if (!d.done && has(d.date) && d.date < today()) out.push({ level: 'amber', field: 'delivery', text: `The delivery was booked for ${longDate(d.date)}. If it’s gone, mark it delivered so the invoice says so.` });
+    }
     if (settings && settings.vat_registered && !has(settings.vat_number)) out.push({ level: 'amber', field: 'settings', text: 'VAT registered is switched on in Invoice details, but there’s no VAT number.' });
     if (settings && inv.kind !== 'purchase' && t.balance > 0.004 && !(has(settings.bank_sort) && has(settings.bank_account)))
       out.push({ level: 'amber', field: 'settings', text: 'There’s money to pay but no bank details on it. Add them in Settings → Invoice details.' });
@@ -494,12 +535,13 @@
       row('Total', gbp(t.goods), 'strong');
       if (t.paid) row('Paid', gbp(t.paid));
       row('Balance to Pay', t.balance > 0.004 ? gbp(t.balance) : gbp(0) + ' - PAID IN FULL', 'blue');
-      if (t.balance > 0.004) row('Due', dueWords(inv).replace(/^by /, '').replace(/^on collection$/, 'On collection'));
+      if (t.balance > 0.004) row('Due', dueLabel(inv));
     } else {
       row(purchase ? 'Agreed Purchase Price' : 'Total Agreed Vehicle Price', gbp(t.price));
       t.extras.forEach(x => row(x.label || (x.amount < 0 ? 'Discount' : 'Extra'), gbp(x.amount)));
+      if (t.delivery) row('Delivery', gbp(t.delivery));
       if (t.px) row('Part Exchange Allowance' + (has(inv.px.registration) ? ` (${plate(inv.px.registration)})` : ''), gbp(-t.px));
-      if (t.extras.length || t.px) row('Total to Pay', gbp(t.due), 'strong');
+      if (t.extras.length || t.px || t.delivery) row('Total to Pay', gbp(t.due), 'strong');
 
       if (inv.kind === 'instalments') {
         row('Total Paid to Date', gbp(t.paid));
@@ -516,12 +558,29 @@
           row('Number of Remaining Instalments', !left.length ? 'None, all paid' : sameLeft ? `${left.length} x ${gbp(left[0].amount)}` : String(left.length));
         }
       } else {
-        if (t.deposit && inv.kind !== 'deposit') row('Deposit Paid', gbp(t.deposit), 'cream');
-        if (inv.kind === 'deposit') row('Deposit Paid', gbp(t.paid), 'cream');
-        else row(purchase ? 'Paid to Seller' : 'Total Paid', gbp(t.paid));
+        // A deposit receipt shows the deposit, and the total paid as well once
+        // more has come in (it used to call everything paid "Deposit Paid")
+        if (t.deposit || inv.kind === 'deposit') row('Deposit Paid', gbp(t.deposit || t.paid), 'cream');
+        if (inv.kind !== 'deposit' || (t.deposit && t.paid !== t.deposit)) row(purchase ? 'Paid to Seller' : 'Total Paid', gbp(t.paid));
         row('TOTAL REMAINING BALANCE', t.balance > 0.004 ? gbp(t.balance) : gbp(0) + ' - PAID IN FULL', 'blue');
-        if (t.balance > 0.004) row('Balance Due', dueWords(inv).replace(/^by /, '').replace(/^on collection$/, 'On collection'));
+        if (t.balance > 0.004) row('Balance Due', dueLabel(inv));
       }
+    }
+    // Where and when it's being delivered, or that it has been: above the
+    // money, so the updated invoice says "completed" before anything else
+    const d = deliveryOf(inv);
+    if (d) {
+      const to = has(d.address) ? d.address : has(c.address) ? c.address : 'To be confirmed';
+      const when = (date, time) => [ukDate(date), time].filter(has).join(', ');
+      const rows = d.done
+        ? [{ label: 'Delivery Status', value: 'COMPLETED', tone: 'green' },
+           { label: 'Delivered On', value: when(d.done_date || d.date, d.done_time) || 'Not given' },
+           { label: 'Delivered To', value: to }]
+          .concat(has(d.received_by) ? [{ label: 'Received By', value: String(d.received_by).trim() }] : [])
+        : [{ label: 'Delivery Date', value: when(d.date, d.time) || 'To be arranged' },
+           { label: 'Deliver To', value: to }];
+      if (!(t.delivery > 0)) rows.push({ label: 'Delivery Charge', value: 'Free of charge' });
+      blocks.push({ type: 'summary', title: 'Delivery', split: 0.4, rows });
     }
     blocks.push({ type: 'summary', title: 'Payment Summary', rows: sumRows });
 
@@ -540,7 +599,7 @@
     // Every payment, when there's more than one to account for
     if (t.payments.length > 1 && inv.kind !== 'instalments') {
       blocks.push({ type: 'table', title: 'Payments Received', head: ['Date', 'Paid by', 'Amount'], align: ['left', 'left', 'right'], widths: [0.3, 0.4, 0.3],
-        rows: t.payments.map(p => [ukDate(p.date) || '', (p.deposit ? 'Deposit' : '') + (p.deposit && has(p.method) ? ', ' : '') + (p.method || (p.deposit ? '' : 'Payment')), gbp(p.amount)]) });
+        rows: t.payments.slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || (b.deposit ? 1 : 0) - (a.deposit ? 1 : 0)).map(p => [ukDate(p.date) || '', (p.deposit ? 'Deposit' : '') + (p.deposit && has(p.method) ? ', ' : '') + (p.method || (p.deposit ? '' : 'Payment')), gbp(p.amount)]) });
     }
 
     // The bank account: under the money when there's something to pay, at
@@ -586,6 +645,8 @@
       subtitle: has(inv.subtitle) ? inv.subtitle : k.subtitle,
       ref: numberLabel(inv.number),
       date: ukDate(inv.issue_date || today()),
+      // A copy sent again after a payment or the delivery says when it changed
+      updated: has(inv.updated_on) && inv.updated_on > (inv.issue_date || '') ? ukDate(inv.updated_on) : '',
       voided: inv.status === 'void',
       details, blocks, signatures, footer
     };
@@ -629,7 +690,7 @@
     return `<div class="inv-page${doc.voided ? ' is-void' : ''}">
       ${logoUrl ? `<img class="inv-logo" src="${escH(logoUrl)}" alt="MBU Car Sales">` : ''}
       <h1 class="inv-title">${escH(doc.title)}</h1>
-      <div class="inv-sub"><span>${escH(doc.subtitle || '')}</span><span>${doc.ref ? 'No. ' + escH(doc.ref) + '  ·  ' : ''}Issued ${escH(doc.date)}</span></div>
+      <div class="inv-sub"><span>${escH(doc.subtitle || '')}</span><span>${doc.ref ? 'No. ' + escH(doc.ref) + '  ·  ' : ''}Issued ${escH(doc.date)}${doc.updated ? '  ·  Updated ' + escH(doc.updated) : ''}</span></div>
       <table class="inv-kv">${doc.details.map(([l, v]) => `<tr><th>${escH(l)}</th><td>${escH(v)}</td></tr>`).join('')}</table>
       ${doc.blocks.map(blk).join('')}
       <div class="inv-sigs">${doc.signatures.map(s => `
@@ -661,8 +722,11 @@
 
   const C = {
     navy: [15, 34, 70], title: [23, 48, 94], ink: [16, 23, 36], ink2: [56, 65, 79], ink3: [110, 118, 136],
-    line: [220, 225, 233], label: [244, 246, 250], blue: [232, 239, 250], blueInk: [23, 48, 94], cream: [253, 243, 223]
+    line: [220, 225, 233], label: [244, 246, 250], blue: [232, 239, 250], blueInk: [23, 48, 94], cream: [253, 243, 223],
+    green: [224, 242, 229], greenInk: [21, 87, 46]
   };
+  const TONE_FILL = { blue: C.blue, cream: C.cream, green: C.green };
+  const TONE_INK = { blue: C.blueInk, green: C.greenInk };
 
   /**
    * @param doc     from buildDoc
@@ -702,7 +766,7 @@
     y += 2;
     font('normal', 9.5); col(C.ink2);
     if (doc.subtitle) pdf.text(pdfSafe(doc.subtitle), M, y + 3);
-    pdf.text(pdfSafe((doc.ref ? 'No. ' + doc.ref + '   ·   ' : '') + 'Issued ' + doc.date), W - M, y + 3, { align: 'right' });
+    pdf.text(pdfSafe((doc.ref ? 'No. ' + doc.ref + '   ·   ' : '') + 'Issued ' + doc.date + (doc.updated ? '   ·   Updated ' + doc.updated : '')), W - M, y + 3, { align: 'right' });
     y += 6;
 
     // Label | value table (details and the money summary)
@@ -717,12 +781,12 @@
         const V = wrap(r.value, w - lw - 2 * pad);
         const h = Math.max(L.length, V.length) * lh(9.5) + 2 * pad;
         room(h);
-        fill(tone === 'blue' ? C.blue : tone === 'cream' ? C.cream : C.label); pdf.rect(x, y, lw, h, 'F');
-        if (tone === 'blue' || tone === 'cream') { pdf.rect(x + lw, y, w - lw, h, 'F'); }
+        fill(TONE_FILL[tone] || C.label); pdf.rect(x, y, lw, h, 'F');
+        if (TONE_FILL[tone]) { pdf.rect(x + lw, y, w - lw, h, 'F'); }
         stroke(C.line); pdf.setLineWidth(0.25); pdf.rect(x, y, lw, h); pdf.rect(x + lw, y, w - lw, h);
-        font('bold', 9.5); col(tone === 'blue' ? C.blueInk : C.ink);
+        font('bold', 9.5); col(TONE_INK[tone] || C.ink);
         L.forEach((l, i) => pdf.text(l, x + pad, y + pad + 3.1 + i * lh(9.5)));
-        font(opts.boldValues || tone ? 'bold' : 'normal', 9.5); col(tone === 'blue' ? C.blueInk : C.ink);
+        font(opts.boldValues || tone ? 'bold' : 'normal', 9.5); col(TONE_INK[tone] || C.ink);
         V.forEach((l, i) => pdf.text(l, x + lw + pad, y + pad + 3.1 + i * lh(9.5)));
         y += h;
       });
@@ -876,21 +940,33 @@
     return pdf;
   }
 
-  /* ---------------------------------------------------------------- EMAIL */
+  /* ---------------------------------------------------------------- EMAIL
+     The subject leads with the car, so it's found in a list of emails:
+     "Kia Sportage RV15 ZWJ – Invoice MBU-1003". Sent before (a payment
+     recorded since, say) it's an updated one; delivered, it says so. */
   function emailText(inv, s) {
     s = Object.assign({}, DEFAULT_SETTINGS, s || {});
     const k = kindOf(inv), t = totals(inv), c = inv.customer || {}, v = inv.vehicle || {};
     const first = String(c.name || '').trim().split(/\s+/)[0] || 'there';
     const car = [v.year, vehicleName(v)].filter(has).join(' ');
-    const carRef = car + (has(v.registration) ? ` (${plate(v.registration)})` : '');
-    const doc = has(inv.title) ? inv.title : k.title;
     const ref = numberLabel(inv.number);
-    const subject = `${doc}${ref ? ' ' + ref : ''}${carRef.trim() ? ': ' + carRef.trim() : ''} | ${s.trading_name}`;
+    const d = deliveryOf(inv), delivered = !!(d && d.done);
+    const again = (inv.sent || []).some(x => x.via === 'email');   // emailed before, not just printed
+    const custom = has(inv.title) ? String(inv.title).trim() : '';
+    const word = custom || k.mail;
+    const what = delivered ? 'Delivered, updated ' + (custom || k.mail.toLowerCase())
+      : again ? (custom ? custom + ' (updated)' : 'Updated ' + k.mail.toLowerCase()) : word;
+    const carRef = [vehicleName(v), plate(v.registration)].filter(has).join(' ');
+    const subject = [carRef, what + (ref ? ' ' + ref : '')].filter(has).join(' – ') + (carRef ? '' : ' – ' + s.trading_name);
+
+    const paper = inv.kind === 'instalments' ? 'agreement' : inv.kind === 'deposit' ? 'receipt' : 'invoice';
     const lines = [`Hi ${first},`, ''];
-    if (inv.kind === 'purchase') lines.push(`Thank you for selling your ${car || 'car'} to us. Your purchase receipt is attached.`);
-    else if (inv.kind === 'deposit') lines.push(`Thank you for your deposit on the ${car || 'car'}. It’s reserved for you, and your receipt is attached.`);
-    else if (inv.kind === 'general') lines.push(`Please find your invoice attached${ref ? ' (' + ref + ')' : ''}.`);
-    else lines.push(`Thank you for buying your ${car || 'car'} from us. Your ${inv.kind === 'instalments' ? 'agreement and payment schedule are' : 'invoice is'} attached${ref ? ' (' + ref + ')' : ''}.`);
+    if (delivered) lines.push(`Thank you for buying your ${car || 'car'} from us. It was delivered on ${longDate(d.done_date || d.date) || 'the date shown'}, and your updated ${paper} confirming the delivery is attached${ref ? ' (' + ref + ')' : ''}.`);
+    else if (inv.kind === 'purchase') lines.push(`Thank you for selling your ${car || 'car'} to us. Your ${again ? 'updated ' : ''}purchase receipt is attached.`);
+    else if (inv.kind === 'deposit') lines.push(`Thank you for your deposit on the ${car || 'car'}. It’s reserved for you, and your ${again ? 'updated ' : ''}receipt is attached.`);
+    else if (inv.kind === 'general') lines.push(`Please find your ${again ? 'updated ' : ''}invoice attached${ref ? ' (' + ref + ')' : ''}.`);
+    else lines.push(`Thank you for buying your ${car || 'car'} from us. Your ${again ? 'updated ' : ''}${inv.kind === 'instalments' ? 'agreement and payment schedule are' : 'invoice is'} attached${ref ? ' (' + ref + ')' : ''}.`);
+    if (d && !delivered) lines.push('', has(d.date) ? `We’ll deliver it to you on ${longDate(d.date)}${has(d.time) ? ' (' + String(d.time).trim() + ')' : ''}.` : 'We’ll be in touch to arrange the delivery.');
     if (inv.kind === 'instalments') {
       const rows = planRows(inv).filter(r => !r.paid_on);
       if (rows.length) lines.push('', `Your next payment of ${gbp(rows[0].amount)} is due on ${longDate(rows[0].due)}.`);
@@ -898,7 +974,7 @@
       lines.push('', `The remaining balance of ${gbp(t.balance)} is due ${dueWords(inv)}.`);
     }
     if (t.balance > 0.004 && inv.kind !== 'purchase' && has(s.bank_sort) && has(s.bank_account)) {
-      lines.push('', `You can pay by bank transfer to ${s.bank_name || s.legal_name}, sort code ${s.bank_sort}, account number ${s.bank_account}, using ${ref || 'your name'} as the reference. The details are on the ${inv.kind === 'instalments' ? 'agreement' : 'invoice'} too.`);
+      lines.push('', `You can pay by bank transfer to ${s.bank_name || s.legal_name}, sort code ${s.bank_sort}, account number ${s.bank_account}, using ${ref || 'your name'} as the reference. The details are on the ${paper} too.`);
     }
     const seller = inv.seller || {};
     lines.push('', `If anything on it doesn’t look right, just reply to this email${has(seller.phone) ? ' or call me on ' + seller.phone : ''}.`, '',
@@ -914,6 +990,6 @@
   }
 
   return { KINDS, KIND_ORDER, TERMS, DEFAULT_SETTINGS, FCA_NOTE,
-    totals, makeSchedule, planRows, planBase, warnings, termList, otherTerms, buildDoc, toHtml, toPdf, emailText, fileName,
+    totals, makeSchedule, planRows, planBase, warnings, termList, otherTerms, buildDoc, toHtml, toPdf, emailText, fileName, deliveryOf,
     gbp, ukDate, longDate, isoDate, parseDate, today, plate, numberLabel, pdfSafe, r2 };
 });

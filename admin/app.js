@@ -387,7 +387,8 @@
     buildStockTools();
     go('home');
     await Promise.all([loadCars(), loadEnquiries()]);
-    checkSchema().then(() => { if (state.schema.v10) loadInvoices(); });
+    // Invoices load after the stock; Home redraws for any delivery due
+    checkSchema().then(async () => { if (state.schema.v10) { await loadInvoices(); if (state.view === 'home') renderHome(); } });
     // Home's recommendations come from the insight engine, which needs the
     // interest and ageing figures. go('home') above has already asked for
     // them, alongside the stock, and Home redraws when they land.
@@ -926,6 +927,21 @@
     const carSub = c => [carTitle(c), c.registration ? fmtReg(c.registration) : null,
       c.status === 'draft' ? 'draft' : null].filter(Boolean).join(' · ');
     const counted = (n, one, many) => n === 1 ? '1 ' + one : n + ' ' + (many || one + 's');
+
+    /* Deliveries booked for today or earlier and not marked delivered: one
+       tap marks it, then the updated invoice is ready to send */
+    const today = INV ? INV.today() : '';
+    const drops = (IV.list || []).map(r => ({ r, d: toDeliver(r) })).filter(x => x.d && x.d.date && x.d.date <= today)
+      .sort((a, b) => a.d.date.localeCompare(b.d.date))
+      .map(({ r, d }) => {
+        const v = (r.data || {}).vehicle || {};
+        return { level: d.date < today ? 'red' : 'amber',
+          title: d.date < today ? `Delivery was booked for ${INV.ukDate(d.date)}` : 'Delivery today' + (d.time ? ' (' + d.time + ')' : ''),
+          sub: [[v.make, v.model].filter(Boolean).join(' '), r.registration ? fmtReg(r.registration) : '', r.customer_name].filter(Boolean).join(' · '),
+          run: () => invoiceSettings().then(() => markDelivered(clone(fromRow(r)))) };
+      });
+    if (drops.length) out.push({ key: 'deliveries', level: worst(drops), rank: 2, icon: 'car', single: 'item',
+      title: counted(drops.length, 'delivery to do', 'deliveries to do'), sub: 'Mark each one delivered, then send the updated invoice', items: drops });
 
     /* MOTs: run out, running out, and cars with no date, in one place */
     const mots = held.filter(c => motLevel(c) || !c.mot_expiry)
@@ -5597,6 +5613,14 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
   const SELLER_KEY = 'mbu_inv_seller';
   const IV = { list: [], loaded: false, tab: 'all', q: '', settings: null, cur: null, pdf: null, pdfFor: null, assets: null };
 
+  /* Gmail on an iPhone ignores the subject the share sheet hands it and
+     makes one from the first line of the message instead (that's how an
+     invoice went out headed "Hi John,"). So on an iPhone or iPad the
+     subject also goes in as the message's first line. Android's Gmail and
+     Apple Mail take the subject properly, and get the message as written. */
+  const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const shareText = e => IOS && (e.subject || '').trim() ? `${e.subject.trim()}\n\n${e.body || ''}` : (e.body || '');
+
   const ukPhone = p => String(p || '').replace(/^\+44\s?/, '0').replace(/^0(\d{4})(\d{6})$/, '0$1 $2');
   const invTitle = i => (i.customer && i.customer.name) || 'No name yet';
   const clone = o => JSON.parse(JSON.stringify(o));
@@ -5724,7 +5748,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     return {
       kind: kind || 'paid', issue_date: INV.today(), sale_date: INV.today(), status: 'draft',
       vehicle: {}, customer: {}, seller: { name: seller.name, phone: seller.phone },
-      price: null, extras: [], px: { on: false }, payments: [], deposit_nonrefundable: true,
+      price: null, extras: [], px: { on: false }, delivery: { on: false }, payments: [], deposit_nonrefundable: true,
       balance_due_date: '', plan: { count: '', amount: '', first: '', frequency: 'monthly' },
       terms: {}, extra_terms: [], custom_terms: [], notes: '',
       options: { company: !!s.company_default }, signatures: {}, sent: []
@@ -5759,15 +5783,54 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
   // the new kind's rather than leaving "paid £7,000" on a pay monthly plan.
   function seedPayments(inv) {
     inv.payments = (inv.payments || []).filter(p => !p.auto);
+    // Paid in full: one row for whatever the other payments (a deposit taken
+    // earlier) leave, kept in step by syncAutoPaid as the figures change
+    if (inv.kind === 'paid') {
+      const left = INV.totals(inv).balance;
+      inv.payments.push({ date: inv.sale_date || INV.today(), amount: left > 0.004 ? left : '', method: 'Bank transfer', auto: true });
+      return;
+    }
     if (inv.payments.length) return;
-    const due = INV.totals(inv).due;
-    if (inv.kind === 'paid' && due > 0) inv.payments = [{ date: inv.sale_date || INV.today(), amount: due, method: 'Bank transfer', auto: true }];
     if (inv.kind === 'deposit') inv.payments = [{ date: INV.today(), amount: '', method: 'Bank transfer', deposit: true, auto: true }];
     if (inv.kind === 'instalments') {
       inv.payments = [{ date: inv.sale_date || INV.today(), amount: '', method: 'Cash', auto: true }];
       if (!inv.plan.first) { const d = new Date(); d.setMonth(d.getMonth() + 1); inv.plan.first = INV.isoDate(d); }
     }
   }
+
+  /* The starting "paid in full" row follows the figures until someone types
+     in it: the price (or delivery, extras, part exchange) less every other
+     payment. Add a £250 deposit row and it drops by £250, so the invoice
+     never says more was paid than the car cost. `box` updates the field on
+     screen without redrawing the form (which would lose the cursor). */
+  function syncAutoPaid(inv, box) {
+    if (inv.kind !== 'paid') return;
+    const auto = (inv.payments || []).find(p => p.auto);
+    if (!auto) return;
+    const left = INV.totals(Object.assign({}, inv, { payments: inv.payments.filter(p => !p.auto) })).balance;
+    auto.amount = left > 0.004 ? left : '';
+    if (inv.sale_date) auto.date = inv.sale_date;
+    if (!box) return;
+    const i = inv.payments.indexOf(auto);
+    const f = box.querySelector(`[data-k="payments.${i}.amount"]`), dt = box.querySelector(`[data-k="payments.${i}.date"]`);
+    if (f && document.activeElement !== f) f.value = auto.amount;
+    if (dt && document.activeElement !== dt) dt.value = auto.date || '';
+  }
+
+  /* After a payment or a delivery, the invoice becomes whatever's true now,
+     keeping its number (one invoice per sale): a deposit receipt or a
+     balance to pay that's all paid becomes Paid in full; a deposit receipt
+     whose car has been delivered, money still owed, becomes Balance to pay
+     (the car's sold, not reserved). Returns the new kind, or false. */
+  function settleKind(inv) {
+    const from = inv.kind, d = INV.deliveryOf(inv);
+    if (['deposit', 'balance'].includes(from) && INV.totals(inv).balance <= 0.004) inv.kind = 'paid';
+    else if (from === 'deposit' && d && d.done) inv.kind = 'balance';
+    if (inv.kind === from) return false;
+    (inv.payments || []).forEach(p => delete p.auto);
+    return inv.kind;
+  }
+  const settledWords = { paid: 'now a Paid in full invoice, same number.', balance: 'now a Balance to pay invoice, same number.' };
 
   function newInvoice() {
     pickCar({
@@ -5814,7 +5877,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     text: (label, k, o = {}) => `<div class="f${o.cls ? ' ' + o.cls : ''}"><label for="${fid(k)}">${esc(label)}${o.opt ? ' <span class="opt">(optional)</span>' : ''}</label>
       <input class="in" id="${fid(k)}" data-k="${k}" value="${esc(getPath(IV.cur, k) ?? '')}" type="${o.type || 'text'}"${o.mode ? ` inputmode="${o.mode}"` : ''}${o.ph ? ` placeholder="${esc(o.ph)}"` : ''}${o.cap ? ` autocapitalize="${o.cap}"` : ''}${o.auto ? ` autocomplete="${o.auto}"` : ''}></div>`,
     money: (label, k, o = {}) => `<div class="f${o.cls ? ' ' + o.cls : ''}"><label for="${fid(k)}">${esc(label)}</label>
-      <div class="money"><input class="in" id="${fid(k)}" data-k="${k}" data-num value="${esc(getPath(IV.cur, k) ?? '')}" inputmode="decimal" placeholder="0"></div></div>`,
+      <div class="money"><input class="in" id="${fid(k)}" data-k="${k}" data-num value="${esc(getPath(IV.cur, k) ?? '')}" inputmode="decimal" placeholder="${esc(o.ph || '0')}"></div></div>`,
     date: (label, k, o = {}) => `<div class="f${o.cls ? ' ' + o.cls : ''}"><label for="${fid(k)}">${esc(label)}</label>
       <input class="in" type="date" id="${fid(k)}" data-k="${k}" value="${esc(getPath(IV.cur, k) || '')}"></div>`
   };
@@ -5871,20 +5934,22 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
           <textarea class="ta inv-ta" id="if-customer-address" data-k="customer.address" rows="2" placeholder="House, street, town, postcode">${esc(inv.customer.address || '')}</textarea></div>
       </div>
 
+      ${general || purchase ? '' : deliveryCard(inv)}
+
       <div class="section-card money-card">
         <h2>The money</h2>
         ${general ? '' : F.money(purchase ? 'What you’re paying them' : 'Agreed price', 'price')}
         <div class="lbl inv-lbl">${general ? 'What it’s for' : 'Extras and discounts'}</div>
         <div id="invLines">${(inv.extras || []).map((x, i) => `
           <div class="inv-line" data-i="${i}">
-            <input class="in" data-k="extras.${i}.label" aria-label="What it’s for" value="${esc(x.label || '')}" placeholder="${general ? 'e.g. MOT' : 'e.g. Delivery'}" autocapitalize="sentences">
+            <input class="in" data-k="extras.${i}.label" aria-label="What it’s for" value="${esc(x.label || '')}" placeholder="${general ? 'e.g. MOT' : 'e.g. Warranty'}" autocapitalize="sentences">
             <button class="inv-sign${x.minus ? ' is-minus' : ''}" type="button" data-sign-line="${i}" aria-label="${x.minus ? 'Takes off the total. Tap to add instead' : 'Adds to the total. Tap to take off instead'}">${x.minus ? '−' : '+'}</button>
             <div class="money${x.minus ? ' money--minus' : ''}"><input class="in" data-k="extras.${i}.amount" aria-label="Amount" data-num value="${esc(x.amount ?? '')}" inputmode="decimal" placeholder="0"></div>
             <button class="inv-x" type="button" data-del-line="${i}" aria-label="Remove">${icon('close')}</button>
           </div>`).join('')}</div>
         <div class="chips inv-addrow">
           <button class="chip chip--add" type="button" data-add-line="">+ Add a line</button>
-          ${general ? '' : ['Delivery', 'Warranty', 'Discount'].map(x => `<button class="chip chip--add" type="button" data-add-line="${x}">+ ${x}</button>`).join('')}
+          ${general ? '' : ['Warranty', 'Discount'].map(x => `<button class="chip chip--add" type="button" data-add-line="${x}">+ ${x}</button>`).join('')}
         </div>
         <p class="hint">${general ? 'Each line prints on the invoice. Tap + on a line to make it take off instead (a discount).' : 'Tap + on a line to make it take off instead (a discount): it turns to −.'}</p>
 
@@ -5917,7 +5982,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
           </select></div>` : ''}
         ${['deposit', 'balance', 'trade', 'purchase', 'general'].includes(inv.kind) ? `<div class="f" style="margin-top:14px"><label>Anything left to pay is due</label>
           <div class="row-2"><select class="sel" id="invDueWhen">
-            <option value="collect"${!inv.balance_due_date ? ' selected' : ''}>${purchase ? 'When we collect it' : 'On collection'}</option>
+            <option value="collect"${!inv.balance_due_date ? ' selected' : ''}>${purchase ? 'When we collect it' : INV.deliveryOf(inv) ? 'On delivery' : 'On collection'}</option>
             <option value="date"${inv.balance_due_date ? ' selected' : ''}>By a date</option></select>
             <input class="in" type="date" data-k="balance_due_date" value="${esc(inv.balance_due_date || '')}"${inv.balance_due_date ? '' : ' hidden'} id="invDueDate"></div></div>` : ''}
         <div class="moneyline" id="invTotals"></div>
@@ -5988,6 +6053,34 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     wireInvoiceForm(enquirers);
   }
 
+  /* Delivery: where, when, what it costs (blank = free). The charge is part
+     of the total like any line, so the payments and the balance include it.
+     Once it's there, Mark as delivered records it and sends them the
+     updated invoice. */
+  function deliveryCard(inv) {
+    const d = inv.delivery || {};
+    const theirs = String((inv.customer && inv.customer.address) || '').replace(/\s*\n\s*/g, ', ');
+    const doneWhen = [INV.ukDate(d.done_date || d.date), d.done_time].filter(Boolean).join(', ');
+    return `<div class="section-card" id="invDelivery">
+      <h2>Delivery</h2>
+      <label class="tickrow"><input type="checkbox" data-k="delivery.on" data-redraw${d.on ? ' checked' : ''}>
+        <div><strong>We’re delivering it</strong><small>Where and when go on the invoice. Once it’s there, Mark as delivered sends them an updated one saying so.</small></div></label>
+      ${d.on ? `<div class="inv-px inv-deliv">
+        ${d.done ? `<div class="inv-delivered">${icon('checkCirc')}
+            <div><strong>Delivered ${esc(doneWhen)}</strong><small>${d.received_by ? 'Received by ' + esc(d.received_by) : 'The invoice says delivery completed'}</small></div>
+            <button class="btn btn--sm btn--outline" type="button" id="invRedeliver">Change</button>
+          </div>` : ''}
+        <div class="row-2">${F.date(d.done ? 'It was booked for' : 'Delivery date', 'delivery.date')}${F.text('Time', 'delivery.time', { opt: true, ph: 'e.g. Morning' })}</div>
+        ${F.money('Delivery charge', 'delivery.charge', { ph: 'Free' })}
+        <div class="f"><label for="if-delivery-address">Deliver to</label>
+          <textarea class="ta inv-ta" id="if-delivery-address" data-k="delivery.address" rows="2" placeholder="${esc(theirs ? 'Their address: ' + theirs : 'House, street, town, postcode')}">${esc(d.address || '')}</textarea></div>
+        <p class="hint" style="margin:-4px 0 14px">Leave the address blank to use theirs, and the charge blank for free delivery.</p>
+        ${d.done ? `<button class="btn btn--ghost btn--block" type="button" id="invUndeliver" style="margin-bottom:14px">It hasn’t been delivered yet</button>`
+          : `<button class="btn btn--outline btn--block" type="button" id="invDeliver" style="margin-bottom:14px">${icon('check')} Mark as delivered</button>`}
+      </div>` : ''}
+    </div>`;
+  }
+
   // The parts that follow the figures: totals, the schedule, the terms
   function refreshInvoiceLive(skipPlan) {
     const inv = IV.cur, t = INV.totals(inv);
@@ -5995,7 +6088,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     const line = (label, value, cls) => `<div class="ml ${cls || ''}"><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
     const box = $('#invTotals');
     if (box) box.innerHTML =
-      (t.extras.length || t.px ? line('Total', INV.gbp(t.goods)) : '') +
+      (t.delivery ? line('Delivery', INV.gbp(t.delivery)) : '') +
+      (t.extras.length || t.px || t.delivery ? line('Total', INV.gbp(t.goods)) : '') +
       (t.px ? line('Part exchange', INV.gbp(-t.px)) : '') +
       line(purchase ? 'To pay them' : 'To pay', INV.gbp(t.due)) +
       line(purchase ? 'Paid to them' : 'Paid', INV.gbp(t.paid)) +
@@ -6094,13 +6188,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     const untouched = k => {
       const m = /^payments\.(\d+)\./.exec(k);
       if (m && inv.payments[+m[1]]) delete inv.payments[+m[1]].auto;
-      // ...and a starting "paid in full" row keeps up with the price
-      if (inv.kind === 'paid' && /^(price|extras|px)/.test(k)) inv.payments.forEach((p, i) => {
-        if (!p.auto) return;
-        p.amount = INV.totals(Object.assign({}, inv, { payments: [] })).due;
-        const f = box.querySelector(`[data-k="payments.${i}.amount"]`);
-        if (f) f.value = p.amount;
-      });
+      // ...and a starting "paid in full" row keeps up with the figures
+      if (/^(price|extras|px|delivery|payments|sale_date)/.test(k)) syncAutoPaid(inv, box);
     };
     box.oninput = e => {
       const el = e.target.closest('[data-k]');
@@ -6158,7 +6247,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       x.minus = !x.minus;
       untouched('extras'); state.dirty = true; renderInvoiceForm();
     });
-    box.querySelectorAll('[data-del-pay]').forEach(b => b.onclick = () => { inv.payments.splice(+b.dataset.delPay, 1); state.dirty = true; renderInvoiceForm(); });
+    box.querySelectorAll('[data-del-pay]').forEach(b => b.onclick = () => { inv.payments.splice(+b.dataset.delPay, 1); syncAutoPaid(inv); state.dirty = true; renderInvoiceForm(); });
     $('#invAddPay').onclick = () => { inv.payments.push({ date: INV.today(), amount: '', method: 'Bank transfer' }); state.dirty = true; renderInvoiceForm(); };
     $('#invPayRest').onclick = () => {
       const left = INV.totals(inv).balance;
@@ -6195,6 +6284,13 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     box.querySelectorAll('[data-unsign]').forEach(b => b.onclick = () => { delete inv.signatures[b.dataset.unsign]; state.dirty = true; renderInvoiceForm(); });
     const more = $('#invMoreActs');
     if (more) more.onclick = () => invoiceActions(inv, true);
+    const dv = $('#invDeliver'), rd = $('#invRedeliver'), ud = $('#invUndeliver');
+    if (dv) dv.onclick = () => markDelivered(inv, true);
+    if (rd) rd.onclick = () => markDelivered(inv, true);
+    if (ud) ud.onclick = () => {
+      ['done', 'done_date', 'done_time', 'received_by'].forEach(k => delete inv.delivery[k]);
+      state.dirty = true; renderInvoiceForm();
+    };
   }
 
   /* ---- Signing with a finger ------------------------------------------- */
@@ -6342,7 +6438,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         <div class="f"><label for="emSubject">Subject</label><input class="in" id="emSubject" value="${esc(inv.email.subject)}"></div>
         <div class="f" style="margin-bottom:0"><label for="emBody">Message</label><textarea class="ta" id="emBody" rows="10">${esc(inv.email.body)}</textarea></div>
         <p class="hint" style="margin-top:10px">${canShare
-          ? '<strong>Email it</strong> opens your phone’s share sheet with the PDF attached and this message written. Pick Gmail or Mail, then paste their address into To (it’s copied for you).'
+          ? `<strong>Email it</strong> opens your phone’s share sheet with the PDF attached and this message written. Pick Gmail or Mail, then paste their address into To (it’s copied for you).${IOS ? ' Gmail on iPhone takes its subject from the first line, so the subject goes in as the first line too.' : ''}`
           : '<strong>Email it</strong> downloads the PDF and opens your email with the address and message filled in. Attach the PDF from Downloads.'}</p>
         <button class="btn btn--ghost btn--sm" type="button" id="emReset">Put the standard message back</button>
       </div>
@@ -6439,7 +6535,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       if (e.to && navigator.clipboard) navigator.clipboard.writeText(e.to).then(() => toast('Their address is copied: paste it into To'), () => {});
       try {
-        await navigator.share({ files: [file], title: e.subject, text: e.body });
+        await navigator.share({ files: [file], title: e.subject, text: shareText(e) });
         recordSent('email', e.to);
       } catch (err) {
         if (err && err.name !== 'AbortError') toast('Couldn’t open the share sheet: ' + err.message);
@@ -6488,6 +6584,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
 
   const fromRow = r => Object.assign({}, r.data || {}, { id: r.id, number: r.number, status: r.status, created_at: r.created_at, kind: r.kind,
     car_id: r.car_id || (r.data || {}).car_id || null });
+  // A delivery that's booked (or to be arranged) and not marked delivered
+  const toDeliver = r => { const d = r.status !== 'void' && INV.deliveryOf(fromRow(r)); return d && !d.done ? d : null; };
 
   function nextDue(r) {
     if (r.kind !== 'instalments' || !(Number(r.balance) > 0)) return null;
@@ -6511,10 +6609,13 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     const owed = r => r.status !== 'void' && r.kind !== 'purchase' && Number(r.balance) > 0.004;
     const owing = r => r.status !== 'void' && r.kind === 'purchase' && Number(r.balance) > 0.004;
     const draft = r => r.status === 'draft';
+    const deliver = r => !!toDeliver(r);
     $('#nInvOwed').textContent = IV.list.filter(owed).length || '';
     $('#nInvDraft').textContent = IV.list.filter(draft).length || '';
+    $('#nInvDeliver').textContent = IV.list.filter(deliver).length || '';
+    $('#invTabDeliver').hidden = !IV.list.some(deliver) && IV.tab !== 'deliver';
     $$('#invTabs button').forEach(b => b.classList.toggle('is-on', b.dataset.tab === IV.tab));
-    const rows = IV.list.filter(r => IV.tab === 'owed' ? owed(r) : IV.tab === 'draft' ? draft(r) : true).filter(r => {
+    const rows = IV.list.filter(r => IV.tab === 'owed' ? owed(r) : IV.tab === 'draft' ? draft(r) : IV.tab === 'deliver' ? deliver(r) : true).filter(r => {
       if (!q) return true;
       const d = r.data || {}, v = d.vehicle || {};
       const hay = [INV.numberLabel(r.number), r.number, r.customer_name, r.registration, v.make, v.model, (d.customer || {}).phone, (d.customer || {}).email]
@@ -6525,6 +6626,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       const d = r.data || {}, v = d.vehicle || {};
       const due = nextDue(r);
       const late = due && due.due < today;
+      const dl = r.status !== 'void' && INV.deliveryOf(fromRow(r));
+      const dlPill = dl && !dl.done ? `<span class="pill pill--${dl.date && dl.date < today ? 'red' : 'blue'}">${dl.date ? (dl.date < today ? 'Delivery was ' : dl.date === today ? 'Delivery today, ' : 'Delivery ') + INV.ukDate(dl.date) : 'Delivery to arrange'}</span>` : '';
       const status = r.status === 'void' ? '<span class="pill pill--grey">Void</span>'
         : owed(r) ? `<span class="pill pill--${late ? 'red' : 'amber'}">${late ? `${INV.gbp(due.amount)} overdue since ${INV.ukDate(due.due)}` : INV.gbp(r.balance) + ' to come'}</span>`
         : owing(r) ? `<span class="pill pill--blue">${INV.gbp(r.balance)} still to pay them</span>`
@@ -6534,8 +6637,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         <span class="inv-row-txt">
           <strong>${esc(INV.numberLabel(r.number))} · ${esc(r.customer_name || 'No name')}</strong>
           <small>${esc([[v.year, v.make, v.model].filter(Boolean).join(' '), r.registration ? fmtReg(r.registration) : ''].filter(Boolean).join(' · ') || ((d.extras || [])[0] || {}).label || '')}</small>
-          <small>${esc((INV.KINDS[r.kind] || {}).short || '')} · ${esc(INV.ukDate(r.issue_date))}${draft(r) ? ' · not sent yet' : r.sent_at ? ' · sent ' + esc(ago(r.sent_at)) : ''}${due && !late ? ' · next ' + esc(INV.ukDate(due.due)) : ''}</small>
-          <span class="inv-row-pill">${status}</span>
+          <small>${esc((INV.KINDS[r.kind] || {}).short || '')} · ${esc(INV.ukDate(r.issue_date))}${draft(r) ? ' · not sent yet' : r.sent_at ? ' · sent ' + esc(ago(r.sent_at)) : ''}${due && !late ? ' · next ' + esc(INV.ukDate(due.due)) : ''}${dl && dl.done ? ' · delivered ' + esc(INV.ukDate(dl.done_date || dl.date)) : ''}</small>
+          <span class="inv-row-pill">${status}${dlPill}</span>
         </span>
         <span class="inv-row-end"><b>${esc(INV.gbp(r.total))}</b></span>
       </button>`;
@@ -6556,6 +6659,9 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       acts.push({ label: 'Open it', icon: 'eye', sub: 'Check it, email it or print it', run: async () => { await invoiceSettings(); IV.cur = clone(inv); state.dirty = false; openPreview(); } });
       acts.push({ label: 'Change it', icon: 'edit', run: async () => { await invoiceSettings(); openInvoice(clone(inv)); } });
     }
+    const dl = INV.deliveryOf(inv);
+    if (dl && !dl.done && inv.status !== 'void' && !fromForm) acts.push({ label: 'Mark as delivered', icon: 'check',
+      sub: (dl.date ? `Booked for ${INV.ukDate(dl.date)}. ` : '') + 'Then send them the updated invoice', run: () => markDelivered(clone(inv)) });
     if (inv.status !== 'void' && t.balance > 0.004) acts.push({ label: 'Record a payment', icon: 'pound',
       sub: inv.kind === 'purchase' ? `${INV.gbp(t.balance)} still to pay them` : `${INV.gbp(t.balance)} still to come`, run: () => recordPayment(clone(inv)) });
     acts.push({ label: 'Make a copy', icon: 'copy', sub: 'Same terms and wording, for a new customer', run: async () => {
@@ -6563,6 +6669,9 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       ['id', 'number', 'created_at'].forEach(k => delete c[k]);
       Object.assign(c, { status: 'draft', customer: {}, signatures: {}, sent: [], email: null, issue_date: INV.today(), sale_date: INV.today() });
       c.payments = (c.payments || []).filter(p => !p.instalment);
+      delete c.updated_on;
+      // Delivering this one too, for the same charge; where, when and "delivered" are theirs to fill
+      c.delivery = c.delivery && c.delivery.on ? { on: true, charge: c.delivery.charge } : { on: false };
       await invoiceSettings(); openInvoice(c);
     } });
     if (inv.car_id) {
@@ -6615,17 +6724,69 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     box.querySelector('#rpSave').onclick = async () => {
       const amount = num($('#rpAmount').value);
       if (!(amount > 0)) return toast('Put in how much they paid');
+      if (amount > t.balance + 0.004) return toast(`That’s more than the ${INV.gbp(t.balance)} left to pay`);
       inv.payments = (inv.payments || []).concat({ date: $('#rpDate').value || INV.today(), amount, method: $('#rpMethod').value, instalment: inv.kind === 'instalments' || undefined });
+      inv.updated_on = INV.today();
+      const switched = settleKind(inv);
       closeSheet();
       IV.cur = inv;
       await invoiceSettings();
       if (!(await saveInvoice(true))) return;
       const left = INV.totals(inv).balance;
-      toast(left > 0.004 ? `Saved. ${INV.gbp(left)} still to come.` : 'Saved. All paid.', 'ok');
+      toast(left > 0.004 ? `Saved. ${INV.gbp(left)} still to come.` : switched ? 'Saved. All paid: ' + settledWords[switched] : 'Saved. All paid.', 'ok');
       if (state.view === 'invoices') renderInvoices();
       sheet('Send them a receipt?', 'The same invoice, updated with this payment' + (inv.kind === 'instalments' ? ' and the schedule ticked off.' : '.'), [
         { label: 'Check and send it', icon: 'mail', run: () => { inv.email = null; openPreview(); } }
       ]);
+    };
+  }
+
+  /* ---- Delivered ------------------------------------------------------------
+     When the car's been dropped off: the date (and time, and who took it)
+     go on the invoice as DELIVERY COMPLETED. If the rest was due on
+     delivery, the payment goes in at the same time, and a deposit receipt
+     that's now all paid becomes the paid in full invoice. From the list it
+     saves and goes straight to Check and send with the "delivered" email. */
+  function markDelivered(inv, fromForm) {
+    const d = inv.delivery || {};
+    const t = INV.totals(inv);
+    const owed = t.balance > 0.004 && inv.kind !== 'instalments';
+    const box = sheetHtml('Mark as delivered', `${INV.numberLabel(inv.number) || 'This invoice'} · ${invTitle(inv)}`, `
+      <div class="section-card">
+        <div class="row-2">
+          <div class="f"><label for="mdDate">Delivered on</label><input class="in" type="date" id="mdDate" value="${esc(d.done_date || INV.today())}"></div>
+          <div class="f"><label for="mdTime">Time <span class="opt">(optional)</span></label><input class="in" id="mdTime" value="${esc(d.done_time || '')}" placeholder="e.g. 2:15pm"></div>
+        </div>
+        <div class="f"${owed ? '' : ' style="margin-bottom:0"'}><label for="mdWho">Who took it <span class="opt">(optional)</span></label>
+          <input class="in" id="mdWho" value="${esc(d.received_by || (inv.customer && inv.customer.name) || '')}" autocapitalize="words"></div>
+        ${owed ? `<label class="tickrow"><input type="checkbox" id="mdPaid"${inv.balance_due_date ? '' : ' checked'}>
+          <div><strong>They paid the ${esc(INV.gbp(t.balance))} left</strong><small>Records the payment, so the invoice shows it all paid. Untick if they haven’t.</small></div></label>
+          <div class="f" id="mdHowF" style="margin:12px 0 0"><label for="mdHow">How they paid</label>
+            <select class="sel" id="mdHow">${PAY_METHODS.map(m => `<option>${m}</option>`).join('')}</select></div>` : ''}
+      </div>
+      <button class="btn btn--accent btn--block" type="button" id="mdSave">${fromForm ? 'Done' : 'Save, then check and send it'}</button>`);
+    const tick = box.querySelector('#mdPaid');
+    if (tick) tick.onchange = () => { box.querySelector('#mdHowF').hidden = !tick.checked; };
+    if (tick && !tick.checked) box.querySelector('#mdHowF').hidden = true;
+    box.querySelector('#mdSave').onclick = async () => {
+      const date = $('#mdDate').value || INV.today();
+      inv.delivery = Object.assign({}, d, { on: true, done: true, done_date: date, done_time: $('#mdTime').value.trim(), received_by: $('#mdWho').value.trim() });
+      if (tick && tick.checked) inv.payments = (inv.payments || []).concat({ date, amount: t.balance, method: $('#mdHow').value });
+      inv.updated_on = INV.today();
+      const switched = settleKind(inv);
+      inv.email = null;   // the "it's been delivered" email, not one typed before
+      closeSheet();
+      const said = switched === 'paid' ? 'Delivered and all paid: ' + settledWords.paid : switched ? 'Delivered: ' + settledWords[switched] : 'Marked as delivered.';
+      if (fromForm) {
+        state.dirty = true; renderInvoiceForm();
+        return toast(said, 'ok');
+      }
+      IV.cur = inv;
+      await invoiceSettings();
+      if (!(await saveInvoice(true))) return;
+      toast(said, 'ok');
+      if (state.view === 'invoices') renderInvoices();
+      openPreview();
     };
   }
 
