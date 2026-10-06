@@ -191,8 +191,8 @@
                        ${financeBadge}
                      </div>
                      <span class="cpb-note">${reduced
-                        ? 'Reduced by ' + fmt.price(car.previous_price - car.price) + '. No admin fees.'
-                        : 'No admin fees. Part exchange welcome.'}</span>`}
+                        ? 'Reduced by ' + fmt.price(car.previous_price - car.price) + '. Part exchange welcome.'
+                        : 'Part exchange welcome.'}</span>`}
               </div>
               <div class="cpb-actions">
                 ${sold
@@ -454,7 +454,7 @@
                             <span style="text-decoration:line-through;opacity:.75">${fmt.price(car.previous_price)}</span>
                             &nbsp;·&nbsp;<strong style="color:#fff">Reduced by ${fmt.price(car.previous_price - car.price)}</strong>
                           </div>`
-                       : `<div class="price-sub">No admin fees. Part exchange welcome.</div>`}`}
+                       : `<div class="price-sub">Part exchange welcome.</div>`}`}
                 ${car.registration ? `<div style="margin-top:16px"><span class="reg-plate">${esc(fmt.reg(car.registration))}</span></div>` : ''}
               </div>
               <div class="buy-panel-body">
@@ -561,6 +561,8 @@
     showSimilar(car);
     MBU.reveal();
 
+    // The phone's contact bar shows on car pages only, WhatsApp about this car
+    MBU.carBar(sold ? MBU.waLink('Hi MBU Car Sales, I saw the ' + title + ' has sold. Could you look out for another one like it?') : waHref);
     MBU.autoTrackLinks(car.id);          // counts WhatsApp, phone and email taps
     MBU.trackGrid(document);             // counts clicks on "similar cars"
 

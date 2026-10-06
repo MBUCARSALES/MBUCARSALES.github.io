@@ -66,8 +66,11 @@ window.MBU_CONFIG = {
     promises: [
       { icon: 'shield',  title: 'HPI checked',        text: 'Every car is HPI checked before it goes on sale, and we tell you up front if it has been repaired.' },
       { icon: 'spanner', title: 'Prepared properly',  text: 'Serviced, MOT’d and road-tested by us before it is handed over. We fix things before you see them, not after.' },
-      { icon: 'tag',     title: 'Priced to be fair',  text: 'We buy well and pass the saving on. What you see is what you pay. No admin fees and no surprises.' },
-      { icon: 'people',  title: 'You deal with us',   text: 'Father and son, no sales team, no commission chasing. The person you speak to is the person who prepared the car.' }
+      // No "no admin fees" or "what you see is what you pay" (6 Oct 2026):
+      // finance through our finance company carries its own fees, and we're
+      // paid commission for introducing it, so neither claim can be made
+      { icon: 'tag',     title: 'Priced to be fair',  text: 'We buy well and pass the saving on, and we are upfront about everything before you commit.' },
+      { icon: 'people',  title: 'You deal with us',   text: 'Father and son, no sales team and no pressure. The person you speak to is the person who prepared the car.' }
     ],
 
     // Set to your real trading start year, or leave null to hide
@@ -184,7 +187,9 @@ window.MBU_CONFIG = {
       firmName:   '',       // the finance company or broker, e.g. 'Example Motor Finance Ltd'
       fcaNumber:  '',       // its FCA firm reference number
       // Until the statement is in, this shows instead (keep it short and true):
-      interim:    'Finance is subject to status and affordability. Ask us for details.',
+      // MBU is paid commission for introducing finance, and customers have to
+      // be told (FCA CONC 4.5), so it says so until the firm's statement is in
+      interim:    'Finance is subject to status and affordability. We may receive commission from the finance company for introducing you. Ask us for details.',
       // Exactly as the finance company gives it you. Typically:
       // 'MBU Sales Limited is an appointed representative of <firm>, which is
       //  authorised and regulated by the Financial Conduct Authority (FRN 123456).

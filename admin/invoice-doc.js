@@ -28,7 +28,10 @@
        price, extras: [{ label, amount }],           amount < 0 is a discount
        px: { on, registration, make, model, allowance },
        delivery: { on, charge, address, date, time,      address blank = theirs
-                   done, done_date, done_time, received_by },
+                   done, done_date, done_time, received_by,
+                   distance },                         bought without visiting: 14 days to cancel
+       disclosed,                                     what they were told before buying
+       terms_v,                                       which standard set (see TERM_SETS)
        payments: [{ date, amount, method, deposit }],
        deposit_nonrefundable, balance_due_date, balance_on_collection,
        plan: { count, amount, first, frequency, rows: [{ due, amount, paid_on }], edited },
@@ -103,42 +106,43 @@
       title: 'Vehicle Sale Invoice', subtitle: 'Vehicle purchase and full payment confirmation',
       help: 'The car’s sold and paid for. A deposit taken earlier goes in as a payment.',
       termsTitle: 'Sale & Payment Terms', mail: 'Invoice',
-      terms: ['full_payment', 'deposit_part', 'deposit_terms', 'px', 'extras', 'delivery', 'payment_record', 'vat_margin', 'statutory']
+      terms: ['full_payment', 'deposit_part', 'deposit_terms', 'px', 'extras', 'delivery', 'disclosed', 'distance_sale', 'payment_record', 'vat_margin', 'statutory']
     },
     deposit: {
       label: 'Deposit taken', short: 'Deposit',
       title: 'Deposit Receipt', subtitle: 'Vehicle reserved on payment of a deposit',
       help: 'The car’s reserved with a deposit and the rest comes later.',
       termsTitle: 'Deposit Terms', mail: 'Deposit receipt',
-      terms: ['deposit_received', 'balance_due', 'reservation', 'delivery', 'deposit_terms', 'px', 'vat_margin', 'statutory']
+      terms: ['deposit_received', 'balance_due', 'reservation', 'delivery', 'deposit_terms', 'px', 'disclosed', 'distance_sale', 'vat_margin', 'statutory']
     },
     balance: {
       label: 'Balance to pay', short: 'Balance due',
       title: 'Vehicle Sale Invoice', subtitle: 'Sale invoice with the balance to pay',
       help: 'Sold, part paid, the rest due on collection or by a date. The car goes when it’s paid.',
       termsTitle: 'Sale & Payment Terms', mail: 'Invoice',
-      terms: ['outstanding', 'balance_due', 'release', 'delivery', 'deposit_part', 'deposit_terms', 'px', 'extras', 'vat_margin', 'statutory']
+      terms: ['outstanding', 'balance_due', 'release', 'delivery', 'deposit_part', 'deposit_terms', 'px', 'extras', 'disclosed', 'distance_sale', 'vat_margin', 'statutory']
     },
     instalments: {
       label: 'Pay monthly', short: 'Instalments',
       title: 'Vehicle Sale & Instalment Payment Agreement', subtitle: 'Sale invoice and outstanding balance payment schedule',
       help: 'They drive away and pay the rest in instalments, interest free.',
       termsTitle: 'Payment & Default Terms', mail: 'Payment agreement',
-      terms: ['plan_outstanding', 'plan_payments', 'payment_record', 'plan_failure', 'plan_changes', 'plan_early', 'plan_no_charges', 'plan_settlement', 'delivery', 'px', 'vat_margin', 'statutory']
+      terms: ['plan_outstanding', 'plan_payments', 'plan_on_time', 'payment_record', 'plan_late_fee', 'plan_default', 'plan_court', 'plan_costs',
+        'plan_selling', 'plan_contact', 'plan_true', 'plan_changes', 'plan_early', 'plan_no_charges', 'plan_settlement', 'delivery', 'px', 'disclosed', 'distance_sale', 'vat_margin', 'statutory']
     },
     trade: {
       label: 'Trade sale', short: 'Trade',
       title: 'Trade Sale Invoice', subtitle: 'Vehicle sold to the motor trade',
       help: 'Sold to another dealer or trader, as seen.',
       termsTitle: 'Terms of Sale', mail: 'Invoice',
-      terms: ['trade_buyer', 'sold_as_seen', 'trade_payment', 'delivery', 'px', 'vat_margin', 'lawful']
+      terms: ['trade_buyer', 'sold_as_seen', 'disclosed', 'trade_payment', 'trade_late', 'delivery', 'px', 'vat_margin', 'lawful']
     },
     purchase: {
       label: 'We bought a car', short: 'Purchase',
       title: 'Vehicle Purchase Receipt', subtitle: 'Vehicle bought by MBU Sales Limited',
       help: 'Someone sold their car to you. They’re the seller on this one.',
       termsTitle: 'Terms of Purchase', mail: 'Purchase receipt',
-      terms: ['buy_owner', 'buy_finance', 'buy_description', 'buy_payment', 'buy_documents']
+      terms: ['buy_owner', 'buy_finance', 'buy_writeoff', 'buy_description', 'buy_untrue', 'buy_payment', 'buy_documents']
     },
     general: {
       label: 'Anything else', short: 'Invoice',
@@ -150,6 +154,27 @@
   };
   const KIND_ORDER = ['paid', 'deposit', 'balance', 'instalments', 'trade', 'purchase', 'general'];
   const kindOf = inv => KINDS[inv && inv.kind] || KINDS.paid;
+
+  /* Each invoice keeps the standard terms it was made with. An agreement a
+     customer has already had must never change wording when it's reopened
+     to record a payment, so a change to a kind's standard list (or to what
+     a term says) is a new set: new invoices get TERMS_V, older ones keep
+     theirs. Set 1 is everything made before 6 Oct 2026 (none were saved: the
+     invoices table wasn't switched on yet), set 2 added the terms in MBU's
+     favour. Only the lists that changed are kept here. */
+  const TERMS_V = 2;
+  const TERM_SETS = {
+    1: {
+      instalments: ['plan_outstanding', 'plan_payments', 'payment_record', 'plan_failure', 'plan_changes', 'plan_early', 'plan_no_charges', 'plan_settlement', 'delivery', 'px', 'vat_margin', 'statutory'],
+      trade: ['trade_buyer', 'sold_as_seen', 'trade_payment', 'delivery', 'px', 'vat_margin', 'lawful'],
+      purchase: ['buy_owner', 'buy_finance', 'buy_description', 'buy_payment', 'buy_documents']
+    }
+  };
+  const termsV = inv => Math.min(TERMS_V, Number(inv && inv.terms_v) || 1);
+  function kindTerms(inv) {
+    const v = termsV(inv), set = v < TERMS_V && TERM_SETS[v];
+    return (set && set[inv.kind]) || kindOf(inv).terms;
+  }
 
   /* --------------------------------------------------------------- TOTALS */
   // Kinds whose form has no price box ("anything else" is lines only) or no
@@ -302,7 +327,8 @@
     px: { label: 'Part exchange', when: (inv, t) => !!(inv.px && inv.px.on && !NO_PX.includes(inv.kind)), make: (inv, t) => {
       const v = [plate(inv.px.registration), vehicleName(inv.px)].filter(has).join(', ');
       return { head: 'Part exchange.',
-        text: `The buyer’s vehicle${v ? ' (' + v + ')' : ''} was accepted in part exchange at an agreed value of ${gbp(t.px)}, deducted from the price. The buyer confirms they own it, that there is no outstanding finance on it unless declared to MBU Sales Limited in writing, and that what they told us about it is accurate.` };
+        text: `The buyer’s vehicle${v ? ' (' + v + ')' : ''} was accepted in part exchange at an agreed value of ${gbp(t.px)}, deducted from the price. The buyer confirms they own it, that there is no outstanding finance on it unless declared to MBU Sales Limited in writing, and that what they told us about it is accurate.`
+          + (termsV(inv) >= 2 ? ' If finance is later found on it, or it turns out to be stolen, an undeclared insurance write-off or not as described, the buyer will pay MBU Sales Limited, when asked, whatever it costs to clear the finance or the loss in the vehicle’s value.' : '') };
     } },
 
     extras: { label: 'Extras included', when: (inv, t) => t.extras.some(x => Number(x.amount) > 0), make: (inv, t) => ({ head: 'Included in the price.',
@@ -327,7 +353,9 @@
       return { head, text: `The buyer agrees to pay the ${gbp(t.balance)} balance in ${countWord(s.count)} instalments on the dates and in the amounts shown in the schedule above.` };
     } },
 
-    plan_failure: { label: 'If a payment is missed', make: () => ({ head: 'Failure to pay.',
+    // Set 1's wording, kept so an agreement made with it reads the same.
+    // Set 2 replaces it with plan_default, plan_court and plan_costs
+    plan_failure: { label: 'If a payment is missed', retired: true, make: () => ({ head: 'Failure to pay.',
       text: 'If the buyer fails to make an instalment when due and does not remedy the missed payment after reasonable notice, MBU Sales Limited may pursue the outstanding balance and exercise any other lawful contractual or legal remedies available to it. Nothing in this clause authorises MBU Sales Limited to take possession of the vehicle without a lawful right and appropriate process.' }) },
 
     plan_changes: { label: 'Changes in writing', make: () => ({ head: 'Changes to the arrangement.',
@@ -336,15 +364,56 @@
     plan_early: { label: 'Paying early', make: () => ({ head: 'Paying early.',
       text: 'The buyer may pay off the outstanding balance early, in full or in part, at any time, at no extra cost.' }) },
 
-    plan_no_charges: { label: 'No interest or charges', make: () => ({ head: 'No interest or charges.',
-      text: 'No interest, fees or other charges are added to the balance. The buyer pays only the outstanding amount shown above.' }) },
+    // Set 2 says what a missed payment costs, so "no fees" would contradict it.
+    // Paying in instalments itself still costs nothing: that's what keeps it
+    // inside the FCA exemption (a default charge isn't a charge for the credit)
+    plan_no_charges: { label: 'No interest or charges', make: (inv, t, s) => termsV(inv) >= 2 && lateFee(s) > 0
+      ? { head: 'No interest.', text: 'No interest is charged, and there is no fee for paying in instalments. The buyer pays only the outstanding amount shown above, plus any missed-payment fee under these terms.' }
+      : { head: 'No interest or charges.', text: 'No interest, fees or other charges are added to the balance. The buyer pays only the outstanding amount shown above.' } },
+
+    /* ---- Set 2 (6 Oct 2026): pay monthly terms in MBU's favour ----------
+       Firm, and written to be enforceable. Deliberately NOT here: a charge
+       for each day late, or interest on arrears. Both work like interest,
+       which takes the plan outside the FCA exemption (then the whole
+       agreement can't be enforced without the FCA's say-so), and a
+       consumer's late fee bigger than the real cost of chasing is an unfair
+       term a court won't enforce (Consumer Rights Act 2015 sch. 2 para 6).
+       The real pressure is lawful: the whole balance falling due, a court
+       claim with 8% statutory interest, a CCJ on their record. */
+    plan_on_time: { label: 'Pay on time, by standing order', make: () => ({ head: 'Paying on time.',
+      text: 'The buyer will set up a standing order (or otherwise pay by bank transfer) so that each instalment reaches MBU Sales Limited in full on or before its due date. A payment counts as made only once it has cleared. A payment due on a weekend or bank holiday must reach MBU Sales Limited by the working day before.' }) },
+
+    plan_late_fee: { label: 'Fee for a missed payment', when: (inv, t, s) => lateFee(s) > 0, make: (inv, t, s) => ({ head: 'Missed payments.',
+      text: `If an instalment is not received in full by its due date, or a payment is returned or reversed, a fee of ${gbp(lateFee(s))} is added to the balance for each missed or returned instalment, to cover the cost of chasing it. Payments received go first towards any such fee, then towards the oldest instalment due.` }) },
+
+    plan_default: { label: 'Miss one and the whole balance is due', make: () => ({ head: 'Whole balance due.',
+      text: 'If any instalment is more than 7 days late, MBU Sales Limited will ask the buyer for it in writing (by text, WhatsApp, email or letter). If it is still unpaid 7 days after that, the whole outstanding balance becomes due at once, and MBU Sales Limited may take steps to recover all of it without further notice.' }) },
+
+    plan_court: { label: 'Court claim and CCJ', make: () => ({ head: 'Recovery through the courts.',
+      text: 'If the balance is not paid, MBU Sales Limited may make a claim in the County Court for the full amount owed, together with court fees and, if the court awards it, interest at the statutory rate of 8% a year. A County Court Judgment that is not paid in full within one month stays on the public Register of Judgments for six years and can make it much harder to get credit, a mortgage, a phone contract or a rental. An unpaid judgment can be enforced by enforcement agents (bailiffs), who can take and sell goods belonging to the buyer, which can include the vehicle.' }) },
+
+    plan_costs: { label: 'They pay the costs of chasing', make: () => ({ head: 'Costs of recovery.',
+      text: 'The buyer will also pay the reasonable costs MBU Sales Limited actually incurs in recovering money owed under this agreement, including court fees and the costs of tracing the buyer if they cannot be contacted.' }) },
+
+    plan_selling: { label: 'Selling the car before it’s paid', make: () => ({ head: 'Selling the vehicle.',
+      text: 'If the buyer sells, part exchanges, scraps or gives away the vehicle before the balance is paid, the whole outstanding balance becomes due on that day. The buyer will tell MBU Sales Limited before doing so.' }) },
+
+    plan_contact: { label: 'Keeping in touch', make: () => ({ head: 'Keeping in touch.',
+      text: 'Until the balance is paid, the buyer will tell MBU Sales Limited within 7 days of any change to their address, phone number or email. MBU Sales Limited may contact the buyer by phone, text, WhatsApp, email or letter about payments due.' }) },
+
+    plan_true: { label: 'The details they gave are true', make: () => ({ head: 'Information given.',
+      text: 'The buyer confirms that the name, address, contact details and identification they have given are true and their own. If any of them turn out to be false, the whole outstanding balance becomes due at once.' }) },
+
+    // Optional (not in any standard list): only true if ID was actually seen
+    plan_id: { label: 'They showed photo ID and proof of address', make: () => ({ head: 'Identification.',
+      text: 'The buyer has shown MBU Sales Limited photo identification and proof of their address.' }) },
 
     // Deliberately no "the car stays ours until it's paid off" here. Keeping
     // ownership until the last payment makes it a conditional sale, and a
     // conditional sale is never covered by the 12-payment interest-free
     // exemption, however short it is (RAO art. 60F(2)).
-    plan_settlement: { label: 'Fully settled when all paid', make: (inv, t) => ({ head: 'Full settlement.',
-      text: `The purchase price will not be treated as fully settled until cleared funds totalling ${gbp(t.due)} have been received.` }) },
+    plan_settlement: { label: 'Fully settled when all paid', make: (inv, t, s) => ({ head: 'Full settlement.',
+      text: `The purchase price will not be treated as fully settled until cleared funds totalling ${gbp(t.due)}${termsV(inv) >= 2 && lateFee(s) > 0 ? ', and any missed-payment fees,' : ''} have been received.` }) },
 
     trade_buyer: { label: 'Bought by a trader', make: () => ({ head: 'Trade sale.',
       text: 'The buyer confirms they are buying this vehicle in the course of their business as a motor trader, and not as a consumer.' }) },
@@ -355,6 +424,11 @@
     trade_payment: { label: 'Payment', make: (inv, t) => ({ head: 'Payment.',
       text: t.balance > 0 ? `${gbp(t.paid)} has been received. The remaining ${gbp(t.balance)} is due ${dueWords(inv)}.` : `Payment of ${gbp(t.due)} has been received in full.` }) },
 
+    // Between businesses the Late Payment Act gives this whether it's written
+    // down or not; saying so on the invoice is what makes a trader pay on time
+    trade_late: { label: 'Late payment interest (business)', when: (inv, t) => t.balance > 0.004, make: (inv, t) => ({ head: 'Late payment.',
+      text: `This is a sale between businesses. If any amount is paid late, MBU Sales Limited may claim interest under the Late Payment of Commercial Debts (Interest) Act 1998 at 8% a year above the Bank of England base rate, fixed compensation of ${gbp(t.balance < 1000 ? 40 : t.balance < 10000 ? 70 : 100)} for a debt of this size, and its reasonable costs of recovering the debt.` }) },
+
     lawful: { label: 'Liability the law won’t let you exclude', make: () => ({ head: 'Liability.',
       text: 'Nothing in this invoice excludes or limits any liability that cannot lawfully be excluded or limited.' }) },
 
@@ -363,6 +437,12 @@
 
     buy_finance: { label: 'No finance on it', make: () => ({ head: 'Finance.',
       text: 'The seller confirms there is no outstanding finance or other debt secured on the vehicle, and will repay MBU Sales Limited any amount needed to clear one later found.' }) },
+
+    buy_writeoff: { label: 'Not written off or stolen', make: () => ({ head: 'History.',
+      text: 'The seller confirms the vehicle has not been stolen, scrapped or recorded as an insurance write-off, unless they told MBU Sales Limited in writing before the sale.' }) },
+
+    buy_untrue: { label: 'If anything they said isn’t true', make: () => ({ head: 'If anything is not as stated.',
+      text: 'If anything the seller has said about the vehicle turns out to be untrue (its ownership, finance, history, mileage or condition), the seller will repay MBU Sales Limited what it paid for the vehicle, or the cost of putting the matter right, together with any reasonable costs MBU Sales Limited has had as a result.' }) },
 
     buy_description: { label: 'Mileage and faults', make: () => ({ head: 'Description.',
       text: 'The seller confirms the recorded mileage is, to the best of their knowledge, genuine, and that they have told MBU Sales Limited about any known faults, damage or accident history.' }) },
@@ -377,12 +457,31 @@
     general_payment: { label: 'Payment', make: (inv, t) => ({ head: 'Payment.',
       text: t.balance > 0.004 ? (t.paid > 0 ? `${gbp(t.paid)} has been received. ` : '') + `${gbp(t.balance)} is due ${dueWords(inv)}.` : `Payment of ${gbp(t.due)} has been received in full. Thank you.` }) },
 
+    /* What the buyer was told before buying (a Cat N/S record, the damage
+       repaired, any known faults) can't later be a reason to reject the car:
+       goods aren't unsatisfactory for a matter specifically drawn to the
+       consumer's attention before the contract (Consumer Rights Act 2015
+       s.9(4)(a)). Filled in from the car's Cat status and damage note. */
+    disclosed: { label: 'What they were told before buying', when: inv => has(inv.disclosed), make: inv => ({ head: 'Disclosed before sale.',
+      text: `Before buying, the buyer was told about, and accepted, the following: ${String(inv.disclosed).trim().replace(/\s*\n+\s*/g, '; ').replace(/[.;]\s*$/, '')}. These matters were pointed out before the sale, so they are not grounds for rejecting the vehicle or for saying it is not as described. The buyer’s statutory rights are not otherwise affected.` }) },
+
+    /* Sold without the buyer visiting (phone, WhatsApp, online) and
+       delivered: the Consumer Contracts Regulations 2013 give 14 days to
+       cancel. Telling them the rules is what keeps it at 14 days (not told,
+       it runs up to 12 months), makes them pay to send it back, and lets MBU
+       take off for extra miles or wear (regs 29-36). */
+    distance_sale: { label: 'Bought without visiting: 14 days to cancel', when: inv => !!(deliveryOf(inv) && deliveryOf(inv).distance), make: (inv, t, s) => ({ head: 'Cancelling a sale made at a distance.',
+      text: `The buyer bought this vehicle without visiting MBU Sales Limited, so they may cancel within 14 days after the day it is delivered, without giving a reason, by telling MBU Sales Limited clearly${has(s && s.email) ? ' (email ' + s.email + ')' : ''}. The buyer must then return the vehicle within 14 days, at their own cost. MBU Sales Limited will refund the payments received, including standard delivery, within 14 days of getting it back, less a deduction for any loss in value caused by handling or use beyond what is needed to check it, such as mileage beyond a short test drive.` }) },
+
     vat_margin: { label: 'VAT margin scheme', when: (inv, t, s) => !!(s && s.vat_registered), make: () => ({ head: 'VAT.',
       text: 'Second-hand goods, margin scheme. VAT is included in the price and is not shown separately.' }) },
 
     statutory: { label: 'Statutory rights', make: () => ({ head: 'Statutory rights.',
       text: 'Nothing in this invoice is intended to exclude or restrict any statutory consumer rights or any liability that cannot lawfully be excluded or restricted.' }) }
   };
+
+  // The fee for a missed instalment, from Invoice details (0 or blank = none)
+  const lateFee = s => Math.max(0, r2(s && s.late_fee));
 
   function dueWords(inv) {
     if (has(inv.balance_due_date)) return 'by ' + longDate(inv.balance_due_date);
@@ -412,7 +511,8 @@
   function termList(inv, settings) {
     const t = totals(inv);
     const k = kindOf(inv);
-    const keys = k.terms.concat((inv.extra_terms || []).filter(x => !k.terms.includes(x)));
+    const base = kindTerms(inv);
+    const keys = base.concat((inv.extra_terms || []).filter(x => !base.includes(x)));
     const changes = inv.terms || {};
     const out = keys.filter(key => TERMS[key]).map(key => {
       const def = TERMS[key];
@@ -420,7 +520,7 @@
       const std = shown ? def.make(inv, t, settings) : { head: '', text: '' };
       const ch = changes[key] || {};
       const edited = has(ch.text) || has(ch.head);
-      return { key, label: def.label, standard: k.terms.includes(key), shown, on: !ch.off,
+      return { key, label: def.label, standard: base.includes(key), shown, on: !ch.off,
         head: edited ? (ch.head || '') : std.head, text: edited ? (ch.text || '') : std.text, edited, std };
     });
     (inv.custom_terms || []).forEach((c, i) => {
@@ -430,8 +530,8 @@
   }
   // Standard terms from other kinds that could be added to this one
   function otherTerms(inv) {
-    const k = kindOf(inv), mine = new Set(k.terms.concat(inv.extra_terms || []));
-    return Object.keys(TERMS).filter(key => !mine.has(key)).map(key => ({ key, label: TERMS[key].label }));
+    const mine = new Set(kindTerms(inv).concat(inv.extra_terms || []));
+    return Object.keys(TERMS).filter(key => !mine.has(key) && !TERMS[key].retired).map(key => ({ key, label: TERMS[key].label }));
   }
 
   /* ------------------------------------------------------------- WARNINGS
@@ -480,6 +580,8 @@
       if (!d.done && has(d.date) && d.date < today()) out.push({ level: 'amber', field: 'delivery', text: `The delivery was booked for ${longDate(d.date)}. If it’s gone, mark it delivered so the invoice says so.` });
     }
     if (settings && settings.vat_registered && !has(settings.vat_number)) out.push({ level: 'amber', field: 'settings', text: 'VAT registered is switched on in Invoice details, but there’s no VAT number.' });
+    if (inv.kind === 'instalments' && settings && lateFee(settings) > 25 && kindTerms(inv).includes('plan_late_fee'))
+      out.push({ level: 'amber', field: 'settings', text: `The missed-payment fee is ${gbp(lateFee(settings))}. A consumer's late fee much above what chasing a payment really costs can be thrown out by a court as unfair. Change it in Invoice details.` });
     if (settings && inv.kind !== 'purchase' && t.balance > 0.004 && !(has(settings.bank_sort) && has(settings.bank_account)))
       out.push({ level: 'amber', field: 'settings', text: 'There’s money to pay but no bank details on it. Add them in Settings → Invoice details.' });
     return out;
@@ -670,7 +772,11 @@
     bank_name: 'MBU Sales Limited',
     bank_sort: '',
     bank_account: '',
-    pay_details: ''
+    pay_details: '',
+    // Added to the balance for each missed or returned instalment on a pay
+    // monthly plan. £12 is the level the OFT said it wouldn't challenge for
+    // credit card late fees; much more and it has to match real costs
+    late_fee: 12
   };
 
   /* ------------------------------------------------------------ ON SCREEN */
@@ -989,7 +1095,7 @@
     return bits.filter(Boolean).join('-') + '.pdf';
   }
 
-  return { KINDS, KIND_ORDER, TERMS, DEFAULT_SETTINGS, FCA_NOTE,
+  return { KINDS, KIND_ORDER, TERMS, TERMS_V, DEFAULT_SETTINGS, FCA_NOTE,
     totals, makeSchedule, planRows, planBase, warnings, termList, otherTerms, buildDoc, toHtml, toPdf, emailText, fileName, deliveryOf,
     gbp, ukDate, longDate, isoDate, parseDate, today, plate, numberLabel, pdfSafe, r2 };
 });

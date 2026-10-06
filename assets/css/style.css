@@ -876,7 +876,11 @@ p  { text-wrap: pretty; }
 .footer-bar-links { display: flex; gap: var(--sp-4); flex-wrap: wrap; }
 
 /* --------------------------------------------------------------------------
-   11. STICKY MOBILE CONTACT BAR
+   11. STICKY MOBILE CONTACT BAR (car pages only)
+   Only on a car's page, where WhatsApp and Call us are about that car
+   (6 Oct 2026: on every page it sat over what people were browsing). It
+   slides away while you scroll down to read, and back as soon as you
+   scroll up, the way a browser's own address bar does.
    -------------------------------------------------------------------------- */
 /* The footer address links through to the directions page. No label under it:
    the address itself is the link and saying so twice just added clutter. */
@@ -894,7 +898,12 @@ p  { text-wrap: pretty; }
   backdrop-filter: blur(14px);
   border-top: 1px solid var(--line);
   box-shadow: 0 -4px 20px rgba(13,22,38,.07);
+  transition: transform .32s cubic-bezier(.22,.61,.36,1), box-shadow .32s;
+  will-change: transform;
 }
+/* Tucked away below the screen edge (shadow too, so no line is left showing) */
+.mobile-bar.is-tucked { transform: translateY(calc(100% + 12px)); box-shadow: none; }
+@media (prefers-reduced-motion: reduce) { .mobile-bar { transition: none; } }
 .mobile-bar .btn { flex: 1; }
 /* Instagram and Auto Trader ride along as square icon buttons so WhatsApp and
    Call us keep almost all the width. Equal buttons would squash the labels. */
@@ -910,8 +919,8 @@ p  { text-wrap: pretty; }
   .mobile-bar--4 .btn { font-size: var(--fs-sm); }
 }
 @media (max-width: 780px) {
-  .mobile-bar { display: flex; }
-  body { padding-bottom: 74px; }
+  body.has-car-bar .mobile-bar { display: flex; }
+  body.has-car-bar { padding-bottom: 74px; }
 }
 
 /* --------------------------------------------------------------------------

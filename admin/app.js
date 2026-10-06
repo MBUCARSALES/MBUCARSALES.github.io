@@ -4630,7 +4630,7 @@ ${facts.join(' • ')}
 
 ${car.description || ''}${honesty}
 
-${feats.length ? 'Spec: ' + feats.join(', ') + '\n\n' : ''}Part exchange welcome and no admin fees. The price is the price.
+${feats.length ? 'Spec: ' + feats.join(', ') + '\n\n' : ''}Part exchange welcome.
 Viewings by appointment 7 days a week in ${B.town}.
 
 Message here or WhatsApp ${B.phone}.`;
@@ -4648,7 +4648,7 @@ ${feats.length ? '\nEQUIPMENT\n' + feats.map(f => '- ' + f).join('\n') : ''}
 WHY BUY FROM US
 - HPI checked before it goes on sale, and we tell you up front about any history
 - Serviced, MOT'd and road tested by us before you collect
-- Part exchange welcome, no admin fees
+- Part exchange welcome
 - Family run business in ${B.town}, so you deal with the people who prepared the car
 
 Call or WhatsApp ${B.phone} to arrange a viewing.`;
@@ -4677,7 +4677,7 @@ ${tags.join(' ')}`;
     const autotrader =
 `${car.description || ''}${honesty}
 
-${feats.length ? 'Equipment includes: ' + feats.join(', ') + '.\n\n' : ''}Every car we sell is HPI checked, serviced and MOT'd before collection, and we are upfront about any history. Part exchange welcome and there are no admin fees. The advertised price is what you pay.
+${feats.length ? 'Equipment includes: ' + feats.join(', ') + '.\n\n' : ''}Every car we sell is HPI checked, serviced and MOT'd before collection, and we are upfront about any history. Part exchange welcome.
 
 Viewings by appointment seven days a week in ${B.town}. Call or message to arrange a time and we will have the car ready for you.`;
 
@@ -5699,6 +5699,12 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
           <div><strong>Tick it on every new invoice</strong><small>You can still untick it on any one.</small></div></label>
       </div>
       <div class="section-card">
+        <h2>Pay monthly</h2>
+        <div class="f"><label for="isLateFee">Fee for each missed or returned payment</label>
+          <div class="money"><input class="in" id="isLateFee" inputmode="decimal" value="${esc(s.late_fee || '')}" placeholder="None"></div></div>
+        <p class="hint" style="margin:-4px 0 0">Added to what they owe and written into every pay monthly agreement. Keep it to what chasing a payment really costs you: £12 is the level the Office of Fair Trading set for card late fees. Leave it blank for none. There’s no daily charge on purpose: it counts as interest, which takes the plan outside the FCA exemption.</p>
+      </div>
+      <div class="section-card">
         <h2>VAT</h2>
         <label class="tickrow"><input type="checkbox" id="isVat"${s.vat_registered ? ' checked' : ''}>
           <div><strong>MBU Sales Limited is VAT registered</strong><small>Adds the VAT number and the margin scheme wording. Leave off if not.</small></div></label>
@@ -5728,7 +5734,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         company_number: $('#isCoNo').value.trim(), legal_name: $('#isLegal').value.trim() || 'MBU Sales Limited',
         registered_office: $('#isOffice').value.trim(), company_default: $('#isCoDefault').checked,
         vat_registered: $('#isVat').checked, vat_number: $('#isVatNo').value.trim(), pay_details: $('#isPay').value.trim(),
-        bank_name: $('#isBankName').value.trim(), bank_sort: sortCode($('#isBankSort').value), bank_account: $('#isBankAcc').value.replace(/\D/g, '')
+        bank_name: $('#isBankName').value.trim(), bank_sort: sortCode($('#isBankSort').value), bank_account: $('#isBankAcc').value.replace(/\D/g, ''),
+        late_fee: num($('#isLateFee').value) || 0
       });
       if (state.view === 'invoice') renderInvoiceForm();
       if (state.view === 'invprev') renderPreview();
@@ -5746,13 +5753,23 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     const pick = remembered(SELLER_KEY, '');
     const seller = s.sellers.find(x => sellerLabel(x) === pick) || s.sellers[0] || { name: '', phone: '' };
     return {
-      kind: kind || 'paid', issue_date: INV.today(), sale_date: INV.today(), status: 'draft',
+      kind: kind || 'paid', issue_date: INV.today(), sale_date: INV.today(), status: 'draft', terms_v: INV.TERMS_V, disclosed: '',
       vehicle: {}, customer: {}, seller: { name: seller.name, phone: seller.phone },
       price: null, extras: [], px: { on: false }, delivery: { on: false }, payments: [], deposit_nonrefundable: true,
       balance_due_date: '', plan: { count: '', amount: '', first: '', frequency: 'monthly' },
       terms: {}, extra_terms: [], custom_terms: [], notes: '',
       options: { company: !!s.company_default }, signatures: {}, sent: []
     };
+  }
+
+  /* What the buyer has to be told about a car before buying, from its
+     record: the Cat status and the damage note. Printed as the "Disclosed
+     before sale" term, it can't later be a reason to reject the car. */
+  const CAT_WORDS = { cat_s: 'Category S (structural damage)', cat_n: 'Category N (non-structural damage)',
+    cat_c: 'Category C (an older category: damage costing more than its value to repair)', cat_d: 'Category D (an older category: repairable damage)' };
+  function disclosedFromCar(car) {
+    return [car.hpi_status && car.hpi_status !== 'clear' ? `It is recorded as an insurance write-off, ${CAT_WORDS[car.hpi_status] || LABEL.hpi[car.hpi_status] || car.hpi_status}` : '',
+      String(car.condition_notes || '').trim()].filter(Boolean).join('\n');
   }
 
   function vehicleFromCar(car) {
@@ -5766,6 +5783,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     const inv = await blankInvoice(kind);
     inv.car_id = car.id;
     inv.vehicle = vehicleFromCar(car);
+    inv.disclosed = disclosedFromCar(car);
     inv.price = car.status === 'sold' && car.sale_price != null ? car.sale_price : car.price;
     if (car.sold_at) inv.sale_date = INV.isoDate(new Date(car.sold_at));
     if (car.px_sale && car.px_cash != null && car.sale_price != null) {
@@ -5923,6 +5941,9 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
           <div class="row-2">${F.text('Trim', 'vehicle.variant', { opt: true })}${F.text('Mileage', 'vehicle.mileage', { mode: 'numeric', opt: true })}</div>
           <div class="row-2">${F.text('Colour', 'vehicle.colour', { opt: true, cap: 'words' })}${F.text('VIN', 'vehicle.vin', { opt: true, cap: 'characters' })}</div>
         </details>
+        ${general || purchase ? '' : `<div class="f" style="margin:16px 0 0"><label for="if-disclosed">Told them before buying <span class="opt">(optional)</span></label>
+          <textarea class="ta inv-ta" id="if-disclosed" data-k="disclosed" rows="2" placeholder="e.g. Cat N, repaired. Small dent on the rear door.">${esc(inv.disclosed || '')}</textarea>
+          <p class="hint" style="margin-top:6px">Its Cat status, damage and any faults you pointed out. It prints as a term, so none of it can be a reason to reject the car later.</p></div>`}
       </div>
 
       <div class="section-card">
@@ -6075,6 +6096,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         <div class="f"><label for="if-delivery-address">Deliver to</label>
           <textarea class="ta inv-ta" id="if-delivery-address" data-k="delivery.address" rows="2" placeholder="${esc(theirs ? 'Their address: ' + theirs : 'House, street, town, postcode')}">${esc(d.address || '')}</textarea></div>
         <p class="hint" style="margin:-4px 0 14px">Leave the address blank to use theirs, and the charge blank for free delivery.</p>
+        ${inv.kind === 'trade' ? '' : `<label class="tickrow" style="margin-bottom:14px"><input type="checkbox" data-k="delivery.distance" data-redraw${d.distance ? ' checked' : ''}>
+          <div><strong>They bought it without coming to see it</strong><small>By phone, WhatsApp or online. The law gives them 14 days from delivery to cancel. This puts the rules on the invoice, so they pay to send it back and it can’t stretch to a year.</small></div></label>`}
         ${d.done ? `<button class="btn btn--ghost btn--block" type="button" id="invUndeliver" style="margin-bottom:14px">It hasn’t been delivered yet</button>`
           : `<button class="btn btn--outline btn--block" type="button" id="invDeliver" style="margin-bottom:14px">${icon('check')} Mark as delivered</button>`}
       </div>` : ''}
@@ -6226,6 +6249,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       extra: inv.vehicle && (inv.vehicle.registration || inv.vehicle.make) ? [{ label: 'No car on this one', icon: 'close', run: () => { inv.vehicle = {}; inv.car_id = null; renderInvoiceForm(); } }] : [],
       run: car => {
         inv.car_id = car.id; inv.vehicle = vehicleFromCar(car);
+        if (!inv.disclosed) inv.disclosed = disclosedFromCar(car);
         if (!inv.price) inv.price = car.status === 'sold' && car.sale_price != null ? car.sale_price : car.price;
         state.dirty = true; renderInvoiceForm();
       } });
@@ -6670,6 +6694,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       Object.assign(c, { status: 'draft', customer: {}, signatures: {}, sent: [], email: null, issue_date: INV.today(), sale_date: INV.today() });
       c.payments = (c.payments || []).filter(p => !p.instalment);
       delete c.updated_on;
+      c.terms_v = INV.TERMS_V;   // a new agreement gets today's standard terms
       // Delivering this one too, for the same charge; where, when and "delivered" are theirs to fill
       c.delivery = c.delivery && c.delivery.on ? { on: true, charge: c.delivery.charge } : { on: false };
       await invoiceSettings(); openInvoice(c);

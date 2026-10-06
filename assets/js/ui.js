@@ -403,6 +403,34 @@
     window.addEventListener('scroll', onScroll, { passive: true });
   }
 
+  /* ------------------------------------------------- CONTACT BAR (car pages)
+     The WhatsApp / Call us bar at the foot of a phone screen only shows on a
+     car's page, with WhatsApp already about that car. It tucks away while
+     you scroll down to read and slides back as soon as you scroll up, near
+     the top, or at the end of the page. */
+  MBU.carBar = function (waHref) {
+    const bar = document.querySelector('.mobile-bar');
+    if (!bar) return;
+    const wa = bar.querySelector('.btn--wa');
+    if (wa && waHref) wa.href = waHref;
+    document.body.classList.add('has-car-bar');
+    if (bar.dataset.wired) return;
+    bar.dataset.wired = '1';
+    let last = window.scrollY, queued = false;
+    const update = () => {
+      queued = false;
+      const y = window.scrollY;
+      const end = document.documentElement.scrollHeight - window.innerHeight;
+      if (y < 0 || y > end) return;            // an iPhone's bounce past either end
+      const dy = y - last;
+      if (Math.abs(dy) < 6) return;            // a twitch, not a scroll (slow scrolls still add up)
+      last = y;
+      bar.classList.toggle('is-tucked', dy > 0 && y > 120 && y < end - 60);
+    };
+    window.addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
+    bar.addEventListener('focusin', () => bar.classList.remove('is-tucked'));
+  };
+
   MBU.reveal = function (root) {
     const els = MBU.qsa('.reveal', root || document).filter(e => !e.classList.contains('is-in'));
     if (!els.length) return;
