@@ -854,8 +854,8 @@
   MBU.waCarLink = function (car) {
     const url = MBU.carUrl(car);
     return MBU.waLink(
+      // The link says which car; the plate stays off the public site
       `Hi MBU Car Sales, I'm interested in the ${fmt.title(car)}` +
-      (car.registration ? ` (${fmt.reg(car.registration)})` : '') +
       ` listed at ${fmt.price(car.price)}.\n${url}\n\nIs it still available?`
     );
   };

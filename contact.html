@@ -251,8 +251,7 @@
 
   msg.addEventListener('input', () => { messageTouched = true; refreshSendVia(); });
 
-  const carLabel = () => !car ? '' :
-    MBU.fmt.title(car) + (car.registration ? ' (' + MBU.fmt.reg(car.registration) + ')' : '');
+  const carLabel = () => !car ? '' : MBU.fmt.title(car);
 
   /** The first draft for a chosen reason. Empty means leave the box alone. */
   function draftFor(r) {

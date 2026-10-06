@@ -137,8 +137,10 @@
     ].filter(Boolean);
 
     /* --- full spec table --- */
+    // No registration anywhere on the public site (Talha, 6 Oct 2026). It's
+    // kept in the database for the admin app (invoices, MOTs, Autotrader);
+    // cars_public sends it as null (schema-v13).
     const specs = [
-      ['Registration', car.registration ? fmt.reg(car.registration) : null],
       ['Year', car.year],
       ['Mileage', car.mileage != null ? fmt.miles(car.mileage) : null],
       ['Fuel', car.fuel && MBU.label('fuel', car.fuel)],
@@ -397,7 +399,7 @@
                   </div>
                   <div class="field span-2">
                     <label for="cfMsg">Your message</label>
-                    <textarea class="textarea" id="cfMsg" name="message">I’d like to know more about the ${esc(title)}${car.registration ? ' (' + esc(fmt.reg(car.registration)) + ')' : ''}. Is it still available and when could I come and see it?</textarea>
+                    <textarea class="textarea" id="cfMsg" name="message">I’d like to know more about the ${esc(title)}. Is it still available and when could I come and see it?</textarea>
                   </div>
                   <div class="span-2">
                     <label class="checkbox">
@@ -455,7 +457,6 @@
                             &nbsp;·&nbsp;<strong style="color:#fff">Reduced by ${fmt.price(car.previous_price - car.price)}</strong>
                           </div>`
                        : `<div class="price-sub">Part exchange welcome.</div>`}`}
-                ${car.registration ? `<div style="margin-top:16px"><span class="reg-plate">${esc(fmt.reg(car.registration))}</span></div>` : ''}
               </div>
               <div class="buy-panel-body">
                 ${sold ? `
