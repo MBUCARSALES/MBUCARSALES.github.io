@@ -31,7 +31,13 @@
 //   → 401. With the link from the app (Copy the link) → 200 and BEGIN:VCALENDAR.
 // ============================================================================
 
+// Any web page may read the answer (the admin app checks the function is
+// there): without the code in the link it's only ever "401, no", so this
+// gives nothing away. Phones' calendars don't use it either way.
+const OPEN = { 'Access-Control-Allow-Origin': '*' };
+
 const HEADERS_ICS: Record<string, string> = {
+  ...OPEN,
   'Content-Type': 'text/calendar; charset=utf-8',
   'Content-Disposition': 'inline; filename="mbu-mot-dates.ics"',
   'Cache-Control': 'private, max-age=900'
@@ -101,7 +107,7 @@ export function calendar(cars: Car[], now = new Date(), site = 'https://mbucarsa
   return out.map(fold).join('\r\n') + '\r\n';
 }
 
-const say = (status: number, body: string) => new Response(body, { status, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+const say = (status: number, body: string) => new Response(body, { status, headers: { ...OPEN, 'Content-Type': 'text/plain; charset=utf-8' } });
 
 export async function handle(req: Request): Promise<Response> {
   if (req.method !== 'GET' && req.method !== 'HEAD') return say(405, 'Use GET');

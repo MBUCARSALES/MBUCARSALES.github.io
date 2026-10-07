@@ -188,6 +188,7 @@
       <h2>Photos</h2>
       <div id="photoArea"></div>
       <input type="file" id="photoInput" accept="image/*" multiple hidden>
+      <input type="file" id="blurInput" accept="image/*" hidden>
       <p class="hint" style="margin-top:12px">
         First photo is the one people see on the website. Tap a photo to move it,
         make it the main one or bin it.
@@ -592,6 +593,12 @@
       <button class="btn btn--outline btn--block" id="signOutBtn" style="margin-top:16px">Sign out</button>
     </div>
 
+    <!-- Every step of the switch-on guide, ticked off by asking Supabase (7 Oct 2026) -->
+    <div class="section-card" id="setupCard">
+      <h2>Setup</h2>
+      <div id="setupBody"><div class="skel" style="height:60px"></div></div>
+    </div>
+
     <div class="section-card">
       <h2>Your own visits</h2>
       <p class="hint" style="margin:-6px 0 14px">Looking at your own cars on the website counts as a visitor, which matters on a quiet week. Do this once on each phone, in the browser you look at the website with, and those visits are left out of Insights. Nothing is stored on customers’ phones.</p>
@@ -600,9 +607,10 @@
     </div>
 
     <div class="section-card">
-      <h2>Invoices</h2>
-      <p class="hint" style="margin:-6px 0 14px">Who sells, their numbers, the business details, VAT and the bank details printed on every invoice.</p>
-      <button class="btn btn--outline btn--block" id="invoiceSettingsBtn" type="button">Invoice details</button>
+      <h2>Business details</h2>
+      <p class="hint" style="margin:-6px 0 14px">Phone numbers, address, bank and the rest: what customers see and where, the website’s and the invoices’ side by side.</p>
+      <button class="btn btn--outline btn--block" id="businessBtn" type="button">See them all</button>
+      <button class="btn btn--ghost btn--block" id="invoiceSettingsBtn" type="button" style="margin-top:8px">Change the invoice details</button>
     </div>
     <div class="section-card">
       <h2>Quick help</h2>
@@ -636,11 +644,6 @@
           </div>
         </div>
       </div>
-    </div>
-
-    <div class="section-card" id="upgradesCard" hidden>
-      <h2>Ready to switch on</h2>
-      <div id="upgradesBody"></div>
     </div>
 
     <div class="section-card" id="atCard">

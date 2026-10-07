@@ -38,6 +38,8 @@
        terms: { [key]: { off } | { head, text } },   changes to standard terms
        extra_terms: [key], custom_terms: [{ head, text }],
        notes, options: { company, vat },
+       fees: [{ due, added, amount }],                pay monthly: a missed-payment fee, one per missed instalment
+       reminders: [{ at, kind, due, via }],           reminders sent: 'soon' | 'late' | 'written'
        updated_on,                                    set when a payment or the delivery is recorded
        signatures: { buyer: { png, name, date }, seller: { png, name, date } } }
    ========================================================================== */
@@ -189,6 +191,11 @@
   // (an iPhone's number pad has no minus key)
   const lineAmount = x => x.minus ? -Math.abs(Number(x.amount) || 0) : (Number(x.amount) || 0);
 
+  /* Missed-payment fees (7 Oct 2026): only on pay monthly, where the terms
+     allow one for each missed instalment. Part of what they owe, never of
+     the agreed price, so "the agreed total" in the terms doesn't move. */
+  const feesOf = inv => inv && inv.kind === 'instalments' ? (inv.fees || []).filter(f => Number(f.amount) > 0) : [];
+
   function totals(inv) {
     const extras = (inv.extras || []).filter(x => has(x.label) || Number(x.amount))
       .map(x => Object.assign({}, x, { amount: r2(lineAmount(x)) }));
@@ -201,8 +208,10 @@
     const payments = (inv.payments || []).filter(p => Number(p.amount));
     const paid = sum(payments, p => p.amount);
     const deposit = sum(payments.filter(p => p.deposit), p => p.amount);
-    const balance = r2(due - paid);
-    return { price, extras, delivery, goods, px, due, payments, paid, deposit, balance };
+    const feeList = feesOf(inv);
+    const fees = sum(feeList, f => f.amount);
+    const balance = r2(due + fees - paid);
+    return { price, extras, delivery, goods, px, due, payments, paid, deposit, fees, feeList, balance };
   }
 
   /* ------------------------------------------------------------- SCHEDULE
@@ -238,25 +247,40 @@
      off instead, oldest first, each dated by the payment that cleared it. */
   function planBase(inv) {
     const later = sum((inv.payments || []).filter(p => p.instalment), p => p.amount);
-    return r2(totals(inv).balance + later);
+    const t = totals(inv);
+    return r2(t.balance - t.fees + later);   // a missed-payment fee isn't part of the plan
   }
 
-  function planRows(inv) {
+  /* The schedule with what's been paid ticked off, and any missed-payment
+     fees still unpaid. Taken in date order, as the terms say: a payment goes
+     first towards a fee already added, then towards the oldest instalment.
+     A fee added on the day of a payment is counted before it (they paid
+     late, the fee went on, then the money came in). `credit` is what's been
+     paid toward the next instalment without covering it yet. */
+  function ledger(inv) {
     const p = inv.plan || {};
     const rows = (p.edited && Array.isArray(p.rows) ? p.rows
       : makeSchedule({ balance: planBase(inv), count: p.count, amount: p.amount, first: p.first, frequency: p.frequency }))
       .map(r => ({ due: r.due, amount: r2(r.amount) }));
-    const pays = (inv.payments || []).filter(x => x.instalment && Number(x.amount))
-      .slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
-    let credit = 0, i = 0, when = null;
-    for (const r of rows) {
-      while (credit < r.amount - 0.004 && i < pays.length) { credit = r2(credit + Number(pays[i].amount)); when = pays[i].date || null; i++; }
-      if (credit < r.amount - 0.004) break;
-      r.paid_on = when || today();
-      credit = r2(credit - r.amount);
+    const events = feesOf(inv).map(f => ({ fee: true, date: String(f.added || f.due || ''), amount: r2(f.amount) }))
+      .concat((inv.payments || []).filter(x => x.instalment && Number(x.amount))
+        .map(x => ({ fee: false, date: String(x.date || ''), amount: r2(x.amount) })))
+      .sort((a, b) => a.date.localeCompare(b.date) || (a.fee === b.fee ? 0 : a.fee ? -1 : 1));
+    let credit = 0, feeOwed = 0, next = 0;
+    for (const e of events) {
+      if (e.fee) { feeOwed = r2(feeOwed + e.amount); continue; }
+      const toFee = Math.min(feeOwed, e.amount);
+      feeOwed = r2(feeOwed - toFee);
+      credit = r2(credit + e.amount - toFee);
+      while (next < rows.length && credit >= rows[next].amount - 0.004) {
+        rows[next].paid_on = e.date || today();
+        credit = r2(credit - rows[next].amount);
+        next++;
+      }
     }
-    return rows;
+    return { rows, feeOwed, credit };
   }
+  const planRows = inv => ledger(inv).rows;
 
   // "£500.00 on the 5th of each month", or null when the amounts differ
   function planShape(rows, frequency) {
@@ -338,8 +362,13 @@
       ? { head: 'Payment record.', text: 'Each cleared payment received will reduce the outstanding balance. The buyer should retain evidence of all payments made.' }
       : { head: 'Payment confirmation.', text: 'This invoice records the agreed sale price and confirms the payments received for the above vehicle.' } },
 
-    plan_outstanding: { label: 'Outstanding balance', make: (inv, t) => ({ head: 'Outstanding balance.',
-      text: `The parties confirm that ${gbp(t.balance)} remains outstanding from the ${agreed(t)}.` }) },
+    // With a missed-payment fee unpaid, the fee is said separately: it's owed,
+    // but it isn't part of the agreed price
+    plan_outstanding: { label: 'Outstanding balance', make: (inv, t) => {
+      const fee = t.fees ? ledger(inv).feeOwed : 0;
+      return { head: 'Outstanding balance.',
+        text: `The parties confirm that ${gbp(t.balance - fee)} remains outstanding from the ${agreed(t)}${fee > 0.004 ? `, plus ${gbp(fee)} in missed-payment fees` : ''}.` };
+    } },
 
     plan_payments: { label: 'The payments', make: (inv, t) => {
       const rows = planRows(inv), f = (inv.plan && inv.plan.frequency) || 'monthly';
@@ -647,6 +676,7 @@
 
       if (inv.kind === 'instalments') {
         row('Total Paid to Date', gbp(t.paid));
+        if (t.fees) row('Missed-payment Fees Added', gbp(t.fees));
         row('TOTAL REMAINING BALANCE', gbp(t.balance), 'blue');
         const rows = planRows(inv), f = (inv.plan && inv.plan.frequency) || 'monthly';
         const shape = planShape(rows, f);
@@ -695,6 +725,11 @@
           align: anyPaid ? ['center', 'center', 'center', 'center'] : ['center', 'center', 'center'],
           widths: anyPaid ? [0.16, 0.3, 0.27, 0.27] : [0.22, 0.45, 0.33],
           rows: rows.map((r, i) => [String(i + 1), ukDate(r.due), gbp(r.amount)].concat(anyPaid ? [r.paid_on ? ukDate(r.paid_on) : ''] : [])) });
+      }
+      if (t.feeList.length) {
+        const n = due => { const i = rows.findIndex(r => r.due === due); return i >= 0 ? `Payment ${i + 1}, due ${ukDate(due)}` : ukDate(due) || 'A missed payment'; };
+        blocks.push({ type: 'table', title: 'Missed-payment Fees', head: ['For', 'Added', 'Fee'], align: ['left', 'center', 'right'], widths: [0.5, 0.25, 0.25],
+          rows: t.feeList.slice().sort((a, b) => String(a.due || '').localeCompare(String(b.due || ''))).map(f => [n(f.due), ukDate(f.added) || '', gbp(f.amount)]) });
       }
     }
 
@@ -1057,7 +1092,7 @@
     const car = [v.year, vehicleName(v)].filter(has).join(' ');
     const ref = numberLabel(inv.number);
     const d = deliveryOf(inv), delivered = !!(d && d.done);
-    const again = (inv.sent || []).some(x => x.via === 'email');   // emailed before, not just printed
+    const again = (inv.sent || []).some(x => x.via === 'email' || x.via === 'app');   // emailed before, not just printed
     const custom = has(inv.title) ? String(inv.title).trim() : '';
     const word = custom || k.mail;
     const what = delivered ? 'Delivered, updated ' + (custom || k.mail.toLowerCase())
@@ -1074,8 +1109,11 @@
     else lines.push(`Thank you for buying your ${car || 'car'} from us. Your ${again ? 'updated ' : ''}${inv.kind === 'instalments' ? 'agreement and payment schedule are' : 'invoice is'} attached${ref ? ' (' + ref + ')' : ''}.`);
     if (d && !delivered) lines.push('', has(d.date) ? `We’ll deliver it to you on ${longDate(d.date)}${has(d.time) ? ' (' + String(d.time).trim() + ')' : ''}.` : 'We’ll be in touch to arrange the delivery.');
     if (inv.kind === 'instalments') {
-      const rows = planRows(inv).filter(r => !r.paid_on);
-      if (rows.length) lines.push('', `Your next payment of ${gbp(rows[0].amount)} is due on ${longDate(rows[0].due)}.`);
+      const lg = ledger(inv), rows = lg.rows.filter(r => !r.paid_on);
+      const now = today();
+      const late = rows.filter(r => r.due < now);
+      if (late.length) lines.push('', `${late.length === 1 ? `Your payment of ${gbp(late[0].amount)} that was due on ${longDate(late[0].due)} hasn’t` : `${countWord(late.length).replace(/^./, m => m.toUpperCase())} payments, the first due on ${longDate(late[0].due)}, haven’t`} reached us yet.${lg.feeOwed > 0.004 ? ` As your agreement says, ${feesOf(inv).length === 1 ? 'a missed-payment fee of ' + gbp(lg.feeOwed) + ' has' : gbp(lg.feeOwed) + ' in missed-payment fees have'} been added.` : ''}`);
+      else if (rows.length) lines.push('', `Your next payment of ${gbp(rows[0].amount)} is due on ${longDate(rows[0].due)}.`);
     } else if (t.balance > 0.004 && inv.kind !== 'purchase') {
       lines.push('', `The remaining balance of ${gbp(t.balance)} is due ${dueWords(inv)}.`);
     }
@@ -1088,6 +1126,122 @@
     return { subject, body: lines.join('\n') };
   }
 
+  /* ---------------------------------------------------------- MONEY OWED
+     What's owed to MBU on one invoice today, for Home, the list and the
+     reminders (7 Oct 2026). null when nothing is: paid, void, a blank draft
+     with no buyer, or a car MBU bought (that's money out).
+       status    'late' | 'soon' (within 7 days) | 'later' | 'open' (no date yet)
+       now       what should have reached MBU by today, fees included
+       due       the date of the oldest thing unpaid
+       next      the next instalment not yet paid (pay monthly), nextAmount what's left of it
+       late      instalments past their date and unpaid; daysLate since the oldest
+       feeOwed   missed-payment fees not yet paid
+       feeable   late instalments with no fee yet (only if the agreement has the fee term)
+       canWrite  over 7 days late and the agreement has "Whole balance due", so the
+                 written request that term needs can go
+       written   the last written request { at, by }: by = the 7 days it gives them
+       last      the last reminder of any kind */
+  const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  function dayDate(s, on) {
+    const d = parseDate(s), o = parseDate(on) || new Date();
+    return d ? `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}${d.getFullYear() !== o.getFullYear() ? ' ' + d.getFullYear() : ''}` : '';
+  }
+
+  function moneyDue(inv, s, on) {
+    on = on || today();
+    // A saved but unsent invoice still counts (an agreement signed on paper and
+    // typed in later), as in the list's To come; a blank copy with no buyer doesn't
+    if (!inv || inv.status === 'void' || inv.kind === 'purchase') return null;
+    if (inv.status === 'draft' && !has(inv.customer && inv.customer.name)) return null;
+    const t = totals(inv);
+    if (!(t.balance > 0.004)) return null;
+    const soonBy = isoDate(addDays(parseDate(on), 7));
+    const daysSince = d => Math.max(0, Math.round((parseDate(on) - parseDate(d)) / 86400000));
+    const terms = termList(inv, s).filter(x => x.shown && x.on).map(x => x.key);
+    const sent = (inv.reminders || []).slice().sort((a, b) => String(a.at).localeCompare(String(b.at)));
+    // Only reminders about what's owed now count: once a payment's in, the
+    // reminders (and any written request) about it stop being said
+    const about = dues => {
+      const mine = sent.filter(r => !r.due || dues.includes(r.due));
+      const w = mine.filter(r => r.kind === 'written').pop();
+      return { last: mine[mine.length - 1] || null, written: w ? { at: w.at, by: isoDate(addDays(new Date(w.at), 7)) } : null };
+    };
+    const base = { balance: t.balance, written: null, last: null, feeOwed: 0, feeable: [], late: [], canWrite: false };
+
+    if (inv.kind === 'instalments') {
+      const lg = ledger(inv);
+      const left = lg.rows.filter(r => !r.paid_on);
+      const late = left.filter(r => r.due < on);
+      const next = left[0] || null;
+      const fees = feesOf(inv);
+      const daysLate = late.length ? daysSince(late[0].due) : 0;
+      // No schedule set, or one that doesn't cover the whole balance: owed, but no date to chase
+      if (!next) return Object.assign(base, about([]), { status: 'open', now: lg.feeOwed, due: null, next: null,
+        nextAmount: t.balance, daysLate: 0, feeOwed: lg.feeOwed, when: lg.rows.length ? 'outside the schedule' : 'in instalments, no schedule set yet' });
+      return Object.assign(base, about(late.length ? late.map(r => r.due) : [next.due]), {
+        status: late.length ? 'late' : next.due <= soonBy ? 'soon' : 'later',
+        now: r2(Math.max(0, sum(late, r => r.amount) - lg.credit) + lg.feeOwed),
+        due: late.length ? late[0].due : next ? next.due : null,
+        next, nextAmount: next ? r2(next.amount - lg.credit) : 0,
+        late, daysLate, feeOwed: lg.feeOwed,
+        feeable: terms.includes('plan_late_fee') && lateFee(s) > 0 ? late.filter(r => !fees.some(f => f.due === r.due)) : [],
+        canWrite: late.length > 0 && daysLate > 7 && terms.includes('plan_default'),
+        when: ''
+      });
+    }
+
+    // Everything else is one balance: due by a date, on delivery, or on collection
+    const d = deliveryOf(inv);
+    const date = has(inv.balance_due_date) ? inv.balance_due_date : d && d.done ? (d.done_date || d.date || '') : '';
+    const status = !date ? 'open' : date < on ? 'late' : date <= soonBy ? 'soon' : 'later';
+    return Object.assign(base, about([date || '']), { status, now: status === 'late' ? t.balance : 0, due: date || null, next: null,
+      nextAmount: t.balance, daysLate: status === 'late' ? daysSince(date) : 0, when: dueWords(inv) });
+  }
+
+  /* A reminder as a WhatsApp or text message, in MBU's voice:
+       soon     the next payment (or the balance) is due in the next few days
+       late     it's gone past its date
+       written  pay monthly over 7 days late: the written request the "Whole
+                balance due" term needs, giving them 7 days and saying what
+                happens after, in the agreement's own words */
+  function reminderText(inv, s, kind, on) {
+    s = Object.assign({}, DEFAULT_SETTINGS, s || {});
+    on = on || today();
+    const m = moneyDue(inv, s, on);
+    if (!m) return '';
+    const c = inv.customer || {}, v = inv.vehicle || {}, seller = inv.seller || {};
+    const first = String(c.name || '').trim().split(/\s+/)[0] || 'there';
+    const car = 'the ' + (vehicleName(v) || 'car');
+    const ref = numberLabel(inv.number);
+    const plan = inv.kind === 'instalments';
+    const lines = [`Hi ${first},`, ''];
+    const feeWords = m.feeOwed > 0.004 ? ` As your agreement says, ${feesOf(inv).length === 1 ? 'a missed-payment fee of ' + gbp(m.feeOwed) + ' has' : gbp(m.feeOwed) + ' in missed-payment fees have'} been added.` : '';
+
+    if (kind === 'written' && plan && m.late.length) {
+      const by = isoDate(addDays(parseDate(on), 7));
+      lines.push(`This is a written request under your pay monthly agreement for ${car}${ref ? ' (' + ref + ')' : ''}.`, '',
+        `${m.late.length === 1 ? `Your payment of ${gbp(m.late[0].amount)} that was due on ${longDate(m.late[0].due)} is` : `${m.late.length} payments, the first due on ${longDate(m.late[0].due)}, are`} now ${m.daysLate} days late.${feeWords}`, '',
+        `Please pay the ${gbp(m.now)} now due by ${dayDate(by, on)}. If it isn’t paid by then, the whole outstanding balance of ${gbp(m.balance)} becomes due at once, as your agreement says.`);
+    } else if (kind === 'late' || kind === 'written') {
+      if (plan && m.late.length) {
+        lines.push(`${m.late.length === 1 ? `Your payment of ${gbp(m.late[0].amount)} for ${car} was due on ${dayDate(m.late[0].due, on)}` : `Your payments for ${car} due on ${m.late.map(r => dayDate(r.due, on)).join(' and ')}`} and we haven’t received ${m.late.length === 1 ? 'it' : 'them'} yet.${feeWords}${m.feeOwed > 0.004 || m.late.length > 1 ? ` That’s ${gbp(m.now)} due now.` : ''}`);
+      } else {
+        lines.push(`The remaining ${gbp(m.balance)} for ${car} was due ${m.due ? 'on ' + dayDate(m.due, on) : dueWords(inv)} and we haven’t received it yet.`);
+      }
+      lines.push('', 'Could you pay it today, or let us know when it will be with us?');
+    } else {
+      lines.push(plan && m.next
+        ? `Just a reminder that your next payment of ${gbp(m.nextAmount)} for ${car} is due on ${dayDate(m.next.due, on)}.`
+        : `Just a reminder that the remaining ${gbp(m.balance)} for ${car} is due ${m.due ? 'on ' + dayDate(m.due, on) : dueWords(inv)}.`);
+    }
+    if (has(s.bank_sort) && has(s.bank_account)) {
+      lines.push('', `You can pay by bank transfer to ${s.bank_name || s.legal_name}, sort code ${s.bank_sort}, account ${s.bank_account}, reference ${ref || 'your name'}.`);
+    }
+    lines.push('', kind === 'written' ? 'Kind regards,' : 'Thank you,',
+      [has(seller.name) ? seller.name : '', s.trading_name].filter(has).join(', ') + (kind === 'written' && has(seller.phone) ? ` · ${seller.phone}` : ''));
+    return lines.join('\n');
+  }
+
   function fileName(inv) {
     const c = inv.customer || {}, v = inv.vehicle || {};
     const bits = [numberLabel(inv.number) || 'MBU-invoice', plate(v.registration).replace(/\s+/g, ''), String(c.name || '').trim().split(/\s+/).slice(-1)[0]]
@@ -1096,6 +1250,7 @@
   }
 
   return { KINDS, KIND_ORDER, TERMS, TERMS_V, DEFAULT_SETTINGS, FCA_NOTE,
-    totals, makeSchedule, planRows, planBase, warnings, termList, otherTerms, buildDoc, toHtml, toPdf, emailText, fileName, deliveryOf,
+    totals, makeSchedule, planRows, planBase, ledger, warnings, termList, otherTerms, buildDoc, toHtml, toPdf, emailText, fileName, deliveryOf,
+    moneyDue, reminderText, lateFee, dayDate,
     gbp, ukDate, longDate, isoDate, parseDate, today, plate, numberLabel, pdfSafe, r2 };
 });

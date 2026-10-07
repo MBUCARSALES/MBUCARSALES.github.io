@@ -671,7 +671,9 @@
   const PAGES = ['home', 'stock', 'car', 'contact', 'sell', 'wanted', 'find-us', 'privacy', 'terms'];
   MBU.pageName = (() => {
     if (window.MBU_PAGE) return String(window.MBU_PAGE);
-    const p = (String(location.pathname || '').split('/').pop() || '').toLowerCase().replace(/\.html$/, '');
+    // A shared car link (/c/<id>/) is a copy of the car page
+    if (window.MBU_FORCED_CAR_ID || /^\/c\/[^/]+\/?$/.test(location.pathname || '')) return 'car';
+    const p = (String(location.pathname || '').replace(/\/+$/, '').split('/').pop() || '').toLowerCase().replace(/\.html$/, '');
     if (p === '' || p === 'index') return 'home';
     return PAGES.includes(p) ? p : 'other';
   })();
@@ -848,17 +850,17 @@
     const ref = document.referrer || '';
     if (!ref) return 'direct';
     try {
-      const host = new URL(ref).hostname;
+      const u = new URL(ref), host = u.hostname;
       if (host === location.hostname) {
-        if (/stock/.test(ref)) return 'stock';
-        if (/index|\/$/.test(ref)) return 'home';
+        if (/stock/.test(u.pathname)) return 'stock';
+        if (u.pathname === '/' || /^\/index(\.html)?$/.test(u.pathname)) return 'home';
         return 'internal';
       }
       if (/google|bing|duckduck|yahoo|ecosia/.test(host)) return 'search';
       if (/facebook|fb\.com|fb\.me/.test(host)) return 'facebook';
       if (/instagram/.test(host)) return 'instagram';
       if (/tiktok/.test(host)) return 'tiktok';
-      if (/t\.co$|twitter|x\.com$/.test(host)) return 'twitter';
+      if (/(^|\.)t\.co$|twitter|(^|\.)x\.com$/.test(host)) return 'twitter';
       if (/whatsapp/.test(host)) return 'whatsapp';
       if (/autotrader/.test(host)) return 'autotrader';
       if (/gumtree/.test(host)) return 'gumtree';

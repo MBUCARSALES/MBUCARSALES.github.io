@@ -58,6 +58,8 @@
     back:     `<line ${P} x1="19" y1="12" x2="5" y2="12"/><polyline ${P} points="11 18 5 12 11 6"/>`,
     phone:    `<path ${P} d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/>`,
     whatsapp: `<path fill="currentColor" d="M17.5 14.4c-.3-.2-1.7-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.7 1-.9 1.2-.2.2-.3.2-.6.1a8.2 8.2 0 0 1-4-3.5c-.3-.5.3-.5.8-1.5.1-.2 0-.4 0-.5l-1-2.3c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.2.2 2.2 3.3 5.3 4.6 2 .8 2.7.9 3.7.8.6-.1 1.7-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.2-.3-.2-.6-.4Z"/><path ${P} d="M12 21.5a9.4 9.4 0 0 1-4.8-1.3L2.5 21.5l1.4-4.5A9.5 9.5 0 1 1 12 21.5Z"/>`,
+    chat:     `<path ${P} d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12Z"/><line ${P} x1="8.5" y1="10.5" x2="15.5" y2="10.5"/><line ${P} x1="8.5" y1="13.8" x2="13" y2="13.8"/>`,
+    blur:     `<rect ${P} x="3" y="5" width="18" height="14" rx="2"/><rect x="6.5" y="9" width="3" height="3" fill="currentColor"/><rect x="12.5" y="9" width="3" height="3" fill="currentColor" opacity=".55"/><rect x="9.5" y="12" width="3" height="3" fill="currentColor" opacity=".75"/><rect x="15.5" y="12" width="3" height="3" fill="currentColor" opacity=".35"/>`,
     mail:     `<rect ${P} x="2" y="4" width="20" height="16" rx="2.5"/><path ${P} d="m2.6 6.6 8.3 5.5c.7.4 1.5.4 2.2 0l8.3-5.5"/>`,
     car:      `<path ${P} d="M3 17v-4.2a2 2 0 0 1 .2-.9l2-4A2 2 0 0 1 7 6.8h10a2 2 0 0 1 1.8 1.1l2 4a2 2 0 0 1 .2.9V17"/><line ${P} x1="3" y1="14" x2="21" y2="14"/><circle ${P} cx="7.5" cy="17" r="2"/><circle ${P} cx="16.5" cy="17" r="2"/>`,
     eye:      `<path ${P} d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle ${P} cx="12" cy="12" r="3"/>`,
@@ -401,7 +403,8 @@
     go('home');
     await Promise.all([loadCars(), loadEnquiries()]);
     // Invoices load after the stock; Home redraws for any delivery due
-    checkSchema().then(async () => { if (state.schema.v10) { await loadInvoices(); if (state.view === 'home') renderHome(); } });
+    // The invoices (and their settings: the late fee, the bank) for Home's deliveries and money owed
+    checkSchema().then(async () => { if (state.schema.v10) { await loadInvoices(); await invoiceSettings(); if (state.view === 'home') renderHome(); } });
     // Home's recommendations come from the insight engine, which needs the
     // interest and ageing figures. go('home') above has already asked for
     // them, alongside the stock, and Home redraws when they land.
@@ -415,6 +418,11 @@
    * the first time someone tries to save a car. This says which file is missing,
    * in words, before that happens.
    */
+  async function fnThere(name) {
+    try { return (await fetch(CFG.supabase.url.replace(/\/$/, '') + '/functions/v1/' + name, { method: 'GET', cache: 'no-store' })).status !== 404; }
+    catch { return null; }   // offline, or can't tell
+  }
+
   async function checkSchema() {
     const checks = [
       ['schema.sql',                 () => sb.from('cars').select('id').limit(1)],
@@ -442,24 +450,31 @@
         return !(error && /does not exist|schema cache|not find the table/i.test(error.message));
       } catch { return false; }
     };
-    // Edge Functions: 404 means not deployed; anything else means it's there
-    const deployed = async (name, method) => {
-      try { return (await fetch(CFG.supabase.url.replace(/\/$/, '') + '/functions/v1/' + name, { method, cache: 'no-store' })).status !== 404; }
-      catch { return null; }
-    };
-    const [v6, v7, v8, v10, v11, v14, track, motFn] = await Promise.all([
+    // Edge Functions: 404 means not deployed; anything else (405 "use POST",
+    // 401 "no code") means it's there. A plain GET, because a browser can't
+    // read the answer to anything that needs a CORS preflight when the
+    // function is missing (Supabase's 404 fails the preflight).
+    const deployed = name => fnThere(name);
+    const [v6, v7, v8, v10, v11, v14, track, motFn, setup] = await Promise.all([
       has(() => sb.from('tracking_status').select('v2_since').limit(1)),
       has(() => sb.from('insight_actions').select('id').limit(1)),
       has(() => sb.from('cars').select('px_sale').limit(1)),
       has(() => sb.from('invoices').select('id').limit(1)),
       has(() => sb.from('instagram_posts').select('id').limit(1)),
       has(() => sb.rpc('site_stats', { p_from: new Date().toISOString(), p_to: new Date().toISOString(), p_car: null })),
-      deployed('track', 'OPTIONS'),
-      deployed('mot-calendar', 'GET')
+      deployed('track'),
+      deployed('mot-calendar'),
+      // v15 asks the database itself, which also sees v9, v12, v13 and the v6b lock
+      Promise.resolve(sb.rpc('setup_status')).then(r => (r && !r.error && r.data) || null, () => null)
     ]);
     state.schema = Object.assign(state.schema, { v6, v7, v8, v10, v11, v14 });
+    state.setup = setup;
+    // Ask afresh next time: a function just deployed shouldn't wait out the 10 minutes
+    siteGot.delete('motfeed');
     state.fns = { track, motCalendar: motFn };
-    renderUpgrades();
+    renderSetup();
+    // The slower ones fill in when they land: sending email, the calendar link
+    Promise.all([mailStatus(true), motFeedMade()]).then(renderSetup, renderSetup);
 
     if (!missing.length) return;
 
@@ -475,53 +490,113 @@
   }
 
   /**
-   * Settings → "Ready to switch on". Lists the upgrades that are written but not
-   * yet turned on, in the order they have to happen, and says what each gets
-   * you. Hidden once there's nothing left to do.
+   * Gear → Setup (7 Oct 2026, was "Ready to switch on"). Every step of the
+   * switch-on guide (SWITCH-ON-GUIDE.md, next to the repo on the Mac) in the
+   * same order, each ticked off by asking Supabase: a file run, a function
+   * deployed, a password in. What can't be seen from here says so rather
+   * than guessing. Check again after each step.
    */
-  function renderUpgrades() {
-    const items = [];
+  const SETUP_FILES = [
+    ['v6', 'schema-v6-tracking.sql', 'Counts people, not page loads'],
+    ['v7', 'schema-v7-insights.sql', '“Price is right” and “Remind me” on insights'],
+    ['v8', 'schema-v8-part-exchange.sql', 'Part exchange sales are kept'],
+    ['v9', 'schema-v9-enquiry-limits.sql', 'A limit on spam through the website’s forms'],
+    ['v10', 'schema-v10-invoices.sql', 'Invoices kept and numbered, payments, both phones in step'],
+    ['v11', 'schema-v11-instagram.sql', 'Room for Instagram posts on the homepage'],
+    ['v12', 'schema-v12-auction-prices.sql', 'Auction results in the price book'],
+    ['v13', 'schema-v13-hide-registration.sql', 'Number plates no longer sent to the website'],
+    ['v14', 'schema-v14-site-analytics.sql', 'Every page and tap counted, for Insights'],
+    ['v15', 'schema-v15-setup-check.sql', 'Lets this list see everything below']
+  ];
+  async function motFeedMade() {
+    if (!state.schema.v10) { state.motFeedMade = state.schema.v10 === false ? false : null; return; }
+    try {
+      const { data, error } = await sb.from('app_settings').select('value').eq('key', 'mot_feed').maybeSingle();
+      state.motFeedMade = error ? null : !!(data && data.value && data.value.token);
+    } catch { state.motFeedMade = null; }
+  }
+
+  function setupSteps() {
+    const st = state.setup, sc = state.schema, fns = state.fns || {}, mail = state.mail || {};
+    // Without v15 the app can still see most files; v15 itself plainly isn't run
+    const file = k => st ? !!st[k] : k === 'v15' ? false : sc[k] === undefined ? null : sc[k];
     const via = (CFG.tracking && CFG.tracking.via) || 'rest';
+    const s = IV.settings || {};
+    const fin = (CFG.finance && CFG.finance.advert) || {};
+    return [
+      { n: 1, title: 'The database', where: 'Supabase → SQL Editor → New query: paste each file, press Run, in this order',
+        items: SETUP_FILES.map(([k, f, what]) => ({ done: file(k), label: f, what })) },
+      { n: 2, title: 'Counting visitors properly', where: 'Supabase → Edge Functions, then config.js',
+        items: [
+          { done: fns.track, label: 'The track function deployed', what: 'Verify JWT off. Each visitor counted once a day, bots left out' },
+          { done: via === 'function', label: 'config.js says tracking: { via: \'function\' }', what: 'The website starts using it once that’s pushed' },
+          { done: st ? !!st.v6b : null, label: 'A day later: schema-v6b-lock-tracking.sql', what: 'Only the function can write visits from then on', later: true }
+        ] },
+      { n: 3, title: 'Sending invoices from the app', where: 'Google, then Supabase → Edge Functions',
+        items: [
+          { done: mail.deployed, label: 'The send-email function deployed', what: 'Verify JWT off' },
+          { done: mail.deployed ? !!mail.configured : mail.deployed, label: 'The Gmail app password in its secrets', what: 'GMAIL_USER and GMAIL_APP_PASSWORD. Then Send it replaces the share sheet', test: !!mail.configured }
+        ] },
+      { n: 4, title: 'MOT dates on your phone’s calendar', where: 'Supabase → Edge Functions, then Tools → MOTs',
+        items: [
+          { done: fns.motCalendar, label: 'The mot-calendar function deployed', what: 'Verify JWT off' },
+          { done: state.motFeedMade, label: 'The calendar link made', what: 'Tools → MOTs → Set up the calendar link, then Add to my calendar on each iPhone', go: 'mot' }
+        ] },
+      { n: 5, title: 'Your details', where: 'Here in the app, and from the finance company',
+        items: [
+          { done: s.sellers ? s.sellers.length > 0 && s.sellers.every(x => x.name && x.phone) : null, label: 'A name for each phone number', what: 'On every invoice: who dealt with it', go: 'details' },
+          { done: IV.settings ? !!(s.bank_sort && s.bank_account) : null, label: 'Bank details', what: 'On invoices and reminders, so they can pay by transfer', go: 'details' },
+          { done: !!(fin.firmName && fin.fcaNumber && fin.statement), label: 'The finance company’s name, FCA number and statement', what: 'The website’s finance advert needs them. Waiting on the finance company', later: true }
+        ] }
+    ];
+  }
 
-    const fns = state.fns || {};
-    if (state.schema.v14 === false) {
-      items.push(['Every page and every tap counted',
-        'Run <strong>schema-v14-site-analytics.sql</strong> in Supabase → SQL Editor (after v6). Then Insights → Website, the week’s summary and “Who tapped what” have their figures.']);
-    }
-    if (state.schema.v6 === false) {
-      items.push(['Count people, not page loads',
-        'Run <strong>schema-v6-tracking.sql</strong> in Supabase → SQL Editor. Then deploy the <strong>track</strong> function. HANDOVER 9f and 9s have the steps.']);
-    } else if (state.schema.v6 && via !== 'function') {
-      items.push(['Switch the website to the new tracking',
-        `${fns.track ? 'The <strong>track</strong> function is there: paste in the latest copy (7 Oct)' : 'Deploy the <strong>track</strong> function'} with JWT verification off, then set <strong>tracking: { via: \'function\' }</strong> in config.js. People get counted once a day each, bots are left out.`]);
-    }
-    if (fns.motCalendar === false) {
-      items.push(['MOT dates on your phone’s calendar, kept up to date',
-        'Deploy the <strong>mot-calendar</strong> function with JWT verification off (HANDOVER 9s). Then Tools → MOTs → Set up the calendar link. Needs v10 too.']);
-    }
-    if (state.schema.v7 === false) {
-      items.push(['"Price is right" and "Remind me" on insights',
-        'Run <strong>schema-v7-insights.sql</strong> in Supabase → SQL Editor, after v6.']);
-    }
-    if (state.schema.v8 === false) {
-      items.push(['Part exchange sales',
-        'Run <strong>schema-v8-part-exchange.sql</strong> in Supabase → SQL Editor. Then a sale can be marked as a part exchange, and it stays out of your margins until their car sells.']);
-    }
-
-    if (state.schema.v10 === false) {
-      items.push(['Keep every invoice',
-        'Run <strong>schema-v10-invoices.sql</strong> in Supabase → SQL Editor. Invoices can be made and sent without it, but the list, the numbering (MBU-1001 on), recording payments and sharing Invoice details between the two phones need it.']);
-    }
-    if (state.schema.v11 === false) {
-      items.push(['Instagram posts on the homepage',
-        'Run <strong>schema-v11-instagram.sql</strong>, connect Instagram to Behold (free) and add its feed address to GitHub as <strong>BEHOLD_FEED_URL</strong>. The steps are at the top of <strong>.github/workflows/instagram-posts.yml</strong>.']);
-    }
-    $('#upgradesCard').hidden = !items.length;
-    $('#upgradesBody').innerHTML = items.map(([title, how]) => `
-      <div style="padding:10px 0;border-bottom:1px solid var(--line-2)">
-        <strong style="display:block;font-size:15.5px">${esc(title)}</strong>
-        <span class="hint" style="display:block;margin-top:3px;font-size:14px;line-height:1.5">${how}</span>
-      </div>`).join('');
+  function renderSetup() {
+    const card = $('#setupCard');
+    if (!card) return;
+    const groups = setupSteps();
+    const all = groups.flatMap(g => g.items);
+    const done = all.filter(i => i.done === true).length;
+    // Next: the first step known to be missing; failing that, the first it can't see
+    const pick = test => { for (const g of groups) { const i = g.items.find(x => test(x) && !x.later); if (i) return [g, i]; } return []; };
+    const [nextGroup, next] = pick(i => i.done === false).length ? pick(i => i.done === false) : pick(i => i.done !== true);
+    const mark = d => d === true ? `<span class="su-mark su-mark--done">${icon('check')}</span>`
+      : d === false ? '<span class="su-mark"></span>' : '<span class="su-mark su-mark--unknown">?</span>';
+    $('#setupBody').innerHTML = `
+      <p class="su-head">${done === all.length ? 'Everything’s switched on.' : `<strong>${done} of ${all.length} done.</strong> ${next ? 'Next: ' + esc(next.label.replace(/^(The|A) /, m => m.toLowerCase())) + '.' : 'Only the later ones left.'}`}</p>
+      <div class="su-bar"><i style="width:${Math.round(done / all.length * 100)}%"></i></div>
+      ${groups.map(g => {
+        const left = g.items.filter(i => i.done !== true).length;
+        return `<details class="su-group"${left && g === nextGroup ? ' open' : ''}>
+          <summary><span class="su-n">${g.n}</span><span class="su-title"><strong>${esc(g.title)}</strong><small>${left ? `${left} to do · ${esc(g.where)}` : 'Done'}</small></span>${icon('down')}</summary>
+          ${g.items.map(i => `<div class="su-item${i.done === true ? ' is-done' : ''}">${mark(i.done)}
+            <span><strong>${esc(i.label)}</strong><small>${esc(i.what)}${i.done === null ? '. Can’t tell from here yet' : ''}</small>
+            ${i.test ? '<button class="btn btn--outline btn--sm" type="button" data-su="test">Send a test email</button>' : ''}
+            ${i.go && i.done !== true ? `<button class="btn btn--ghost btn--sm" type="button" data-su="${i.go}">${i.go === 'mot' ? 'Open MOTs' : 'Open Invoice details'}</button>` : ''}</span>
+          </div>`).join('')}
+        </details>`;
+      }).join('')}
+      <p class="hint" style="margin-top:12px">Every step, with what to click, is in <strong>SWITCH-ON-GUIDE.md</strong> in the MbuWebsite folder on the Mac. Do them in order and check again after each.</p>
+      <button class="btn btn--outline btn--block" type="button" id="suCheck">Check again</button>`;
+    $('#suCheck').onclick = async () => {
+      const b = $('#suCheck'); b.disabled = true; b.textContent = 'Checking…';
+      await checkSchema();
+      b.disabled = false; b.textContent = 'Check again';
+      toast('Checked', 'ok');
+    };
+    $$('#setupBody [data-su]').forEach(b => b.onclick = async () => {
+      const what = b.dataset.su;
+      if (what === 'details') return invoiceSettingsSheet();
+      if (what === 'mot') { state.motTab = 'cal'; return go('motcal'); }
+      if (what === 'test') {
+        b.disabled = true; b.textContent = 'Sending…';
+        try {
+          const r = await callMail({ action: 'test' });
+          toast(r.status === 200 && r.data && r.data.ok ? `Sent. Look in ${r.data.to}’s inbox` : (r.data && r.data.error) || 'It didn’t send', r.status === 200 ? 'ok' : '');
+        } catch (err) { toast('It didn’t send: ' + err.message); }
+        b.disabled = false; b.textContent = 'Send a test email';
+      }
+    });
   }
 
   /* ---- Settings → Your own visits -------------------------------------------
@@ -539,9 +614,9 @@
   /* ---- Settings → Auto Trader ----------------------------------------- */
   function atIntro() {
     if (!AT || !AT.isEnabled()) {
-      $('#atStatus').innerHTML = `Not switched on yet. Once Auto Trader approve access, deploy the
-        <strong>autotrader</strong> function with your key and secret (HANDOVER 9f), tap Test,
-        then set <strong>enabled: true</strong> for autotrader in config.js.`;
+      $('#atStatus').innerHTML = `Not switched on. Auto Trader have to approve access first (ask your
+        Account Manager). Once they send a key and secret, Claude sets up the connection
+        (HANDOVER 9f) and this button checks it works.`;
     } else {
       $('#atStatus').textContent = 'Switched on. Tap Test to check the connection.';
     }
@@ -686,6 +761,8 @@
   // Screens that redraw themselves each time they're shown (coming back
   // from a sub-screen included), so a saved invoice is in the list at once
   const ON_SHOW = {};
+  // Opening the gear redraws Setup with the invoice details loaded (names, bank)
+  ON_SHOW.settings = () => { renderSetup(); if (INV) invoiceSettings().then(renderSetup, () => {}); };
 
   function go(view, opts) {
     opts = opts || {};
@@ -936,6 +1013,7 @@
       ${!insightsAt && insightsBusy ? '<p class="note home-note">Checking prices and interest…</p>' : ''}
 
       ${homeMoney()}
+      ${homeOwed()}
       ${homeStock()}
       ${homeMessages()}
       ${homeOldest()}`;
@@ -952,6 +1030,9 @@
     $$('#homeBody [data-hide]').forEach(b => b.onclick = e => { e.stopPropagation(); hideSheet(b.dataset.hide, b.dataset.what); });
     const hh = $('#hHidden');
     if (hh) hh.onclick = hiddenSheet;
+    $$('#homeBody [data-money]').forEach(b => b.onclick = () => moneySheet(b.dataset.money));
+    const oa = $('#hOwedAll');
+    if (oa) oa.onclick = () => { IV.tab = 'owed'; go('invoices'); };
     wireSiteBits(body);
     $$('#homeBody [data-go]').forEach(b => {
       b.onclick = () => {
@@ -968,7 +1049,8 @@
 
   /* ---- Which group a Needs you row goes in ------------------------------- */
   function homeWhen(x) {
-    if (['deliveries', 'messages', 'photos'].includes(x.key)) return 'today';
+    if (['deliveries', 'messages', 'photos', 'money'].includes(x.key)) return 'today';
+    if (x.key === 'moneysoon') return 'week';
     if (x.key === 'mot' || x.key === 'recs') return x.level === 'red' ? 'today' : x.level === 'grey' ? 'later' : 'week';
     if (['cat', 'unmargined', 'pxcar', 'drafts'].includes(x.key)) return 'week';
     return 'later';
@@ -1072,6 +1154,21 @@
       });
     if (drops.length) out.push({ key: 'deliveries', level: worst(drops), rank: 2, icon: 'car', single: 'item',
       title: counted(drops.length, 'delivery to do', 'deliveries to do'), sub: 'Mark each one delivered, then send the updated invoice', items: drops });
+
+    /* Money owed: a payment gone past its date (Today), then one due in the
+       next week (This week). Each opens the money sheet: remind, record it,
+       add the fee. Hidden per invoice and date, so the next one comes back. */
+    const owedRows = (status, words) => owedList([status]).map(x => ({ x, hid: 'money:' + x.inv.id + ':' + (x.m.due || '') }))
+      .filter(o => keep(o.hid, owedName(o.x.inv), owedWords(o.x.m)))
+      .map(({ x, hid }) => ({ level: status === 'late' ? 'red' : 'amber', hid, title: words(x), amount: x.m.now,
+        sub: [owedCar(x.inv), status === 'late' ? owedWords(x.m) : INV.numberLabel(x.inv.number), remindedWords(x.m)].filter(Boolean).join(' · '), run: () => moneySheet(x.r.id) }));
+    const late = owedRows('late', x => `${owedName(x.inv)}: ${owedMoney(x.m.now)} overdue`);
+    if (late.length) out.push({ key: 'money', level: 'red', rank: 2, icon: 'pound', single: 'item',
+      title: late.length === 1 ? '1 payment overdue' : `${late.length} customers behind with payments`,
+      sub: `${owedMoney(late.reduce((n, it) => n + it.amount, 0))} to chase. Remind them in one tap.`, items: late });
+    const soon = owedRows('soon', x => `${owedName(x.inv)}: ${owedMoney(x.m.nextAmount)} due ${owedWhen(x.m.due)}`);
+    if (soon.length) out.push({ key: 'moneysoon', level: 'amber', rank: 5, icon: 'pound', single: 'item',
+      title: counted(soon.length, 'payment due this week', 'payments due this week'), sub: 'A reminder the day before saves chasing later', items: soon });
 
     /* MOTs: run out, running out, and cars with no date, in one place */
     const motHid = c => 'mot:' + c.id + ':' + (c.mot_expiry ? String(c.mot_expiry).slice(0, 10) : 'none');
@@ -1295,6 +1392,39 @@
       </div>`;
   }
 
+  /** What customers still owe (and what's still to pay on cars you bought), from the invoices. */
+  function homeOwed() {
+    if (!state.schema.v10 || !INV) return '';
+    const all = owedList();
+    const outgoing = (IV.list || []).filter(r => r.status !== 'void' && r.kind === 'purchase' && Number(r.balance) > 0.004);
+    if (!all.length && !outgoing.length) return '';
+    const total = all.reduce((n, x) => n + x.m.balance, 0);
+    const late = all.filter(x => x.m.status === 'late');
+    const lateSum = late.reduce((n, x) => n + x.m.now, 0);
+    const next = all.filter(x => x.m.status !== 'late' && x.m.due).sort((a, b) => a.m.due.localeCompare(b.m.due))[0];
+    const first = inv => owedName(inv).split(/\s+/)[0];
+    const rows = all.slice(0, 4).map(x => `
+      <button class="home-msg home-owed" type="button" data-money="${esc(x.r.id)}">
+        <span class="home-msg-txt">
+          <span class="home-msg-top"><strong>${esc(owedName(x.inv))}</strong>${x.m.status === 'late'
+            ? `<span class="pill pill--red">${esc(owedMoney(x.m.now))} overdue</span>`
+            : `<span class="pill pill--${x.m.status === 'soon' ? 'amber' : 'grey'}">${esc(owedMoney(x.m.balance))} to come</span>`}</span>
+          <span class="home-msg-about">${esc([owedCar(x.inv), INV.numberLabel(x.inv.number)].filter(Boolean).join(' · '))}</span>
+          <span class="home-msg-snip">${esc([owedWords(x.m), remindedWords(x.m)].filter(Boolean).join(' · ').replace(/^./, c => c.toUpperCase()))}</span>
+        </span>
+      </button>`).join('');
+    return `
+      <h2 class="home-h">Money to come <button class="home-link" type="button" id="hOwedAll">Invoices</button></h2>
+      <div class="section-card home-money">
+        ${all.length ? `<div class="hm-label">Owed to you</div>
+        <div class="hm-figure">${esc(owedMoney(total))}</div>
+        <div class="hm-compare">On ${plural(all.length, 'invoice')}. ${late.length ? `<b class="down">${esc(owedMoney(lateSum))} of it is overdue.</b>` : 'Nothing overdue.'}
+          ${next ? `Next: ${esc(owedMoney(next.m.nextAmount))} from ${esc(first(next.inv))} ${esc(owedWhen(next.m.due))}.` : ''}</div>` : ''}
+        ${outgoing.length ? `<div class="hm-compare" style="margin-top:${all.length ? 8 : 0}px">You still owe ${esc(owedMoney(outgoing.reduce((n, r) => n + Number(r.balance), 0)))} on ${plural(outgoing.length, 'car')} you bought.</div>` : ''}
+      </div>
+      ${rows ? `<div class="card home-msgs">${rows}</div>` : ''}`;
+  }
+
   /** How much stock, what it's worth, and what's tied up in it. */
   function homeStock() {
     const live = state.cars.filter(inStock);
@@ -1512,18 +1642,33 @@
     chip.innerHTML = `${icon('calendar')} MOT due <b>${dueN}</b>`;
     const cars = all.filter(c => matchesQuery(c, q) && (!state.stockMot || motDue(c))).sort(SORTS[state.stockSort][1]);
 
-    // One line saying what you're looking at, and on In stock what it's worth
+    // What you're looking at, in a sentence or two (7 Oct 2026: plain words)
     const priced = cars.filter(c => c.price != null);
-    const worth = state.tab === 'available' && priced.length
-      ? ` · ${money(priced.reduce((n, c) => n + c.price, 0))} at asking` : '';
-    const summary = !all.length ? ''
-      : state.stockMot ? `${plural(cars.length, 'car')} with an MOT to see to (run out, due in 90 days, or no date)`
-      : q ? `${cars.length} of ${all.length} match “${q}”${worth}`
-      : `${plural(all.length, state.tab === 'sold' ? 'car sold' : state.tab === 'draft' ? 'draft' : 'car', state.tab === 'sold' ? 'cars sold' : undefined)}${worth}`;
-    // Mashallah beside what the stock is worth, as it is beside the money on Home
+    const worth = state.tab === 'available' && priced.length ? money(priced.reduce((n, c) => n + c.price, 0)) : '';
+    let summary = '', why = '';
+    if (!all.length) summary = '';
+    else if (state.stockMot) summary = esc(`${plural(cars.length, 'car')} with an MOT to see to: run out, due within 90 days, or no date yet. Tap the MOT on one to change it.`);
+    else if (q) summary = esc(`${cars.length} of ${all.length} match “${q}”${worth ? `, ${worth} at asking` : ''}.`);
+    else if (state.tab === 'available') {
+      const reserved = all.filter(c => c.status === 'reserved').length;
+      const oldest = all.slice().sort((a, b) => listedAt(a) - listedAt(b))[0];
+      summary = esc(`${plural(all.length, 'car')} for sale${reserved ? `, ${reserved} reserved` : ''}. ${worth} at their asking prices.`)
+        + (oldest && daysIn(oldest) >= 30 ? ' ' + esc(`The ${[oldest.make, oldest.model].filter(Boolean).join(' ')} has been in longest: ${daysIn(oldest)} days.`) : '');
+      why = 'asking';
+    } else if (state.tab === 'sold') {
+      const counted = all.filter(c => carMargin(c) != null);
+      const made = counted.reduce((n, c) => n + carMargin(c), 0);
+      const missing = all.filter(unmargined).length, waiting = all.filter(carried).length;
+      summary = esc(`${plural(all.length, 'car')} sold. ${counted.length ? `${signed(made)} made on the ${counted.length === all.length ? (all.length === 1 ? 'one' : 'lot') : counted.length + ' with every figure in'}.` : ''}`)
+        + (missing ? ' ' + esc(`${missing === 1 ? '1 is' : missing + ' are'} missing a figure: tap ${missing === 1 ? 'it' : 'one'} to fill it in.`) : '')
+        + (waiting ? ' ' + esc(`${waiting === 1 ? '1 part exchange waits' : waiting + ' part exchanges wait'} for their car to sell.`) : '');
+      why = 'margin';
+    } else summary = esc(`${plural(all.length, 'draft')}: bought, not on the website yet. Add the photos and a price, then Publish.`);
     const box = $('#stockSummary');
-    box.innerHTML = summary ? `<span>${esc(summary)}</span>${worth && !state.stockMot ? mashallah() : ''}` : '';
+    // Mashallah beside what the stock is worth, as it is beside the money on Home
+    box.innerHTML = summary ? `<span>${summary}${why ? ' ' + info(why) : ''}</span>${worth && !state.stockMot && !q ? mashallah() : ''}` : '';
     wireMashallah(box);
+    box.querySelectorAll('[data-explain]').forEach(b => b.onclick = e => { e.stopPropagation(); explain(b.dataset.explain); });
 
     if (state.view === 'home') renderHome();
 
@@ -1547,7 +1692,7 @@
       const sold = c.status === 'sold';
       const meta = [
         sold && c.sold_at ? 'Sold ' + shortDay(c.sold_at) : null,
-        !sold && c.status !== 'draft' ? plural(daysIn(c), 'day') + ' in stock' : null,
+        !sold && c.status !== 'draft' ? (daysIn(c) ? plural(daysIn(c), 'day') + ' in stock' : 'In today') : null,
         c.mileage != null ? Number(c.mileage).toLocaleString('en-GB') + ' mi' : null,
         !sold ? (imgs.length ? imgs.length + ' photo' + (imgs.length === 1 ? '' : 's') : 'No photos') : null,
         sold ? null : c.transmission && LABEL.transmission[c.transmission]
@@ -1569,8 +1714,8 @@
       const mg = sold ? carMargin(c) : null;
       const price = sold
         ? (mg != null ? `<span class="stock-price ${mg < 0 ? 'is-loss' : ''}">${signed(mg)}</span><span class="stock-price-note">margin</span>`
-           : carried(c) ? '<span class="stock-price is-px">Part exchange</span><span class="stock-price-note">profit on their car</span>'
-           : '<span class="stock-price is-missing">Figures missing</span>')
+           : carried(c) ? '<span class="stock-price is-px">Part exchange</span><span class="stock-price-note">profit when theirs sells</span>'
+           : `<span class="stock-price is-missing">${c.sale_price == null && c.purchase_price == null ? 'No figures yet' : c.sale_price == null ? 'No sale price' : c.purchase_price == null ? 'No purchase price' : 'Figures missing'}</span>`)
         : `<span class="stock-price">${money(c.price)}</span>`;
       const soldPill = sold && mg != null && c.prep_cost == null ? '<span class="pill pill--grey">No prep entered</span>' : '';
       // Taken in part exchange (its margin is the profit on both cars), or sold
@@ -1868,7 +2013,7 @@
         if (!px && !pxReady()) {
           const note = $('#fgPxNote');
           note.hidden = false;
-          note.innerHTML = 'Part exchange needs a one-off database update first: run <strong>schema-v8-part-exchange.sql</strong> (Settings, the gear at the top right → Ready to switch on).';
+          note.innerHTML = 'Part exchange needs a one-off database update first: run <strong>schema-v8-part-exchange.sql</strong> (the gear at the top right → Setup).';
           return;
         }
         setPx(!px);
@@ -2404,13 +2549,14 @@
           <h3>Add your photos</h3>
           <p>Pick them straight from your camera roll.<br>10 to 15 is plenty. They’re shrunk automatically.</p>
           <button class="btn btn--accent btn--block" type="button" id="pickBtn">Choose photos</button>
+          <button class="btn btn--ghost btn--block btn--sm" type="button" id="blurPick" style="margin-top:8px">${icon('blur')} A photo with something to hide</button>
         </div>`;
     } else {
       area.innerHTML = `
         <div class="photo-grid">
           ${state.photos.map((p, i) => `
             <div class="photo-item ${i === 0 ? 'is-main' : ''}" data-i="${i}">
-              <img src="${imgUrl(p, 300)}" alt="">
+              <img src="${imgUrl(p, 300)}" alt="" ${p.uploading ? '' : `data-photo="${i}"`}>
               ${i === 0 ? '<span class="photo-main-tag">MAIN</span>' : ''}
               ${p.uploading ? `<div class="photo-progress">${p.progress || 0}%</div>` : `
                 <div class="photo-actions">
@@ -2422,10 +2568,14 @@
         </div>
         <button class="btn btn--outline btn--block" type="button" id="pickBtn" style="margin-top:12px">
           ${icon('camera')} Add more photos
-        </button>`;
+        </button>
+        <button class="btn btn--ghost btn--block btn--sm" type="button" id="blurPick" style="margin-top:6px">${icon('blur')} A photo with something to hide</button>
+        <p class="hint" style="margin-top:4px;text-align:center">Tap any photo to blur part of it.</p>`;
     }
 
     $('#pickBtn').onclick = () => $('#photoInput').click();
+    $('#blurPick').onclick = () => $('#blurInput').click();
+    area.querySelectorAll('[data-photo]').forEach(img => img.onclick = () => photoSheet(+img.dataset.photo));
     area.querySelectorAll('[data-act]').forEach(btn => {
       btn.onclick = e => {
         e.stopPropagation();
@@ -2437,6 +2587,216 @@
         renderPhotos();
       };
     });
+  }
+
+  /* ---- One photo: blur part of it, make it the main one, delete it -------- */
+  function photoSheet(i) {
+    const p = state.photos[i];
+    if (!p || p.uploading) return;
+    const acts = [{ label: 'Blur part of it', icon: 'blur', sub: 'A plate, or a name and address on a letter', run: () => blurPhoto(i) }];
+    if (i > 0) acts.push({ label: 'Make it the main photo', icon: 'star', run: () => { state.photos.splice(i, 1); state.photos.unshift(p); state.dirty = true; renderPhotos(); } });
+    acts.push({ label: 'Delete it', icon: 'trash', danger: true, run: () => { state.photos.splice(i, 1); state.dirty = true; renderPhotos(); } });
+    sheet(i === 0 ? 'The main photo' : `Photo ${i + 1}`, '', acts);
+  }
+
+  /* ==========================================================================
+     BLUR PART OF A PHOTO (7 Oct 2026)
+     --------------------------------------------------------------------------
+     Optional, tucked away: Autotrader shows plates anyway, so most photos are
+     fine as they are. It's for the odd one: a service history letter with a
+     previous owner's name and address on it, or a plate now and then.
+
+     Drag boxes over what to hide; the blur is burned into a new copy of the
+     photo (so nothing can be "un-blurred" from the website), which is
+     uploaded and takes the old one's place. "A photo with something to hide"
+     blurs it before it ever goes up, which is the safer way for letters.
+     The old copy of a photo blurred after upload stays in Cloudinary's
+     library until it's deleted there: the app says so. */
+  const BLUR_MAX = 1800;
+
+  // The whole photo, uncropped, at the size the app uploads (photos are kept
+  // as { public_id }, or on older cars a plain address)
+  function fullPhotoUrl(p) {
+    if (p && p.localUrl) return p.localUrl;
+    const id = String((p && (p.public_id || p.url)) || p || '');
+    const t = `c_limit,w_${BLUR_MAX},h_${BLUR_MAX},q_auto:best,f_jpg`;
+    if (id.includes('res.cloudinary.com')) return id.replace(/\/upload\/(v\d+\/)?/, `/upload/${t}/$1`);
+    if (/^(https?:|blob:|data:)/.test(id)) return id;
+    return `https://res.cloudinary.com/${CFG.cloudinary.cloudName}/image/upload/${t}/${id}`;
+  }
+
+  async function blurPhoto(i) {
+    const p = state.photos[i];
+    const src = fullPhotoUrl(p);
+    const oldId = String((p && (p.public_id || p.url)) || p || '');
+    blurEditor(src, async ({ blob, width, height }) => {
+      const at = state.photos.indexOf(p);
+      if (at < 0) return;
+      const ph = { uploading: true, progress: 0, localUrl: URL.createObjectURL(blob) };
+      state.photos[at] = ph;
+      renderPhotos();
+      try {
+        const up = await uploadToCloudinary(blob, pct => { ph.progress = pct; const el = document.querySelector(`.photo-item[data-i="${state.photos.indexOf(ph)}"] .photo-progress`); if (el) el.textContent = pct + '%'; });
+        Object.assign(ph, up, { uploading: false, width, height });
+        URL.revokeObjectURL(ph.localUrl); delete ph.localUrl;
+        state.dirty = true;
+        renderPhotos();
+        if (oldId && !(p && p.localUrl)) msg('#formMsg', `<strong>Blurred.</strong> Save the car to put the new copy on the website. The old one is still in your Cloudinary library: if it showed something private, delete it there (Media Library → ${esc(oldId.replace(/^.*\/upload\/(v\d+\/)?/, '').replace(/\.[a-z]+$/i, ''))}).`, 'ok');
+        toast('Blurred. Save to keep it', 'ok');
+      } catch (err) {
+        state.photos[state.photos.indexOf(ph)] = p;   // put the original back
+        renderPhotos();
+        toast('The blurred copy didn’t upload: ' + (err.message || 'try again on wi-fi'));
+      }
+    });
+  }
+
+  // A new photo, blurred on this phone before it's uploaded
+  $('#blurInput').onchange = async e => {
+    const file = e.target.files && e.target.files[0];
+    $('#blurInput').value = '';
+    if (!file || !file.type.startsWith('image/')) return;
+    try {
+      const { blob } = await compress(file, BLUR_MAX, 0.9);
+      const url = URL.createObjectURL(blob);
+      blurEditor(url, async ({ blob: out, width, height }) => {
+        URL.revokeObjectURL(url);
+        const ph = { uploading: true, progress: 0, localUrl: URL.createObjectURL(out) };
+        state.photos.push(ph);
+        renderPhotos();
+        try {
+          const up = await uploadToCloudinary(out, pct => { ph.progress = pct; });
+          Object.assign(ph, up, { uploading: false, width, height });
+          URL.revokeObjectURL(ph.localUrl); delete ph.localUrl;
+          state.dirty = true;
+          toast('Added, blurred', 'ok');
+        } catch (err) {
+          state.photos = state.photos.filter(x => x !== ph);
+          toast('It didn’t upload: ' + (err.message || 'try again on wi-fi'));
+        }
+        renderPhotos();
+      }, () => URL.revokeObjectURL(url));
+    } catch (err) { toast(err.message || 'Couldn’t read that photo'); }
+  };
+
+  /** The editor: the photo, boxes dragged with a finger, then the blur burned in. */
+  function blurEditor(src, onDone, onCancel) {
+    const ed = document.createElement('div');
+    ed.className = 'blur-ed';
+    ed.innerHTML = `
+      <div class="blur-top">
+        <button type="button" class="blur-btn" data-b="cancel">Cancel</button>
+        <strong>Blur part of it</strong>
+        <button type="button" class="blur-btn blur-btn--go" data-b="save" disabled>Blur</button>
+      </div>
+      <div class="blur-stage"><div class="blur-wrap"><img alt="The photo" draggable="false"><div class="blur-boxes"></div></div>
+        <div class="blur-loading">Loading the photo…</div></div>
+      <div class="blur-foot">
+        <p>Drag a box over anything to hide: a plate, a name, an address. As many as you like.</p>
+        <button type="button" class="blur-btn" data-b="undo" disabled>Undo the last box</button>
+      </div>`;
+    document.body.appendChild(ed);
+    document.body.classList.add('blur-open');
+    const img = ed.querySelector('img'), wrap = ed.querySelector('.blur-wrap'), layer = ed.querySelector('.blur-boxes');
+    const saveBtn = ed.querySelector('[data-b=save]'), undoBtn = ed.querySelector('[data-b=undo]');
+    const boxes = [];   // fractions of the photo: { x, y, w, h }
+    let fit = () => {};
+    const close = () => { window.removeEventListener('resize', fit); ed.remove(); document.body.classList.remove('blur-open'); };
+
+    const draw = () => {
+      layer.innerHTML = boxes.map((b, i) => `<div class="blur-box" style="left:${b.x * 100}%;top:${b.y * 100}%;width:${b.w * 100}%;height:${b.h * 100}%">
+        <button type="button" data-x="${i}" aria-label="Remove this box">×</button></div>`).join('');
+      layer.querySelectorAll('[data-x]').forEach(b => b.onpointerdown = e => { e.stopPropagation(); boxes.splice(+b.dataset.x, 1); draw(); });
+      saveBtn.disabled = !boxes.length;
+      undoBtn.disabled = !boxes.length;
+    };
+
+    // Fit the photo to the space left between the bars
+    fit = () => {
+      if (!img.naturalWidth) return;
+      const stage = ed.querySelector('.blur-stage'), cs = getComputedStyle(stage);
+      const room = (side, a, b) => side - parseFloat(cs[a]) - parseFloat(cs[b]);
+      const k = Math.min(room(stage.clientWidth, 'paddingLeft', 'paddingRight') / img.naturalWidth, room(stage.clientHeight, 'paddingTop', 'paddingBottom') / img.naturalHeight);
+      wrap.style.width = Math.round(img.naturalWidth * k) + 'px';
+      wrap.style.height = Math.round(img.naturalHeight * k) + 'px';
+    };
+    img.crossOrigin = 'anonymous';   // Cloudinary allows it; without it the canvas can't be saved
+    img.onload = () => { ed.querySelector('.blur-loading').remove(); fit(); };
+    img.onerror = () => { close(); toast('Couldn’t load the photo. Check the signal and try again'); if (onCancel) onCancel(); };
+    img.src = src;
+    window.addEventListener('resize', fit);
+
+    // Drag out a box
+    let start = null, live = null;
+    const at = e => { const r = wrap.getBoundingClientRect(); return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) }; };
+    wrap.onpointerdown = e => {
+      if (!img.naturalWidth) return;
+      e.preventDefault();
+      wrap.setPointerCapture(e.pointerId);
+      start = at(e);
+      live = document.createElement('div');
+      live.className = 'blur-box is-live';
+      layer.appendChild(live);
+    };
+    wrap.onpointermove = e => {
+      if (!start) return;
+      const p = at(e);
+      Object.assign(live.style, { left: Math.min(p.x, start.x) * 100 + '%', top: Math.min(p.y, start.y) * 100 + '%',
+        width: Math.abs(p.x - start.x) * 100 + '%', height: Math.abs(p.y - start.y) * 100 + '%' });
+    };
+    wrap.onpointerup = wrap.onpointercancel = e => {
+      if (!start) return;
+      const p = at(e);
+      const b = { x: Math.min(p.x, start.x), y: Math.min(p.y, start.y), w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y) };
+      start = null;
+      if (b.w * wrap.clientWidth > 10 && b.h * wrap.clientHeight > 10) boxes.push(b);   // a tap isn't a box
+      draw();
+    };
+
+    ed.querySelector('[data-b=cancel]').onclick = () => { close(); if (onCancel) onCancel(); };
+    undoBtn.onclick = () => { boxes.pop(); draw(); };
+    saveBtn.onclick = async () => {
+      saveBtn.disabled = true; saveBtn.textContent = 'Blurring…';
+      try {
+        const out = await burnBlur(img, boxes);
+        close();
+        onDone(out);
+      } catch (err) {
+        console.error(err);
+        saveBtn.disabled = false; saveBtn.textContent = 'Blur';
+        toast('Couldn’t blur it: ' + (err.message || 'try again'));
+      }
+    };
+  }
+
+  /* Each box is averaged into big blocks and smoothed, so what was there
+     can't be read or rebuilt: blocks a third of the box's shorter side
+     (never under 12px) leave under two blocks per letter on a plate. A
+     little extra is taken round the edge. */
+  function burnBlur(img, boxes) {
+    const k = Math.min(1, BLUR_MAX / Math.max(img.naturalWidth, img.naturalHeight));
+    const W = Math.round(img.naturalWidth * k), H = Math.round(img.naturalHeight * k);
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0, W, H);
+    for (const b of boxes) {
+      const pad = Math.round(Math.min(b.w * W, b.h * H) * 0.06);
+      const x = Math.max(0, Math.round(b.x * W) - pad), y = Math.max(0, Math.round(b.y * H) - pad);
+      const w = Math.min(W - x, Math.round(b.w * W) + 2 * pad), h = Math.min(H - y, Math.round(b.h * H) + 2 * pad);
+      if (w < 2 || h < 2) continue;
+      const block = Math.max(12, Math.round(Math.min(w, h) / 3));
+      const small = document.createElement('canvas');
+      small.width = Math.max(1, Math.ceil(w / block)); small.height = Math.max(1, Math.ceil(h / block));
+      const sc = small.getContext('2d');
+      sc.imageSmoothingEnabled = true; sc.imageSmoothingQuality = 'high';
+      sc.drawImage(c, x, y, w, h, 0, 0, small.width, small.height);
+      ctx.save();
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(small, 0, 0, small.width, small.height, x, y, w, h);
+      ctx.restore();
+    }
+    return new Promise((resolve, reject) => c.toBlob(blob => blob ? resolve({ blob, width: W, height: H }) : reject(new Error('Couldn’t make the photo')), 'image/jpeg', 0.88));
   }
 
   /* ==========================================================================
@@ -3532,7 +3892,9 @@
       sb.from('wanted_requests').select('id,created_at,kind,car_id,name,make,model,transmission,fuel,budget_max,is_read,archived')
         .gte('created_at', since).order('created_at', { ascending: false }).limit(400)
     ]);
-    return { enquiries: e.error ? [] : (e.data || []), requests: r.error ? [] : (r.data || []) };
+    // A failed load must not read as "no messages": need() keeps it as unknown
+    if (e.error || r.error) throw (e.error || r.error);
+    return { enquiries: e.data || [], requests: r.data || [] };
   }
 
   /* The windows the summary compares: the last 7 days up to now, and the 7
@@ -3590,7 +3952,7 @@
   /* What each figure means, behind the ⓘ beside it */
   const EXPLAIN = {
     views: ['Page views', 'Every time a page of the website is opened. One person looking at three cars is three views, and opening the same page again counts again. Your own phones are left out once they’re marked (gear → Don’t count this phone).'],
-    people: ['People', 'Each visitor counted once a day, however many pages they open. There are no cookies: a code is made from their connection and phone that changes every day, so nobody can be followed, and the same person on two different days counts twice. Bots are left out. Needs the visitor counter switched on (gear → Ready to switch on).'],
+    people: ['People', 'Each visitor counted once a day, however many pages they open. There are no cookies: a code is made from their connection and phone that changes every day, so nobody can be followed, and the same person on two different days counts twice. Bots are left out. Needs the visitor counter switched on (gear → Setup).'],
     taps: ['Taps to get in touch', 'Someone tapped WhatsApp, Call or Email on the website. A tap opens WhatsApp or the phone’s dialler: whether they then sent a message or rang, the website can’t know. Forms that did arrive are in your Inbox, and are shown alongside.'],
     photos: ['Opened the photos', 'Tapped into the big photo viewer on a car’s page. Someone who does that is looking properly, not just passing.'],
     messages: ['Messages', 'Forms sent from the website: questions about a car, part exchanges, sell your car, finance. They’re in your Inbox. Messages sent straight on WhatsApp, and phone calls, never pass through the website, so they can’t be counted here.'],
@@ -3598,6 +3960,8 @@
     busy: ['Busier than most', 'Compared with the typical car in stock over the same days: the one in the middle when they’re put in order of views. Twice the views or more is one of your busiest; half or less is quieter than most.'],
     funnel: ['From looking to buying', 'How far people got with this car. Each step is out of the views at the top. Lots of views but few photo opens usually means the first photo or the price in the list isn’t pulling people in; lots of photo opens but no taps points at the price or something in the details.'],
     places: ['Which button', 'Where the WhatsApp, Call or Email button was: the top bar and bottom bar are on every page, the price box is on each car’s page.'],
+    asking: ['At asking prices', 'What the cars for sale add up to at the prices on the website. What you’d take is usually a little less. What’s tied up in them (what you paid, plus prep) is on Home under Money tied up.'],
+    margin: ['What you made', 'For each sold car: what it sold for, less what you paid and the prep. A car with a figure missing is left out until it’s filled in (tap it, then Edit the figures), so the total is never a guess. On a part exchange, the profit counts when their car sells, so it’s never counted twice.'],
     counting: ['How the website is counted', 'No cookies and nothing stored on customers’ phones. Page views count every time a page opens. Once the visitor counter is on, people are counted once a day each and bots are left out. Your own phones are left out once marked.']
   };
   const info = key => `<button class="info" type="button" data-explain="${key}" aria-label="What this means">i</button>`;
@@ -3608,7 +3972,9 @@
   }
 
   /* ---- Messages for a car or a stretch of time --------------------------- */
-  const messagesFor = (msgs, carId) => ((msgs && msgs.enquiries) || []).filter(e => String(e.car_id || '') === String(carId));
+  // The last 60 days' (archived too), and older ones still in the Inbox, once each
+  const messagesFor = (msgs, carId) => ((msgs && msgs.enquiries) || []).concat(state.enquiries)
+    .filter((e, i, all) => String(e.car_id || '') === String(carId) && all.findIndex(x => x.id === e.id) === i);
   const inWindow = (list, from, to) => (list || []).filter(x => { const t = new Date(x.created_at); return t >= from && (!to || t < to); });
 
   /* ==========================================================================
@@ -3712,7 +4078,7 @@
       <div class="card-head"><h2>Last 7 days</h2>${home ? `<button class="home-link" type="button" data-week="${more}">More</button>` : ''}</div>
       ${lines || (loading ? '<div class="skel" style="height:60px"></div>' : '<p class="note">Nothing to report yet.</p>')}
       ${loading && lines ? '<p class="note">Adding up the website…</p>' : ''}
-      ${!v14 && !home ? '<p class="note">Website figures need <b>schema-v14-site-analytics.sql</b> run in Supabase (gear → Ready to switch on).</p>' : ''}
+      ${!v14 && !home ? '<p class="note">Website figures need <b>schema-v14-site-analytics.sql</b> run in Supabase (gear → Setup).</p>' : ''}
       ${act ? `<button class="btn btn--accent btn--sm btn--block week-go" type="button" data-week="${go}">${esc(act.label)} ${icon('right')}</button>` : ''}
     </div>`;
   }
@@ -3850,7 +4216,7 @@
     const s = [...siteGot.values()].map(x => x.data).find(d => d && d.days);
     if (!s) return '';
     const bits = [];
-    if (!s.v2_since) bits.push('Counting page views. Switch on the visitor counter (gear → Ready to switch on) to count people and leave bots out.');
+    if (!s.v2_since) bits.push('Counting page views. Switch on the visitor counter (gear → Setup) to count people and leave bots out.');
     else bits.push(`Counting people since ${shortDay(s.v2_since)}${s.bots ? `, with ${nf(s.bots)} bot visit${s.bots === 1 ? '' : 's'} left out` : ''}.`);
     if (s.pages_since) bits.push(`Every page counted since ${shortDay(s.pages_since)}; before that, car pages only.`);
     return `<p class="note counting">${info('counting')} ${esc(bits.join(' '))}</p>`;
@@ -3998,7 +4364,8 @@
   function priceHistory(car) {
     return need('ph:' + car.id, async () => {
       const { data, error } = await sb.from('price_history').select('*').eq('car_id', car.id).order('changed_at', { ascending: true });
-      return error ? [] : (data || []);
+      // Real changes only: not the first price it went on at, nor a save that kept it
+      return error ? [] : (data || []).filter(x => x.old_price != null && x.new_price != null && x.old_price !== x.new_price);
     }, 600000);
   }
 
@@ -4030,9 +4397,7 @@
     }
 
     const since = new Date(listedAt(car));
-    const enqs = messagesFor(msgs, car.id).concat(state.enquiries.filter(e => String(e.car_id) === String(car.id)))
-      .filter((e, i, all) => all.findIndex(x => x.id === e.id) === i)
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const enqs = messagesFor(msgs, car.id).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     const soldSame = soldLike(car), achieved = averageAchieved(soldSame);
 
     box.innerHTML = `
@@ -4365,7 +4730,7 @@
     </div>`;
     if (data === undefined) return head + '<div class="section-card"><div class="skel" style="height:220px"></div></div>';
     if (data === null) {
-      return head + `<div class="msg msg--warn is-shown">Website figures need <b>schema-v14-site-analytics.sql</b> run in Supabase (gear → Ready to switch on). It adds every page and every tap, and the totals by day, week and month.</div>`;
+      return head + `<div class="msg msg--warn is-shown">Website figures need <b>schema-v14-site-analytics.sql</b> run in Supabase (gear → Setup). It adds every page and every tap, and the totals by day, week and month.</div>`;
     }
 
     const buckets = webBuckets(data.days || [], scale);
@@ -5034,7 +5399,7 @@
     </div>`;
   }
 
-  const ordinal = n => n + (n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th');
+  const ordinal = n => n + ([11, 12, 13].includes(n % 100) ? 'th' : n % 10 === 1 ? 'st' : n % 10 === 2 ? 'nd' : n % 10 === 3 ? 'rd' : 'th');
 
   /** Hover, focus and tap for every chart inside `root`. */
   function wireCharts(root) {
@@ -6598,6 +6963,83 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     };
   }
   $('#invoiceSettingsBtn').onclick = () => invoiceSettingsSheet();
+  $('#businessBtn').onclick = () => businessSheet();
+
+  /* ---- Business details, in one place (7 Oct 2026) --------------------------
+     Every detail a customer sees, where they see it, the website's and the
+     invoices' side by side. The website's live in config.js (a change there
+     is a push); the invoices' are typed in Invoice details and shared by both
+     phones. Where the two disagree it says so, with "Use the website's". */
+  async function businessSheet() {
+    const s = await invoiceSettings();
+    const B = CFG.business || {};
+    const flat = v => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const digits = v => { const d = String(v || '').replace(/\D/g, ''); return d.startsWith('44') ? '0' + d.slice(2) : d; };
+    const siteAddress = [B.addressLine, B.town, B.postcode].filter(Boolean).join(', ');
+    const site = String((CFG.options && CFG.options.siteUrl) || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const sellers = s.sellers || [];
+    const fin = (CFG.finance && CFG.finance.advert) || {};
+    const rv = CFG.reviews || {};
+    const fixes = [];   // [what, invoice setting key, website value]
+    const row = (k, v, where, flag) => `<div class="bd-row"><div class="bd-k">${esc(k)}</div><div class="bd-v">${v ? esc(v) : '<em>Not filled in</em>'}
+      <small>${esc(where)}</small>${flag ? `<span class="bd-flag">${icon('alert')}${esc(flag)}</span>` : ''}</div></div>`;
+
+    const siteNumberOnInvoices = sellers.some(x => digits(x.phone) === digits(B.phone));
+    const emailDiffers = s.email && B.email && flat(s.email) !== flat(B.email);
+    const addressDiffers = s.address && siteAddress && flat(s.address) !== flat(siteAddress);
+    const siteDiffers = s.website && site && flat(s.website) !== flat(site);
+    if (emailDiffers) fixes.push(['email', 'email', B.email]);
+    if (addressDiffers) fixes.push(['address', 'address', siteAddress]);
+    if (siteDiffers) fixes.push(['website', 'website', site]);
+    // "3 October 2026", as config.js has it (Safari can't read that with new Date)
+    const checked = /^(\d{1,2}) ([A-Za-z]+) (\d{4})$/.exec(String(rv.checked || '').trim());
+    const monthAt = checked ? ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].indexOf(checked[2].slice(0, 3).toLowerCase()) : -1;
+    const reviewsAge = monthAt >= 0 ? Math.round((Date.now() - new Date(+checked[3], monthAt, +checked[1])) / DAY) : null;
+
+    const box = sheetHtml('Business details', 'What customers see, and where. Website and invoices side by side.', `
+      ${fixes.length ? `<div class="msg msg--warn is-shown" style="margin-bottom:12px"><strong>${fixes.length === 1 ? 'One thing differs' : fixes.length + ' things differ'}</strong> between the website and your invoices: ${fixes.map(f => f[0]).join(', ')}.
+        <button class="btn btn--outline btn--sm btn--block" type="button" id="bdFix" style="margin-top:10px">Use the website’s on invoices too</button></div>` : ''}
+      <div class="section-card">
+        <h2>Phone numbers</h2>
+        ${row('On the website', ukPhone(B.phone), 'Header, footer, Contact, Find us, and every Call button')}
+        ${row('WhatsApp', B.whatsapp ? ukPhone('+' + B.whatsapp) : '', 'Every WhatsApp button on the website, and messages about a car')}
+        ${sellers.map((x, i) => row(`On invoices${sellers.length > 1 ? ' (' + (i + 1) + ')' : ''}`, [x.name, x.phone].filter(Boolean).join(' · '),
+          'Sales contact on the invoice, the email’s sign-off, payment reminders', x.name ? '' : 'No name: invoices just show the number')).join('')}
+        ${!siteNumberOnInvoices && B.phone ? '<p class="hint" style="margin:8px 0 0">The website’s number isn’t one of the invoice numbers. That’s fine if it’s meant to be.</p>' : ''}
+      </div>
+      <div class="section-card">
+        <h2>Email, address, website</h2>
+        ${row('Email (website)', B.email, 'Footer and Contact; where the website’s forms are sent')}
+        ${row('Email (invoices)', s.email, 'The foot of every invoice, and the cancelling term on delivered cars', emailDiffers ? 'Not the same as the website' : '')}
+        ${row('Address (website)', siteAddress, 'Footer, Contact, Find us and the map')}
+        ${row('Address (invoices)', s.address, 'Seller address on every invoice', addressDiffers ? 'Not the same as the website' : '')}
+        ${row('Website (invoices)', s.website, 'The footer of every invoice', siteDiffers ? 'Not the same as the website’s own address' : '')}
+      </div>
+      <div class="section-card">
+        <h2>On invoices only</h2>
+        ${row('Company', [s.legal_name, s.company_number ? 'no. ' + s.company_number : ''].filter(Boolean).join(', '), s.company_default ? 'In the footer of every invoice' : 'In the footer when ticked on an invoice')}
+        ${row('Bank', s.bank_sort && s.bank_account ? `${s.bank_name || s.legal_name} · ${s.bank_sort} · ••••${String(s.bank_account).slice(-4)}` : '', 'How to pay, on invoices and in payment reminders', s.bank_sort && s.bank_account ? '' : 'Without it, customers have to ask how to pay')}
+        ${row('Missed-payment fee', INV.lateFee(s) ? INV.gbp(INV.lateFee(s)) : 'None', 'Pay monthly agreements, and the fee the app can add')}
+        ${row('VAT', s.vat_registered ? (s.vat_number || 'Registered, no number yet') : 'Not VAT registered', 'Invoices: the margin scheme wording when registered')}
+      </div>
+      <div class="section-card">
+        <h2>On the website only</h2>
+        ${row('Opening hours', (B.openingHours || []).length ? B.openingHours[0].hours + ' weekdays' : '', 'Contact and the footer')}
+        ${row('Reviews', rv.enabled ? `${rv.rating} from ${rv.count} on ${rv.source || 'Autotrader'}` : 'Off', `Homepage. Copied by hand, last checked ${rv.checked || 'never'}`, reviewsAge != null && reviewsAge > 31 ? `Checked ${reviewsAge} days ago: worth a fresh look` : '')}
+        ${row('Instagram', B.instagram ? B.instagram.replace(/^https?:\/\/(www\.)?/, '') : '', 'Footer, and the posts on the homepage once Behold is set up')}
+        ${row('Finance company', fin.firmName ? `${fin.firmName}${fin.fcaNumber ? ', FRN ' + fin.fcaNumber : ''}` : '', 'Under the finance advert and in every page’s footer', fin.enabled && !(fin.firmName && fin.fcaNumber && fin.statement) ? 'The advert is on without their details: waiting on the finance company' : '')}
+      </div>
+      <button class="btn btn--accent btn--block" type="button" id="bdEdit">Change the invoice details</button>
+      <p class="hint" style="margin-top:10px">The website’s details live in <strong>config.js</strong>. Ask Claude to change one, then push.</p>`);
+    box.querySelector('#bdEdit').onclick = () => { closeSheet(); setTimeout(invoiceSettingsSheet, 180); };
+    const fx = box.querySelector('#bdFix');
+    if (fx) fx.onclick = async () => {
+      const next = {};
+      fixes.forEach(([, key, value]) => { next[key] = value; });
+      closeSheet();
+      await saveInvoiceSettings(next);
+    };
+  }
   // "305466" or "30 54 66" → "30-54-66"
   const sortCode = v => { const d = String(v || '').replace(/\D/g, ''); return d.length === 6 ? d.replace(/(\d\d)(\d\d)(\d\d)/, '$1-$2-$3') : String(v || '').trim(); };
 
@@ -6769,7 +7211,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     const sellerIdx = sellers.findIndex(x => x.name === (inv.seller || {}).name && x.phone === (inv.seller || {}).phone);
 
     $('#invForm').innerHTML = `
-      ${state.schema.v10 === false ? `<div class="msg msg--warn is-shown">Invoices aren’t being kept yet. You can make, send and print this one, but it won’t be in the list afterwards until <strong>schema-v10-invoices.sql</strong> is run (Settings → Ready to switch on).</div>` : ''}
+      ${state.schema.v10 === false ? `<div class="msg msg--warn is-shown">Invoices aren’t being kept yet. You can make, send and print this one, but it won’t be in the list afterwards until <strong>schema-v10-invoices.sql</strong> is run (gear → Setup).</div>` : ''}
       <div class="section-card">
         <h2>What’s it for?</h2>
         <div class="chips" id="invKinds">${INV.KIND_ORDER.map(key => `<button class="chip${inv.kind === key ? ' is-on' : ''}" type="button" data-kind="${key}">${esc(INV.KINDS[key].label)}</button>`).join('')}</div>
@@ -6972,6 +7414,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       (t.px ? line('Part exchange', INV.gbp(-t.px)) : '') +
       line(purchase ? 'To pay them' : 'To pay', INV.gbp(t.due)) +
       line(purchase ? 'Paid to them' : 'Paid', INV.gbp(t.paid)) +
+      (t.fees ? line('Missed-payment fees', INV.gbp(t.fees)) : '') +
       line(t.balance < -0.004 ? 'Paid too much' : 'Left to pay', t.balance > 0.004 ? INV.gbp(t.balance) : t.balance < -0.004 ? INV.gbp(-t.balance) : 'Nothing, paid in full',
         'ml--total ' + (t.balance < -0.004 ? 'ml--bad' : t.balance > 0.004 ? '' : 'ml--good'));
 
@@ -6993,9 +7436,12 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       ${rows.length ? `<table class="inv-sched"><thead><tr><th>#</th><th>Due</th><th>Amount</th></tr></thead><tbody>
         ${rows.map((r, i) => `<tr${r.paid_on ? ' class="is-paid"' : ''}><td>${i + 1}</td>
           <td>${edited ? `<input class="in in--sm" type="date" data-row="${i}" data-f="due" value="${esc(r.due)}">` : esc(INV.ukDate(r.due))}</td>
-          <td>${edited ? `<input class="in in--sm" data-row="${i}" data-f="amount" inputmode="decimal" value="${esc(r.amount)}">` : esc(INV.gbp(r.amount))}${r.paid_on ? ` <span class="pill pill--green">Paid</span>` : ''}</td></tr>`).join('')}
+          <td>${edited ? `<input class="in in--sm" data-row="${i}" data-f="amount" inputmode="decimal" value="${esc(r.amount)}">` : esc(INV.gbp(r.amount))}${r.paid_on ? ` <span class="pill pill--green">Paid</span>` : inv.id && r.due < INV.today() ? ` <span class="pill pill--red">Late</span>` : ''}</td></tr>`).join('')}
         </tbody></table>
-        <button class="btn btn--ghost btn--sm" type="button" id="ipEdit">${edited ? 'Work them out again' : 'Change a date or amount'}</button>` : ''}`;
+        <button class="btn btn--ghost btn--sm" type="button" id="ipEdit">${edited ? 'Work them out again' : 'Change a date or amount'}</button>` : ''}
+      ${(inv.fees || []).length ? `<div class="inv-fees"><strong>Missed-payment fees</strong>
+        ${inv.fees.map((f, i) => `<div class="inv-fee"><span>${esc(INV.gbp(f.amount))} for the payment due ${esc(INV.ukDate(f.due))}<small>Added ${esc(INV.ukDate(f.added))}</small></span>
+          <button class="btn btn--ghost btn--sm" type="button" data-fee-off="${i}">Take it off</button></div>`).join('')}</div>` : ''}`;
     $$('#invPlan [data-row]').forEach(el => el.oninput = () => {
       const r = inv.plan.rows[+el.dataset.row];
       r[el.dataset.f] = el.dataset.f === 'amount' ? (num(el.value) || 0) : el.value;
@@ -7003,6 +7449,13 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       refreshInvoiceLive(true);
       // The rows being typed in stay put; only the warnings above them redraw
       $('#invPlanWarn').innerHTML = planWarnings(INV.warnings(inv, IV.settings).filter(w => w.field === 'plan'));
+    });
+    // Waived, or added by mistake: off it comes, and off the next copy
+    $$('#invPlan [data-fee-off]').forEach(b => b.onclick = () => {
+      inv.fees.splice(+b.dataset.feeOff, 1);
+      state.dirty = true;
+      refreshInvoiceLive();
+      toast('Fee taken off. Save to keep it that way', 'ok');
     });
     const ed = $('#ipEdit');
     if (ed) ed.onclick = () => {
@@ -7297,7 +7750,10 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
 
     if (SELLS_A_CAR.includes(inv.kind)) {
       asked.add(key);
-      const price = Number(inv.price) > 0 ? Number(inv.price) : null;
+      // What the car went for: its price on the invoice, less any discount line
+      // (delivery and extras aren't the car, so they stay out)
+      const off = INV.totals(inv).extras.filter(x => x.amount < 0).reduce((n, x) => n + x.amount, 0);
+      const price = Number(inv.price) > 0 ? Math.round(Number(inv.price) + off) : null;
       const pxOn = inv.px && inv.px.on && Number(inv.px.allowance) > 0;
       const pxCash = pxOn && price != null ? Math.max(0, price - Number(inv.px.allowance)) : null;
       sheet(`Mark the ${carTitle(car)} sold?`,
@@ -7331,6 +7787,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     go('invprev', { title: INV.numberLabel(inv.number) || 'Check and send' });
     renderPreview();
     makePdf();
+    // Redrawn only if it changes the button, and never under a finger typing in the email
+    mailStatus().then(m => { if (state.view === 'invprev' && m.configured && !$('#invPrev').contains(document.activeElement)) renderPreview(); });
   }
 
   function renderPreview() {
@@ -7338,6 +7796,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     const doc = INV.buildDoc(inv, IV.settings);
     const warns = INV.warnings(inv, IV.settings);
     const canShare = !!(navigator.canShare && window.File);
+    const direct = !!(state.mail && state.mail.configured);   // the send-email function is set up
     $('#invPrev').innerHTML = `
       ${warns.length ? `<div class="section-card inv-warns">
         <h2>Worth a look first</h2>
@@ -7353,12 +7812,15 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
           <button class="btn btn--outline btn--sm" type="button" id="emCopy">Copy</button></div></div>
         <div class="f"><label for="emSubject">Subject</label><input class="in" id="emSubject" value="${esc(inv.email.subject)}"></div>
         <div class="f" style="margin-bottom:0"><label for="emBody">Message</label><textarea class="ta" id="emBody" rows="10">${esc(inv.email.body)}</textarea></div>
-        <p class="hint" style="margin-top:10px">${canShare
+        <p class="hint" style="margin-top:10px">${direct
+          ? `<strong>Send it</strong> emails it from ${esc(state.mail.from)} with the PDF attached, this subject and this message. A copy goes in Gmail’s Sent, and replies come back there.`
+          : canShare
           ? `<strong>Email it</strong> opens your phone’s share sheet with the PDF attached and this message written. Pick Gmail or Mail, then paste their address into To (it’s copied for you).${IOS ? ' Gmail on iPhone takes its subject from the first line, so the subject goes in as the first line too.' : ''}`
           : '<strong>Email it</strong> downloads the PDF and opens your email with the address and message filled in. Attach the PDF from Downloads.'}</p>
         <button class="btn btn--ghost btn--sm" type="button" id="emReset">Put the standard message back</button>
+        ${direct && canShare ? '<button class="btn btn--ghost btn--sm" type="button" id="emShare">Use the share sheet instead</button>' : ''}
       </div>
-      ${inv.sent && inv.sent.length ? `<p class="hint" style="margin:12px 4px 0">${inv.sent.slice(-3).map(x => `${x.via === 'print' ? 'Printed or saved' : 'Shared'} ${esc(ago(x.at))}${x.to ? ' · ' + esc(x.to) : ''}`).join('<br>')}</p>` : ''}`;
+      ${inv.sent && inv.sent.length ? `<p class="hint" style="margin:12px 4px 0">${inv.sent.slice(-3).map(x => `${x.via === 'print' ? 'Printed or saved' : x.via === 'app' ? 'Sent from the app' : 'Shared'} ${esc(ago(x.at))}${x.to ? ' · ' + esc(x.to) : ''}`).join('<br>')}</p>` : ''}`;
     fitPaper();
     $('#invPaper').onclick = () => { $('#invPaper').classList.toggle('is-zoomed'); fitPaper(); };
     ['emTo', 'emSubject', 'emBody'].forEach(id => $('#' + id).oninput = () => {
@@ -7374,6 +7836,9 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       navigator.clipboard.writeText(to).then(() => toast('Copied: paste it into To', 'ok'), () => toast('Couldn’t copy it: type it into To'));
     };
     $('#emReset').onclick = () => { const e = INV.emailText(inv, IV.settings); inv.email = { to: $('#emTo').value.trim(), subject: e.subject, body: e.body }; renderPreview(); };
+    const es = $('#emShare');
+    if (es) es.onclick = () => shareInvoice();
+    $('#prevSendBtn').textContent = direct ? 'Send it' : 'Email it';
     $('#prevSendBtn').disabled = $('#prevPrintBtn').disabled = !IV.pdf;
   }
 
@@ -7445,7 +7910,82 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 
-  $('#prevSendBtn').onclick = async () => {
+  $('#prevSendBtn').onclick = () => state.mail && state.mail.configured ? confirmSend() : shareInvoice();
+
+  /* ---- Sending from the app (7 Oct 2026) -----------------------------------
+     With the send-email function deployed and the Gmail app password in its
+     secrets, Send it emails the invoice from mbusales39@gmail.com itself:
+     their address, the subject and the PDF all in, a copy in Gmail's Sent.
+     Until then, or if Gmail says no, the share sheet as before. */
+  async function callMail(body) {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) throw new Error('Your session has expired. Sign in again.');
+    const res = await fetch(CFG.supabase.url.replace(/\/$/, '') + '/functions/v1/send-email', {
+      method: 'POST', cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: 'Bearer ' + session.access_token },
+      body: JSON.stringify(body)
+    });
+    let data = null;
+    try { data = await res.json(); } catch { /* not JSON */ }
+    // Supabase's own "no such function" has no `error` of ours in it
+    return { status: res.status, data, deployed: !(res.status === 404 && !(data && data.error)) };
+  }
+
+  /** Is sending from the app set up? Asked once every ten minutes at most. */
+  async function mailStatus(force) {
+    if (state.mail && !force && Date.now() - state.mail.at < 10 * 60 * 1000) return state.mail;
+    const s = { at: Date.now(), deployed: null, configured: false, from: null, missing: [] };
+    // Is it there at all? (A plain GET: see fnThere.) Only then ask it, signed in
+    s.deployed = await fnThere('send-email');
+    if (s.deployed) {
+      try {
+        const r = await callMail({ action: 'status' });
+        if (r.status === 200 && r.data) Object.assign(s, { configured: !!r.data.configured, from: r.data.from || null, missing: r.data.missing || [] });
+      } catch { /* offline: try again next time */ }
+    }
+    state.mail = s;
+    return s;
+  }
+
+  const fileB64 = file => new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result).replace(/^data:[^,]*,/, ''));
+    r.onerror = () => rej(new Error('Couldn’t read the PDF'));
+    r.readAsDataURL(file);
+  });
+
+  function confirmSend() {
+    const inv = IV.cur, e = inv.email || {};
+    if (!IV.pdf) return;
+    const to = String(e.to || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(to)) { toast(to ? 'That email address doesn’t look right' : 'Put their email address in To first'); $('#emTo').focus(); return; }
+    sheet(`Send it to ${to}?`, `From ${state.mail.from}, with ${IV.pdf.name} attached. A copy goes in Gmail’s Sent.`, [
+      { label: 'Send it now', icon: 'mail', run: () => sendFromApp(to) }
+    ]);
+  }
+
+  async function sendFromApp(to) {
+    const inv = IV.cur, file = IV.pdf, e = inv.email || {};
+    const btn = $('#prevSendBtn');
+    btn.disabled = true; btn.textContent = 'Sending…';
+    try {
+      const r = await callMail({ action: 'send', to, subject: e.subject, text: e.body, filename: file.name, pdf: await fileB64(file) });
+      if (r.status === 200 && r.data && r.data.ok) {
+        // Their address goes on the invoice for next time
+        if (!(inv.customer && inv.customer.email)) inv.customer = Object.assign({}, inv.customer, { email: r.data.to });
+        toast('Sent to ' + r.data.to, 'ok');
+        await recordSent('app', r.data.to);
+      } else {
+        if (r.data && r.data.code === 'not_configured') state.mail = null;
+        toast((r.data && r.data.error) || 'Couldn’t send it. Use the share sheet instead.');
+      }
+    } catch (err) {
+      toast('Couldn’t send it: ' + err.message);
+    }
+    if (state.view === 'invprev') renderPreview();
+  }
+
+  async function shareInvoice() {
     const inv = IV.cur, file = IV.pdf;
     if (!file) return;
     const e = inv.email || {};
@@ -7519,7 +8059,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
   function renderInvoices() {
     if (!state.schema.v10) {
       msg('#invoicesMsg', `<strong>Invoices aren’t kept yet.</strong> You can make and send them now; to keep a list of every one, run
-        <strong>schema-v10-invoices.sql</strong> in Supabase → SQL Editor (Settings → Ready to switch on).`, 'warn');
+        <strong>schema-v10-invoices.sql</strong> in Supabase → SQL Editor (gear → Setup).`, 'warn');
     } else msg('#invoicesMsg', '');
     const q = IV.q.trim().toLowerCase().replace(/\s+/g, ' ');
     const today = INV.today();
@@ -7542,19 +8082,22 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     $('#invList').innerHTML = rows.length ? `<div class="card">${rows.map(r => {
       const d = r.data || {}, v = d.vehicle || {};
       const due = nextDue(r);
-      const late = due && due.due < today;
+      const m = owed(r) ? INV.moneyDue(fromRow(r), IV.settings, today) : null;
+      const late = m && m.status === 'late';
       const dl = r.status !== 'void' && INV.deliveryOf(fromRow(r));
       const dlPill = dl && !dl.done ? `<span class="pill pill--${dl.date && dl.date < today ? 'red' : 'blue'}">${dl.date ? (dl.date < today ? 'Delivery was ' : dl.date === today ? 'Delivery today, ' : 'Delivery ') + INV.ukDate(dl.date) : 'Delivery to arrange'}</span>` : '';
       const status = r.status === 'void' ? '<span class="pill pill--grey">Void</span>'
-        : owed(r) ? `<span class="pill pill--${late ? 'red' : 'amber'}">${late ? `${INV.gbp(due.amount)} overdue since ${INV.ukDate(due.due)}` : INV.gbp(r.balance) + ' to come'}</span>`
+        : owed(r) ? `<span class="pill pill--${late ? 'red' : 'amber'}">${late ? `${INV.gbp(m.now)} overdue since ${INV.ukDate(m.due)}` : INV.gbp(r.balance) + ' to come'}</span>`
         : owing(r) ? `<span class="pill pill--blue">${INV.gbp(r.balance)} still to pay them</span>`
         : '<span class="pill pill--green">Paid</span>';
+      const reminded = m ? remindedWords(m) : '';
       return `<button class="inv-row${r.status === 'void' ? ' is-void' : ''}" type="button" data-id="${esc(r.id)}">
         <span class="inv-row-ic">${icon('receipt')}</span>
         <span class="inv-row-txt">
           <strong>${esc(INV.numberLabel(r.number))} · ${esc(r.customer_name || 'No name')}</strong>
           <small>${esc([[v.year, v.make, v.model].filter(Boolean).join(' '), r.registration ? fmtReg(r.registration) : ''].filter(Boolean).join(' · ') || ((d.extras || [])[0] || {}).label || '')}</small>
           <small>${esc((INV.KINDS[r.kind] || {}).short || '')} · ${esc(INV.ukDate(r.issue_date))}${draft(r) ? ' · not sent yet' : r.sent_at ? ' · sent ' + esc(ago(r.sent_at)) : ''}${due && !late ? ' · next ' + esc(INV.ukDate(due.due)) : ''}${dl && dl.done ? ' · delivered ' + esc(INV.ukDate(dl.done_date || dl.date)) : ''}</small>
+          ${reminded ? `<small>${esc(reminded.replace(/^./, x => x.toUpperCase()))}</small>` : ''}
           <span class="inv-row-pill">${status}${dlPill}</span>
         </span>
         <span class="inv-row-end"><b>${esc(INV.gbp(r.total))}</b></span>
@@ -7581,6 +8124,12 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       sub: (dl.date ? `Booked for ${INV.ukDate(dl.date)}. ` : '') + 'Then send them the updated invoice', run: () => markDelivered(clone(inv)) });
     if (inv.status !== 'void' && t.balance > 0.004) acts.push({ label: 'Record a payment', icon: 'pound',
       sub: inv.kind === 'purchase' ? `${INV.gbp(t.balance)} still to pay them` : `${INV.gbp(t.balance)} still to come`, run: () => recordPayment(clone(inv)) });
+    const md = !fromForm && inv.id ? INV.moneyDue(inv, IV.settings) : null;
+    if (md) {
+      acts.push({ label: 'Send a reminder', icon: 'whatsapp', sub: owedWords(md).replace(/^./, x => x.toUpperCase()), run: () => reminderSheet(clone(inv)) });
+      if (md.feeable.length) acts.push({ label: `Add the ${owedMoney(INV.lateFee(IV.settings))} missed-payment fee`, icon: 'plus',
+        sub: `For the payment due ${INV.ukDate(md.feeable[0].due)}`, run: () => addFeeSheet(clone(inv), md.feeable[0]) });
+    }
     acts.push({ label: 'Make a copy', icon: 'copy', sub: 'Same terms and wording, for a new customer', run: async () => {
       const c = clone(inv);
       ['id', 'number', 'created_at'].forEach(k => delete c[k]);
@@ -7628,15 +8177,19 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     const t = INV.totals(inv);
     const plan = inv.kind === 'instalments' ? INV.planRows(inv) : [];
     const nextAt = plan.findIndex(r => !r.paid_on), next = nextAt >= 0 ? plan[nextAt] : null;
+    // What's due now (a missed payment and its fee), else the next payment, else the lot
+    const md = inv.kind === 'instalments' ? INV.moneyDue(Object.assign({}, inv, { status: 'issued' }), IV.settings) : null;
+    const suggest = md && md.now > 0.004 ? md.now : md && next ? md.nextAmount : next ? next.amount : t.balance;
     const box = sheetHtml(inv.kind === 'purchase' ? 'Record what you paid them' : 'Record a payment',
       `${INV.numberLabel(inv.number) || 'Not saved yet'} · ${invTitle(inv)} · ${INV.gbp(t.balance)} ${inv.kind === 'purchase' ? 'still to pay them' : 'still to come'}`, `
       <div class="section-card">
-        <div class="f"><label>How much</label><div class="money"><input class="in" id="rpAmount" inputmode="decimal" value="${esc(next ? next.amount : t.balance)}"></div></div>
+        <div class="f"><label>How much</label><div class="money"><input class="in" id="rpAmount" inputmode="decimal" value="${esc(INV.r2(suggest))}"></div></div>
         <div class="row-2">
           <div class="f"><label>When</label><input class="in" type="date" id="rpDate" value="${INV.today()}"></div>
           <div class="f"><label>How</label><select class="sel" id="rpMethod">${PAY_METHODS.map(m => `<option>${m}</option>`).join('')}</select></div>
         </div>
-        ${next ? `<p class="hint" style="margin-top:12px">Instalment ${nextAt + 1} of ${plan.length} ${next.due < INV.today() ? 'was' : 'is'} due ${esc(INV.ukDate(next.due))}. Paying it ticks it off the schedule.</p>` : ''}
+        ${next ? `<p class="hint" style="margin-top:12px">Instalment ${nextAt + 1} of ${plan.length} ${next.due < INV.today() ? 'was' : 'is'} due ${esc(INV.ukDate(next.due))}. Paying it ticks it off the schedule.${md && md.feeOwed > 0.004
+          ? ` ${esc(INV.gbp(suggest))} is that and the ${esc(INV.gbp(md.feeOwed))} missed-payment fee: their agreement says payments go to the fee first.` : ''}</p>` : ''}
       </div>
       <button class="btn btn--accent btn--block" type="button" id="rpSave">Save the payment</button>`);
     box.querySelector('#rpSave').onclick = async () => {
@@ -7652,7 +8205,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       if (!(await saveInvoice(true))) return;
       const left = INV.totals(inv).balance;
       toast(left > 0.004 ? `Saved. ${INV.gbp(left)} still to come.` : switched ? 'Saved. All paid: ' + settledWords[switched] : 'Saved. All paid.', 'ok');
-      if (state.view === 'invoices') renderInvoices();
+      afterMoneyChange();
       sheet('Send them a receipt?', 'The same invoice, updated with this payment' + (inv.kind === 'instalments' ? ' and the schedule ticked off.' : '.'), [
         { label: 'Check and send it', icon: 'mail', run: () => { inv.email = null; openPreview(); } }
       ]);
@@ -7719,6 +8272,163 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       { label: 'Pay monthly agreement', icon: 'calendar', sub: 'They pay the rest in instalments', run: () => invoiceForCar(car, 'instalments') },
       { label: 'Balance to pay', icon: 'pound', sub: 'Part paid, the rest on collection', run: () => invoiceForCar(car, 'balance') }
     ]);
+  }
+
+  /* ---- Money owed (7 Oct 2026) -----------------------------------------------
+     What customers still owe, worked out from the saved invoices by
+     INV.moneyDue: Home's Needs you (gone past its date: Today; due in the
+     next 7 days: This week), the Money to come card, the To come list, and
+     one sheet per invoice to remind them, record what came in, or add the
+     missed-payment fee their agreement allows. Reminders go by WhatsApp or
+     text from this phone, worded by INV.reminderText, and are noted on the
+     invoice so the next look says when they were last asked. */
+  function owedList(statuses) {
+    if (!INV) return [];
+    const on = INV.today();
+    return (IV.list || []).map(r => {
+      const inv = fromRow(r), m = INV.moneyDue(inv, IV.settings, on);
+      return m && (!statuses || statuses.includes(m.status)) ? { r, inv, m } : null;
+    }).filter(Boolean).sort((a, b) => String(a.m.due || '9999').localeCompare(String(b.m.due || '9999')));
+  }
+  const owedName = inv => String((inv.customer && inv.customer.name) || 'No name').trim();
+  const owedCar = inv => { const v = inv.vehicle || {}; return [v.make ? (MK.makeName(v.make) || v.make) : '', v.model].filter(Boolean).join(' '); };
+  // Whole pounds as the rest of Home shows them, pence only when there are some
+  const owedMoney = n => Math.abs(INV.r2(n) - Math.round(n)) < 0.004 ? money(Math.round(n)) : INV.gbp(n);
+  function owedWhen(due) {
+    const on = INV.today(), d = INV.parseDate(due);
+    if (!d) return '';
+    if (due === on) return 'today';
+    if (due === INV.isoDate(addDays(INV.parseDate(on), 1))) return 'tomorrow';
+    if (due === INV.isoDate(addDays(INV.parseDate(on), -1))) return 'yesterday';
+    return 'on ' + INV.dayDate(due, on);
+  }
+  /** One line on where it stands: "due Thursday 5 November, 5 days ago", "£500 due tomorrow". */
+  function owedWords(m) {
+    if (m.status === 'late') {
+      const what = m.late.length > 1 ? `${m.late.length} payments missed, the first due ${owedWhen(m.due)}` : `was due ${owedWhen(m.due)}`;
+      return `${what}${m.daysLate > 1 ? `, ${m.daysLate} days ago` : ''}${m.feeOwed > 0.004 ? ` (${owedMoney(m.feeOwed)} fee included)` : ''}`;
+    }
+    if (m.status === 'open') return `${owedMoney(m.balance)} ${m.due ? 'due ' + owedWhen(m.due) : /^(on|by|now)\b/.test(m.when || '') ? 'due ' + m.when : m.when || 'due on collection'}`;
+    return `${owedMoney(m.nextAmount)} due ${owedWhen(m.due)}`;
+  }
+  function remindedWords(m) {
+    if (m.written) return m.written.by > INV.today() ? `asked in writing, deadline ${INV.dayDate(m.written.by)}` : `asked in writing ${ago(m.written.at)}: the whole balance is due`;
+    return m.last ? 'reminded ' + ago(m.last.at) : '';
+  }
+
+  /** Saves a change made outside the invoice form (a reminder, a fee) without touching the one being edited. */
+  async function storeInvoice(inv) {
+    if (!state.schema.v10 || !inv.id) { toast('Can’t keep that until schema v10 is run'); return false; }
+    const row = invoiceRow(inv);
+    const { error } = await sb.from('invoices').update(row).eq('id', inv.id);
+    if (error) { toast('Couldn’t save it: ' + error.message); return false; }
+    const i = IV.list.findIndex(x => x.id === inv.id);
+    if (i >= 0) IV.list[i] = Object.assign({}, IV.list[i], row);
+    return true;
+  }
+  function afterMoneyChange() {
+    if (state.view === 'home') renderHome();
+    if (state.view === 'invoices') renderInvoices();
+  }
+
+  /** One invoice's money: where it stands in a sentence, then what to do about it. */
+  async function moneySheet(id) {
+    await invoiceSettings();
+    const r = IV.list.find(x => String(x.id) === String(id));
+    if (!r) return toast('That invoice has gone');
+    const inv = fromRow(r), m = INV.moneyDue(inv, IV.settings);
+    if (!m) return invoiceActions(inv);
+    const c = inv.customer || {};
+    const first = owedName(inv).split(/\s+/)[0];
+    const plan = inv.kind === 'instalments';
+    const said = [
+      m.status === 'late' ? `${owedMoney(m.now)} should have reached you by now${/^was/.test(owedWords(m)) ? '. It ' : ': '}${owedWords(m)}.`
+        : m.status === 'open' ? `${owedMoney(m.balance)} to pay ${INV.deliveryOf(inv) ? 'on delivery' : 'on collection'}.`
+        : `Next: ${owedWords(m)}.`,
+      `${owedMoney(m.balance)} left to pay in all${plan && m.next ? `, ${plural(INV.planRows(inv).filter(x => !x.paid_on).length, 'payment')} to go` : ''}.`,
+      m.written ? (m.written.by > INV.today() ? `You asked in writing ${ago(m.written.at)}. If it isn’t paid by ${INV.longDate(m.written.by)}, their agreement makes the whole balance due.`
+        : `You asked in writing ${ago(m.written.at)} and the 7 days have passed: their agreement makes the whole ${owedMoney(m.balance)} due now.`)
+        : m.last ? `Last reminded ${ago(m.last.at)}.` : ''
+    ].filter(Boolean).join(' ');
+    const acts = [
+      { label: 'Send a reminder', icon: 'whatsapp', sub: c.phone ? `WhatsApp or a text to ${first}, written for you` : 'Written for you. No phone number on the invoice, so copy it', run: () => reminderSheet(inv) },
+      { label: 'Record a payment', icon: 'pound', sub: m.now > 0.004 ? `${owedMoney(m.now)} clears what’s due now` : `${owedMoney(m.nextAmount)} is the next one`, run: () => recordPayment(clone(inv)) }
+    ];
+    if (m.feeable.length) {
+      const row = m.feeable[0];
+      acts.push({ label: `Add the ${owedMoney(INV.lateFee(IV.settings))} missed-payment fee`, icon: 'plus',
+        sub: `For the payment due ${INV.ukDate(row.due)}. Their agreement allows it`, run: () => addFeeSheet(inv, row) });
+    }
+    if (c.phone) acts.push({ label: 'Call ' + first, icon: 'phone', sub: ukPhone(c.phone), run: () => { location.href = 'tel:' + String(c.phone).replace(/[^0-9+]/g, ''); } });
+    acts.push({ label: 'The invoice', icon: 'receipt', sub: [INV.numberLabel(inv.number), (INV.KINDS[inv.kind] || {}).label].filter(Boolean).join(' · '), run: () => invoiceActions(inv) });
+    sheet(`${owedName(inv)}${owedCar(inv) ? ' · ' + owedCar(inv) : ''}`, said, acts);
+  }
+
+  /* A reminder, written for you, sent from this phone. Three kinds:
+     due soon, missed, and (pay monthly, over 7 days late) the written
+     request their agreement's "whole balance due" term needs. */
+  function reminderSheet(inv, kind) {
+    const m = INV.moneyDue(inv, IV.settings);
+    if (!m) return toast('Nothing is owed on this one');
+    const c = inv.customer || {};
+    const phone = String(c.phone || '').trim();
+    const kinds = [['soon', 'Due soon'], ['late', 'Missed']].concat(m.canWrite ? [['written', 'In writing']] : []);
+    kind = kinds.some(k => k[0] === kind) ? kind : m.status === 'late' ? 'late' : 'soon';
+    const text = INV.reminderText(inv, IV.settings, kind);
+    const box = sheetHtml('Send a reminder', `${owedName(inv)} · ${m.status === 'late' ? owedMoney(m.now) + ' due now' : owedWords(m)}`, `
+      <div class="segment" id="rmKinds" style="margin-bottom:12px">${kinds.map(([k, label]) => `<button type="button" data-k="${k}" class="${k === kind ? 'is-on' : ''}">${label}</button>`).join('')}</div>
+      ${kind === 'written' ? `<p class="hint" style="margin:0 0 10px">Their agreement says that when a payment is over 7 days late you ask for it in writing, and if it’s still not paid 7 days after that, the whole balance is due. This is that request. Keep a screenshot once it’s delivered.</p>`
+        : m.canWrite && !m.written ? `<p class="hint" style="margin:0 0 10px">It’s over 7 days late: <strong>In writing</strong> sends the request their agreement needs before the whole balance can be asked for.</p>` : ''}
+      <textarea class="ta" id="rmText" rows="7" aria-label="The message">${esc(text)}</textarea>
+      <div class="rm-send">
+        ${phone ? `<a class="btn btn--green btn--block" id="rmWa" target="_blank" rel="noopener">${icon('whatsapp')} WhatsApp</a>
+        <a class="btn btn--outline btn--block" id="rmSms">${icon('chat')} Text message</a>` : `<p class="hint">No phone number on this invoice. Add one with Change it, or copy the message.</p>`}
+        <button class="btn btn--ghost btn--block" type="button" id="rmCopy">Copy the message</button>
+      </div>
+      ${m.last ? `<p class="hint" style="margin-top:6px">${esc(remindedWords(m).replace(/^./, x => x.toUpperCase()))}.</p>` : ''}`);
+    const links = () => {
+      const t = $('#rmText').value;
+      const wa = $('#rmWa'), sms = $('#rmSms');
+      if (wa) wa.href = `https://wa.me/${ukNumber(phone)}?text=${encodeURIComponent(t)}`;
+      // "?&body=" works on iPhone and Android alike
+      if (sms) sms.href = `sms:${phone.replace(/[^0-9+]/g, '')}?&body=${encodeURIComponent(t)}`;
+    };
+    links();
+    $('#rmText').oninput = links;
+    box.querySelectorAll('#rmKinds [data-k]').forEach(b => b.onclick = () => reminderSheet(inv, b.dataset.k));
+    // Noted on the invoice as it goes. The link opens WhatsApp (or Messages)
+    // straight from the tap, which an iPhone insists on, so nothing waits on the save.
+    const sent = via => {
+      inv.reminders = (inv.reminders || []).concat({ at: new Date().toISOString(), kind, due: m.due, via });
+      storeInvoice(inv).then(okd => { if (okd) afterMoneyChange(); });
+      setTimeout(closeSheet, 300);
+    };
+    if ($('#rmWa')) $('#rmWa').onclick = () => sent('whatsapp');
+    if ($('#rmSms')) $('#rmSms').onclick = () => sent('sms');
+    $('#rmCopy').onclick = () => {
+      if (!navigator.clipboard) return toast('Copying isn’t allowed here');
+      navigator.clipboard.writeText($('#rmText').value).then(() => { toast('Copied. Paste it into a message or an email', 'ok'); sent('copied'); }, () => toast('Couldn’t copy it'));
+    };
+  }
+
+  /* The fee their agreement allows for a missed payment, once per payment.
+     It goes on their balance and on the next copy of the agreement; payments
+     go to it first. Taken off again in the invoice (Change it). */
+  function addFeeSheet(inv, row) {
+    const fee = INV.lateFee(IV.settings);
+    const first = owedName(inv).split(/\s+/)[0];
+    confirmSheet(`Add the ${owedMoney(fee)} missed-payment fee?`,
+      `For the ${owedMoney(row.amount)} that was due ${INV.longDate(row.due)}. ${first}’s agreement allows one for each missed payment, to cover chasing it. It goes on what they owe and on the next copy of the agreement.`,
+      `Yes, add ${owedMoney(fee)}`, async () => {
+        inv.fees = (inv.fees || []).concat({ due: row.due, added: INV.today(), amount: fee });
+        inv.updated_on = INV.today();
+        if (!(await storeInvoice(inv))) return;
+        afterMoneyChange();
+        sheet('Fee added. Tell them?', `${owedMoney(INV.moneyDue(inv, IV.settings).now)} is due now, the fee included.`, [
+          { label: 'Send a reminder that says so', icon: 'whatsapp', run: () => reminderSheet(inv, 'late') },
+          { label: 'Send the updated agreement', icon: 'mail', sub: 'With the fee on it', run: () => { IV.cur = Object.assign(clone(inv), { email: null }); state.dirty = false; openPreview(); } }
+        ]);
+      });
   }
 
   /* ====================================================== MOTs (7 Oct 2026)
@@ -8015,10 +8725,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       } catch { /* not there yet */ }
     }
     // Is the function there? It answers 401 without the code, 404 if it isn't deployed
-    try {
-      const r = await fetch(FEED_FN(), { method: 'GET', cache: 'no-store' });
-      out.live = r.status !== 404;
-    } catch { out.live = null; }
+    out.live = await fnThere('mot-calendar');
     return out;
   }
 
@@ -8026,7 +8733,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     const f = need('motfeed', motFeed, 600000);
     if (f === undefined) return '<div class="section-card"><div class="skel" style="height:70px"></div></div>';
     const dated = heldCars().filter(c => c.mot_expiry);
-    const ready = f && f.live && state.schema.v10 !== false;
+    // Can't tell (offline) isn't "not there": the link works for the calendar either way
+    const ready = f && f.live !== false && state.schema.v10 !== false;
     if (ready && f.token) {
       const url = feedUrl(f.token);
       return `<div class="section-card mot-feed">
@@ -8052,8 +8760,8 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     return `<div class="section-card mot-feed">
       <div class="card-head"><h2>On your phone’s calendar</h2></div>
       <p class="note" style="margin-bottom:10px">${state.schema.v10 === false
-        ? 'The live calendar link needs schema-v10-invoices.sql run, and the mot-calendar function set up (gear → Ready to switch on).'
-        : 'The live calendar link needs the mot-calendar function set up in Supabase (gear → Ready to switch on). Until then, download the dates: they won’t update by themselves.'}</p>
+        ? 'The live calendar link needs schema-v10-invoices.sql run, and the mot-calendar function set up (gear → Setup).'
+        : 'The live calendar link needs the mot-calendar function set up in Supabase (gear → Setup). Until then, download the dates: they won’t update by themselves.'}</p>
       ${dated.length ? `<button class="btn btn--outline btn--block" type="button" id="mcIcs">${icon('calendar')} Download the dates for my calendar</button>` : ''}
     </div>`;
   }
@@ -8618,8 +9326,18 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
      picking the car first. */
   function toolList() {
     const inStockCar = c => c.status === 'available' || c.status === 'reserved';
+    // A live line where there's something worth knowing before tapping in
+    const owed = state.schema.v10 && INV ? owedList() : [];
+    const late = owed.filter(x => x.m.status === 'late');
+    const invSub = late.length ? `${owedMoney(late.reduce((n, x) => n + x.m.now, 0))} overdue · ${owedMoney(owed.reduce((n, x) => n + x.m.balance, 0))} to come`
+      : owed.length ? `${owedMoney(owed.reduce((n, x) => n + x.m.balance, 0))} to come` : 'Make, send and print';
+    const held = state.cars.filter(c => inStock(c) || c.status === 'draft');
+    const ranOut = held.filter(c => motDays(c) != null && motDays(c) < 0).length;
+    const dueMonth = held.filter(c => motDays(c) != null && motDays(c) >= 0 && motDays(c) <= 30).length;
+    const noDate = held.filter(c => !c.mot_expiry).length;
+    const motSub = [ranOut ? ranOut + ' run out' : '', dueMonth ? dueMonth + ' due this month' : '', noDate ? noDate + ' with no date' : ''].filter(Boolean).join(' · ') || 'Every date in, none due soon';
     return [
-      { key: 'invoice', icon: 'receipt', title: 'Invoices', sub: 'Make, send and print', primary: true,
+      { key: 'invoice', icon: 'receipt', title: 'Invoices', sub: invSub, primary: true,
         run: () => go('invoices') },
       { key: 'bid', icon: 'gauge', title: 'Before you bid', sub: 'History and a max bid',
         run: () => go('value') },
@@ -8629,7 +9347,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         run: () => go('pricebook') },
       { key: 'motcheck', icon: 'checkCirc', title: 'MOT checker', sub: 'Any plate’s MOT history',
         run: () => go('motcheck') },
-      { key: 'motcal', icon: 'calendar', title: 'MOTs', sub: 'Calendar, and every car’s date',
+      { key: 'motcal', icon: 'calendar', title: 'MOTs', sub: state.carsLoaded ? motSub : 'Calendar, and every car’s date',
         run: () => go('motcal') },
       { key: 'photos', icon: 'camera', title: 'Photo guide', sub: 'Same angles, every car',
         run: () => go('photos') },
