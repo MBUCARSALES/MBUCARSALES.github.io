@@ -945,7 +945,9 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; font-weight: 800; }
 .chart-x span { flex: 1; min-width: 0; text-align: center; font-size: 11px; color: var(--ink-3); }
 .chart-x span.is-now { color: var(--ink); font-weight: 800; }
 .chart-x--days { position: relative; display: block; height: 16px; }
-.chart-x--days span { position: absolute; transform: translateX(-50%); }
+.chart-x--days span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.chart-x--days span:first-child { transform: none; }
+.chart-x--days span:last-child { transform: translateX(-100%); }
 .chart-tip {
   position: absolute; top: 0; z-index: 3; transform: translateX(-50%);
   width: max-content; max-width: 230px; padding: 8px 11px;
@@ -1333,3 +1335,214 @@ html.pg-locked, html.pg-locked body { overflow: hidden; }
 
 .em-to { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .inv-seller .in { font-size: 16px; padding-inline: 11px; }
+
+/* ==========================================================================
+   INSIGHTS, IN PLAIN WORDS (7 Oct 2026): Summary · Cars · Website · Money
+   ========================================================================== */
+.segment--sm { margin-bottom: 12px; }
+.segment--sm button { min-height: 36px; font-size: 13.5px; }
+
+/* ⓘ beside a figure: what it means and where it comes from */
+.info {
+  display: inline-grid; place-items: center; flex: none;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1.5px solid var(--ink-4); color: var(--ink-3);
+  font: italic 700 12.5px/1 Georgia, serif; vertical-align: 1px;
+  position: relative;
+}
+.info::after { content: ''; position: absolute; inset: -11px; }   /* 44px to tap */
+.explain { font-size: 16px; line-height: 1.6; color: var(--ink-2); padding: 4px 4px 12px; }
+
+/* The last 7 days, in sentences */
+.week-card p { font-size: 15.5px; line-height: 1.55; color: var(--ink-2); margin-bottom: 8px; }
+.week-card p b, .cf-say b { color: var(--ink); }
+.week-card .linkish { display: inline; padding: 0; font-size: inherit; line-height: inherit; text-align: left; }
+.week-go { margin-top: 6px; justify-content: space-between; }
+.week-go svg { width: 18px; height: 18px; }
+.week-card--home { margin-bottom: 4px; }
+.cf-say { font-size: 15.5px; line-height: 1.55; color: var(--ink-2); margin-bottom: 8px; }
+
+/* Who tapped what */
+.feed-row {
+  display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left;
+  padding: 11px 2px; border-top: 1px solid var(--line-2);
+}
+.feed-row:first-of-type { border-top: 0; }
+.feed-ic {
+  width: 34px; height: 34px; flex: none; border-radius: 50%;
+  display: grid; place-items: center; background: var(--line-2); color: var(--ink-2);
+}
+.feed-ic svg { width: 18px; height: 18px; }
+.feed-row--tap .feed-ic { background: var(--green-100); color: var(--green-600); }
+.feed-row--form .feed-ic { background: var(--blue-100); color: var(--navy-700); }
+.feed-txt { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.feed-what { font-size: 15px; line-height: 1.45; color: var(--ink-2); }
+.feed-what b { color: var(--ink); }
+.feed-txt small { font-size: 12.5px; color: var(--ink-3); }
+.feed-more { font-size: 12.5px; color: var(--ink-2); background: var(--bg); border-radius: 8px; padding: 4px 8px; justify-self: start; }
+.feed-more--ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-100); color: var(--green-600); font-weight: 700; }
+.feed-more--ok svg { width: 14px; height: 14px; }
+
+.ask-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line-2); }
+.ask-row:first-of-type { border-top: 0; }
+.ask-row strong { display: block; font-size: 15.5px; }
+.ask-row small { display: block; font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+.counting { display: flex; gap: 10px; align-items: flex-start; margin: 14px 2px 4px; }
+
+/* Cars: one line each */
+.carline {
+  display: flex; gap: 12px; width: 100%; text-align: left; align-items: flex-start;
+  padding: 12px 0; border-top: 1px solid var(--line-2);
+}
+.carline:first-of-type { border-top: 0; }
+.carline img { width: 72px; height: 54px; flex: none; border-radius: var(--r-sm); object-fit: cover; background: var(--line-2); }
+.carline-txt { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.carline-top { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.carline-top strong { font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.carline-txt > small { font-size: 13px; color: var(--ink-3); }
+.carline-say { font-size: 14px; line-height: 1.5; color: var(--ink-2); margin-top: 3px; }
+.carline-say b { color: var(--ink); }
+.carline-flag { justify-self: start; margin-top: 5px; font-size: 12px; font-weight: 800; padding: 3px 9px; border-radius: var(--r-full); background: var(--amber-100); color: var(--amber-600); }
+.carline-flag--act { background: var(--red-100); color: var(--red-600); }
+.carline-flag--good { background: var(--green-100); color: var(--green-600); }
+.btn-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+
+/* One car's screen */
+.cf-head { display: grid; gap: 14px; }
+.cf-top { display: flex; gap: 12px; align-items: center; }
+.cf-top img { width: 96px; height: 72px; flex: none; object-fit: cover; border-radius: var(--r-sm); background: var(--line-2); }
+.cf-head h2 { font-size: 19px; }
+#carfigBody .chart { margin-top: 18px; }
+.cf-head p { font-size: 14.5px; color: var(--ink-3); margin-top: 3px; }
+.cf-head .btn-pair { margin-top: 0; }
+
+.funnel { display: grid; gap: 10px; }
+.funnel-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; font-size: 14.5px; color: var(--ink-2); }
+.funnel-row b { font-variant-numeric: tabular-nums; color: var(--ink); }
+.funnel-row i { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: #2A62B4; min-width: 0; }
+
+/* Ranked lists with a bar each */
+.lbars { display: grid; gap: 10px; }
+.lbar { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; font-size: 14.5px; color: var(--ink-2); width: 100%; text-align: left; }
+.lbar b { font-variant-numeric: tabular-nums; color: var(--ink); }
+.lbar i { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: #2A62B4; opacity: .85; }
+.lbar small { grid-column: 1 / -1; font-size: 12.5px; color: var(--ink-3); margin-top: -2px; }
+.lbar--btn + .lbar--btn { padding-top: 10px; border-top: 1px solid var(--line-2); }
+.lbar--btn span { color: var(--accent-600); font-weight: 700; }
+
+/* Views over time: the period still going is paler; a price change is marked */
+.chart[data-action="pick"] .bar--now { background: var(--accent-300); }
+.bar-cols--tight { gap: 1px; }
+.bar-cols--tight .bar { width: 80%; border-radius: 2px 2px 0 0; }
+.bar-mark {
+  position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%);
+  width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-bottom: 7px solid #EB6834;
+}
+
+.cmp-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.cmp-table th { text-align: right; font-size: 12.5px; color: var(--ink-3); padding: 0 0 8px 6px; font-weight: 700; vertical-align: bottom; }
+.cmp-table th .key { display: block; margin: 0 0 5px auto; }
+.cmp-table td { padding: 8px 0 8px 6px; border-top: 1px solid var(--line-2); text-align: right; font-variant-numeric: tabular-nums; }
+.cmp-table td:first-child, .cmp-table th:first-child { text-align: left; padding-left: 0; color: var(--ink-2); }
+
+/* ==========================================================================
+   MOTs (7 Oct 2026): month calendar, every car's date, the MOT sheet
+   ========================================================================== */
+.mc-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.mc-head h2 { font-size: 17px; letter-spacing: -.01em; }
+.mc-nav { color: var(--navy-900); background: var(--line-2); border-radius: 12px; }
+.mc-nav svg { width: 20px; height: 20px; }
+.mc-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; touch-action: pan-y; }
+.mc-grid--head span { text-align: center; font-size: 11.5px; font-weight: 800; color: var(--ink-3); padding: 4px 0; }
+.mc-cell {
+  position: relative; aspect-ratio: 1 / 1.05; min-height: 40px; border-radius: 10px;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 6px;
+  font-size: 14.5px; font-variant-numeric: tabular-nums; color: var(--ink-2);
+}
+.mc-cell--blank { pointer-events: none; }
+.mc-cell.has-mot { background: var(--bg); font-weight: 800; color: var(--ink); }
+.mc-cell.is-today { box-shadow: inset 0 0 0 2px var(--accent-500); }
+.mc-cell.is-picked { background: var(--navy-900); color: #fff; }
+.mc-dots { display: flex; gap: 3px; margin-top: 4px; font-style: normal; }
+.mc-dots .dot { width: 7px; height: 7px; margin: 0; }
+.mc-cell.is-picked .dot { box-shadow: 0 0 0 1.5px #fff; }
+.mc-cell small { position: absolute; top: 2px; right: 4px; font-size: 10px; font-weight: 800; color: var(--ink-3); }
+.mc-cell.is-picked small { color: #A8B6CC; }
+.mc-today { display: block; margin: 10px auto 0; font-size: 14px; }
+.mc-fill { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px; text-align: left; }
+.mc-fill > svg { width: 20px; height: 20px; color: var(--accent-600); flex: none; }
+.mc-fill span { flex: 1; min-width: 0; }
+.mc-fill strong { display: block; font-size: 15.5px; }
+.mc-fill small { display: block; font-size: 13px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Every car's date on one screen */
+.md-row {
+  display: grid; grid-template-columns: auto 1fr; gap: 6px 0; align-items: center;
+  padding: 12px 14px 12px 0;
+}
+.md-row + .md-row { border-top: 1px solid var(--line-2); }
+.md-txt strong { display: block; font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-txt small { display: block; font-size: 13px; color: var(--ink-3); }
+.md-date { grid-column: 2; min-height: 46px; }
+.md-btns { grid-column: 2; display: flex; gap: 8px; }
+.md-btns .btn { flex: 1; }
+.md-state { grid-column: 2; font-size: 12.5px; font-weight: 700; color: var(--green-600); min-height: 0; }
+.md-state:empty { display: none; }
+
+/* The MOT sheet and "passed" */
+.mot-sheet { display: grid; gap: 10px; padding-bottom: 6px; }
+.mot-sheet .lbl { font-size: 14px; font-weight: 700; color: var(--ink-2); }
+.mot-sheet-row { display: flex; gap: 8px; }
+.mot-sheet-row .in { flex: 1; min-width: 0; }
+.mot-new { font-size: 16px; color: var(--ink-2); padding: 12px 14px; background: var(--green-100); border-radius: var(--r-md); }
+.mot-new b { color: var(--green-600); }
+.mot-new small { display: block; font-size: 13px; color: var(--ink-3); margin-top: 2px; }
+
+/* Checker rows with a second button */
+.mot-row--split { padding: 0 12px 0 0; gap: 4px; }
+.mot-row-main { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding: 13px 0 13px 14px; text-align: left; }
+.mot-row-main > svg { width: 18px; height: 18px; color: var(--ink-4); flex: none; }
+.mot-row--split .dot { margin: 0; }
+
+/* Stock: the MOT pill opens the MOT sheet; "MOT due" filter */
+.pill-btn { border: 0; cursor: pointer; font: inherit; font-size: 12px; font-weight: 800; }
+.pill-btn svg { width: 13px; height: 13px; }
+.chip--filter { min-height: 38px; padding: 0 14px; gap: 6px; margin: -2px 0 10px; font-size: 14px; font-weight: 700; }
+.chip--filter svg { width: 16px; height: 16px; }
+.chip--filter b { font-weight: 800; }
+.f-help { display: inline-block; margin-top: 8px; font-size: 13.5px; }
+
+/* ==========================================================================
+   HOME (7 Oct 2026): Needs you by when, and hiding a row for now
+   ========================================================================== */
+.alerts-when-h {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 14px 6px; font-size: 12.5px; font-weight: 800; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.alerts > .alerts-when-h { border-top: 0; }
+.alerts > .alerts-when-h ~ .alerts-when-h { border-top: 1px solid var(--line); margin-top: 4px; }
+.alert-wrap { display: flex; align-items: stretch; }
+.alert-wrap > .alert, .alert-wrap > .alert-item { flex: 1; min-width: 0; }
+.alert-items .alert-wrap + .alert-wrap { border-top: 1px solid var(--line-2); }
+.alert-hide {
+  flex: none; width: 46px; display: grid; place-items: center;
+  color: var(--ink-4); border-left: 1px solid var(--line-2);
+}
+.alert-hide svg { width: 19px; height: 19px; }
+.alert-hide:active { background: var(--line-2); }
+.alerts-when > summary {
+  display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer;
+  padding: 13px 14px; font-size: 12.5px; font-weight: 800; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.alerts-when > summary::-webkit-details-marker { display: none; }
+.alerts-when > summary svg { width: 18px; height: 18px; margin-left: auto; transition: transform .2s var(--ease); }
+.alerts-when[open] > summary svg { transform: rotate(180deg); }
+.home-hidden {
+  display: inline-flex; align-items: center; gap: 6px; margin: 10px 4px 0;
+  font-size: 13.5px; font-weight: 700; color: var(--ink-3);
+}
+.home-hidden svg { width: 16px; height: 16px; }
+.alerts-more.alerts-when[open] > summary { display: flex; }

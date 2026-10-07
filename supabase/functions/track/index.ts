@@ -22,6 +22,12 @@
 //      Only known event types, only real car ids, sensible sizes, and a cap on
 //      how many events one visitor can send in ten minutes.
 //
+// Since 7 Oct 2026 (schema-v14-site-analytics.sql) it also takes events that
+// aren't about one car: every page opened (page_view) and WhatsApp, call and
+// email taps anywhere on the site. Which page, and which button, ride in
+// meta ({ page: 'home', at: 'header' }), so no new column is needed and the
+// order of deploying this and running v14 doesn't matter.
+//
 // ----------------------------------------------------------------------------
 // DEPLOY (no command line needed)
 //   Supabase → Edge Functions → Deploy a new function
@@ -56,8 +62,9 @@ const CORS: Record<string, string> = {
   'Access-Control-Max-Age': '86400'
 };
 
-// Must match the check constraint in schema-v6-tracking.sql
+// Must match the check constraint in schema-v14-site-analytics.sql
 export const EVENT_TYPES = new Set([
+  'page_view',
   'view', 'card_click', 'gallery_open',
   'whatsapp_click', 'phone_click', 'email_click',
   'enquire_click', 'enquiry_start', 'enquiry_sent',
@@ -66,6 +73,9 @@ export const EVENT_TYPES = new Set([
 ]);
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// The only kinds that can come without a car: a page opened, or a contact tap
+// away from a car (the header, the homepage, Find us...)
+export const SITE_WIDE = new Set(['page_view', 'whatsapp_click', 'phone_click', 'email_click']);
 const MAX_BODY_BYTES = 8_000;
 const MAX_EVENTS = 10;
 
@@ -127,9 +137,10 @@ const shortText = (v: unknown, max: number, pattern?: RegExp): string | null => 
 /** One event from the page → one row for car_events, or null to drop it. */
 export function cleanEvent(raw: any) {
   if (!raw || typeof raw !== 'object') return null;
-  const car_id = typeof raw.car_id === 'string' ? raw.car_id.toLowerCase() : '';
+  const car_id = typeof raw.car_id === 'string' && raw.car_id ? raw.car_id.toLowerCase() : null;
   const event_type = String(raw.event_type || '');
-  if (!UUID.test(car_id) || !EVENT_TYPES.has(event_type)) return null;
+  if (!EVENT_TYPES.has(event_type)) return null;
+  if (car_id === null ? !SITE_WIDE.has(event_type) : !UUID.test(car_id)) return null;
 
   let meta: Record<string, unknown> | null = null;
   if (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) {

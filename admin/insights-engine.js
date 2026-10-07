@@ -372,7 +372,7 @@
         money(car.price),
         plural(days, 'day'),
         tracked ? plural(people, 'person', 'people') : null,
-        tracked ? (contacted === 1 ? '1 got in touch' : `${contacted} got in touch`) : null
+        tracked ? `${contacted} tapped or messaged` : null
       ].filter(Boolean).join(' · '),
       days,
       market,
@@ -404,8 +404,8 @@
       const strong = people >= ctx.minPeople;
       const oneIn = Math.round(1 / ctx.baseline.contactRate);
       const opener = strong
-        ? `${plural(people, 'person', 'people')} ${people === 1 ? 'has' : 'have'} looked in ${plural(trackedDays, 'day')} and nobody has got in touch. Normally about 1 in ${oneIn} would have.`
-        : `${plural(people, 'person', 'people')} ${people === 1 ? 'has' : 'have'} looked in ${plural(trackedDays, 'day')} and nobody has got in touch yet.`;
+        ? `${plural(people, 'person', 'people')} ${people === 1 ? 'has' : 'have'} looked in ${plural(trackedDays, 'day')} and nobody has tapped to get in touch or sent a message. Normally about 1 in ${oneIn} would have.`
+        : `${plural(people, 'person', 'people')} ${people === 1 ? 'has' : 'have'} looked in ${plural(trackedDays, 'day')} and nobody has tapped to get in touch or sent a message yet.`;
 
       if (photos < T.GOOD_PHOTOS) {
         return finding('no_contact', 'photos', strong ? 'act' : 'watch', [
@@ -450,7 +450,7 @@
           opener,
           presentation,
           `It's priced like a clean one. ${marketSentence(car, market, pos)}`,
-          `That is the likeliest reason nobody has got in touch${strong ? '' : ' yet'}.`
+          `That is the likeliest reason nobody has tapped to get in touch${strong ? '' : ' yet'}.`
         ], { actions: ['check_market', 'priced_ok', 'snooze'] });
       }
 
@@ -478,7 +478,7 @@
     /* 3. Getting calls: say so, so nobody cuts a price that's working */
     if (i && (i.contacted_7d || 0) >= T.HOT_CONTACTS_7D) {
       return finding('hot', 'demand', 'good', [
-        `${plural(i.contacted_7d, 'person', 'people')} got in touch about it this week.`,
+        `${plural(i.contacted_7d, 'person', 'people')} tapped to get in touch or sent a message about it this week.`,
         pos && pos.isAbove
           ? `It's above ${MARKET_LABEL[market.source]} and still getting calls, so hold the price.`
           : `Hold the price.`

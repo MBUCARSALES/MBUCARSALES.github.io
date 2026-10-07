@@ -644,9 +644,37 @@
   /* Opening the site from your own machine (or Claude testing it) must not
      book fake views against real cars. On localhost events are logged to the
      console and kept in MBU.trackLog instead of being sent. */
-  const trackingOff = location.protocol === 'file:' ||
+  const localSite = location.protocol === 'file:' ||
     /^(localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|\[::1\]|)$/.test(location.hostname);
   MBU.trackLog = [];
+
+  /* STAFF PHONES. The dealer looking at his own cars isn't a customer. The
+     admin app's "Don't count this phone" opens the site once with ?staff=1,
+     which leaves one marker on that phone (?staff=0 takes it off). It is the
+     only thing the website ever stores, it's only ever on staff phones, and
+     customers' phones get nothing. The admin app sets the same marker for
+     the browser it's signed in on (same web address, same storage), and its
+     "See it on the website" links carry ?staff=auto, which sets it quietly. */
+  MBU.isStaff = (() => {
+    try {
+      const p = new URLSearchParams(location.search).get('staff');
+      if (p === '1' || p === 'auto') localStorage.setItem('mbu_staff', '1');
+      if (p === '0') localStorage.removeItem('mbu_staff');
+      return localStorage.getItem('mbu_staff') === '1';
+    } catch { return false; }
+  })();
+  const trackingOff = localSite || MBU.isStaff;
+
+  /* Which page this is, in one word, for the page_view events and so every
+     tap says where it happened. 404.html sets MBU_PAGE itself because its
+     address is whatever was mistyped. */
+  const PAGES = ['home', 'stock', 'car', 'contact', 'sell', 'wanted', 'find-us', 'privacy', 'terms'];
+  MBU.pageName = (() => {
+    if (window.MBU_PAGE) return String(window.MBU_PAGE);
+    const p = (String(location.pathname || '').split('/').pop() || '').toLowerCase().replace(/\.html$/, '');
+    if (p === '' || p === 'index') return 'home';
+    return PAGES.includes(p) ? p : 'other';
+  })();
 
   const trackEndpoint = () => `${CFG.supabase.url.replace(/\/$/, '')}/functions/v1/track`;
 
@@ -697,25 +725,33 @@
     } catch { /* tracking must never break the page */ }
   }
 
+  /* Events that make sense without a car: a page opened, or a WhatsApp, call
+     or email tap anywhere on the site (the header, the homepage, Find us...).
+     Everything else is about one car and needs its id. */
+  const SITE_WIDE = ['page_view', 'whatsapp_click', 'phone_click', 'email_click'];
+
   /**
    * Record an anonymous interest event.
-   * @param {string} eventType  view | card_click | gallery_open |
+   * @param {string} eventType  page_view | view | card_click | gallery_open |
    *                            whatsapp_click | phone_click | email_click |
    *                            enquire_click | enquiry_start | enquiry_sent |
    *                            interest_sent | share | video_play | engagement
-   * @param {string} carId
-   * @param {object} [meta]     small, non-personal extras only
+   * @param {string|null} carId  null only for the SITE_WIDE kinds
+   * @param {object} [meta]     small, non-personal extras only. The page name
+   *                            is added (meta.page), and taps say which button
+   *                            (meta.at: header, bar, menu, footer, buy...)
    * @param {object} [extra]    { duration_ms, photos_seen, photo_count, beacon }
    */
   MBU.track = function (eventType, carId, meta, extra) {
-    if (!hasBackend || !carId) return;                 // demo mode: nothing to record
-    if (!/^[0-9a-f-]{36}$/i.test(String(carId))) return; // ignore demo ids
+    if (!hasBackend) return;                            // demo mode: nothing to record
+    if (carId != null && !/^[0-9a-f-]{36}$/i.test(String(carId))) return; // ignore demo ids
+    if (carId == null && !SITE_WIDE.includes(eventType)) return;
 
     // One of these per car per page load. Everything else is a genuine repeat
     // action, and the database counts each person once however many times
     // they tap.
-    const once = ['view', 'card_click', 'gallery_open', 'enquiry_start', 'video_play'];
-    const key = eventType + ':' + carId;
+    const once = ['page_view', 'view', 'card_click', 'gallery_open', 'enquiry_start', 'video_play'];
+    const key = eventType + ':' + (carId || '');
     if (once.includes(eventType)) {
       if (sent.has(key)) return;
       sent.add(key);
@@ -723,15 +759,21 @@
 
     const x = extra || {};
     sendEvent({
-      car_id: String(carId),
+      car_id: carId == null ? null : String(carId),
       event_type: eventType,
       page_id: pageId,
       source: MBU.trackSource || 'direct',
       duration_ms: x.duration_ms,
       photos_seen: x.photos_seen,
       photo_count: x.photo_count,
-      meta: meta || null
+      meta: Object.assign({ page: MBU.pageName }, meta || {})
     }, !!x.beacon);
+  };
+
+  /** Count this page being opened. Car pages count a car 'view' instead. */
+  MBU.trackPage = function () {
+    if (MBU.pageName === 'car') return;
+    MBU.track('page_view', null);
   };
 
   /**
@@ -792,10 +834,17 @@
     return { photo: i => { if (i >= 0 && i < photoCount) seen.add(i); } };
   };
 
-  /** Where the visitor came from, for the source column. */
+  /**
+   * Where the visitor came from, for the source column. A link we put out
+   * ourselves can say so with ?from= (the admin's listing pack adds
+   * ?from=facebook, ?from=gumtree...; the Share button adds ?from=share).
+   * Otherwise the referrer: search engines, the social apps, Autotrader.
+   * WhatsApp and most apps send no referrer at all, so they read as direct.
+   * Moving between our own pages is 'stock', 'home' or 'internal'.
+   */
   MBU.trackSource = (() => {
     const p = new URLSearchParams(location.search).get('from');
-    if (p) return p.slice(0, 40);
+    if (p) return p.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40) || 'direct';
     const ref = document.referrer || '';
     if (!ref) return 'direct';
     try {
@@ -805,28 +854,61 @@
         if (/index|\/$/.test(ref)) return 'home';
         return 'internal';
       }
-      if (/google|bing|duckduck/.test(host)) return 'search';
-      if (/facebook|instagram|t\.co|twitter/.test(host)) return 'social';
+      if (/google|bing|duckduck|yahoo|ecosia/.test(host)) return 'search';
+      if (/facebook|fb\.com|fb\.me/.test(host)) return 'facebook';
+      if (/instagram/.test(host)) return 'instagram';
+      if (/tiktok/.test(host)) return 'tiktok';
+      if (/t\.co$|twitter|x\.com$/.test(host)) return 'twitter';
+      if (/whatsapp/.test(host)) return 'whatsapp';
       if (/autotrader/.test(host)) return 'autotrader';
+      if (/gumtree/.test(host)) return 'gumtree';
       return 'referral';
     } catch { return 'direct'; }
   })();
 
-  /**
-   * Wire up WhatsApp, phone and email links so taps are counted automatically.
-   * @param {string} carId
-   * @param {Element} [root]
-   * @param {object} [meta]  e.g. { from: 'contact' } to say which page it was
-   */
-  MBU.autoTrackLinks = function (carId, root, meta) {
-    (root || document).addEventListener('click', e => {
-      const a = e.target.closest('a[href]');
+  /* WHICH BUTTON. Every WhatsApp, call and email link on every page is
+     counted by one listener, which works out where the link sits: the
+     header, the phone menu, the bottom bar, the footer, a car's price box,
+     or anywhere marked data-at="..." (the homepage's buttons, the contact
+     page's cards). Anything else is just "page". */
+  function placeOf(a) {
+    const marked = a.closest('[data-at]');
+    if (marked) return marked.getAttribute('data-at').slice(0, 20);
+    if (a.closest('.mobile-nav')) return 'menu';
+    if (a.closest('.site-header')) return 'header';
+    if (a.closest('.mobile-bar')) return 'bar';
+    if (a.closest('.site-footer')) return 'footer';
+    if (a.closest('.buy-panel')) return 'buy';
+    return 'page';
+  }
+
+  // The car this page is about, if any (car.html, contact.html?car=), and
+  // anything else worth saying about taps here ({ from: 'contact' })
+  let pageCar = null, pageMeta = null;
+
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('click', e => {
+      const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
       if (!a) return;
       const href = a.getAttribute('href') || '';
-      if (href.startsWith('https://wa.me/'))  MBU.track('whatsapp_click', carId, meta);
-      else if (href.startsWith('tel:'))       MBU.track('phone_click', carId, meta);
-      else if (href.startsWith('mailto:'))    MBU.track('email_click', carId, meta);
+      const kind = href.startsWith('https://wa.me/') ? 'whatsapp_click'
+        : href.startsWith('tel:') ? 'phone_click'
+        : href.startsWith('mailto:') ? 'email_click' : null;
+      if (kind) MBU.track(kind, pageCar, Object.assign({}, pageMeta, { at: placeOf(a) }));
     }, { capture: true });
+  }
+
+  /**
+   * Say which car this page is about, so WhatsApp, phone and email taps on it
+   * are counted against that car. (Every tap is counted anyway; this only
+   * adds the car.) Kept under its old name so the pages read the same.
+   * @param {string} carId
+   * @param {Element} [root]  no longer used: one listener covers the page
+   * @param {object} [meta]  e.g. { from: 'contact' }
+   */
+  MBU.autoTrackLinks = function (carId, root, meta) {
+    pageCar = carId || null;
+    pageMeta = meta || null;
   };
 
   /* ==========================================================================
@@ -844,11 +926,14 @@
    * actual car instead of our logo. Falls back to the query-string URL if the
    * share pages haven't been generated yet.
    */
-  MBU.carUrl = function (car) {
+  /** @param {string} [from]  where the link is going (share, facebook, gumtree...),
+   *  so a visit from it says where it came from (see MBU.trackSource) */
+  MBU.carUrl = function (car, from) {
     const base = (CFG.options.siteUrl || '').replace(/\/$/, '');
+    const tag = from ? encodeURIComponent(String(from)) : '';
     return CFG.options.sharePages === false
-      ? `${base}/car?id=${encodeURIComponent(car.id)}`
-      : `${base}/c/${encodeURIComponent(car.id)}/`;
+      ? `${base}/car?id=${encodeURIComponent(car.id)}${tag ? '&from=' + tag : ''}`
+      : `${base}/c/${encodeURIComponent(car.id)}/${tag ? '?from=' + tag : ''}`;
   };
 
   MBU.waCarLink = function (car) {

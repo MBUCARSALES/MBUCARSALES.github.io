@@ -61,8 +61,12 @@ comment on column public.car_events.photos_seen is
 --   enquire_click  tapped "Enquire now" on a car
 --   video_play     started the walkaround video
 -- ============================================================================
+-- 'page_view' belongs to schema-v14-site-analytics.sql (7 Oct 2026). It's in
+-- this list too so that running this file again after v14 can't refuse the
+-- page views already saved.
 alter table public.car_events drop constraint if exists car_events_event_type_check;
 alter table public.car_events add constraint car_events_event_type_check check (event_type in (
+  'page_view',
   'view', 'card_click', 'gallery_open',
   'whatsapp_click', 'phone_click', 'email_click',
   'enquire_click', 'enquiry_start', 'enquiry_sent',

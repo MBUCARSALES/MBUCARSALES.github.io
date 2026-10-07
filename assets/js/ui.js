@@ -446,6 +446,31 @@
     els.forEach(e => io.observe(e));
   };
 
+  /* --------------------------------------------------- STAFF PHONE NOTICE
+     Shown only straight after the admin app's "Don't count this phone"
+     link (?staff=1) or its undo (?staff=0), so whoever tapped it knows it
+     worked. Never shown to anyone else. */
+  function staffNote() {
+    const p = new URLSearchParams(location.search).get('staff');
+    if (p !== '1' && p !== '0') return;
+    const on = MBU.isStaff;
+    const note = document.createElement('div');
+    note.className = 'staff-note';
+    note.setAttribute('role', 'status');
+    note.innerHTML = on
+      ? `<strong>This phone won’t be counted.</strong> Your own visits are left out of the figures in the admin app.
+         <a href="?staff=0">Count it again</a>`
+      : `<strong>This phone is counted again,</strong> like any visitor’s.`;
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Close');
+    close.innerHTML = icon('close');
+    close.onclick = () => note.remove();
+    note.appendChild(close);
+    document.body.appendChild(note);
+    setTimeout(() => note.remove(), 12000);
+  }
+
   /* ------------------------------------------------------------------ BOOT */
   function boot() {
     const h = document.getElementById('site-header-slot');
@@ -457,6 +482,18 @@
     wireNav();
     wireStickyHeader();
     MBU.reveal();
+
+    // Count the page (car pages count the car once it's loaded), then take
+    // ?from= and ?staff= back out of the address bar, so a link copied from
+    // here doesn't carry "came from Facebook" on to whoever it's sent to
+    if (MBU.trackPage) MBU.trackPage();
+    staffNote();
+    const qs = new URLSearchParams(location.search);
+    if ((qs.has('from') || qs.has('staff')) && history.replaceState) {
+      qs.delete('from'); qs.delete('staff');
+      const rest = qs.toString();
+      history.replaceState(history.state, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+    }
 
     // Friendly warning in the console while the backend isn't wired up yet
     if (!MBU.hasBackend) {

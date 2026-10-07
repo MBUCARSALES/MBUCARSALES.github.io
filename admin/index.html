@@ -102,6 +102,7 @@
       </label>
       <select class="sel sel--sm" id="stockSort" aria-label="Sort by"></select>
     </div>
+    <button class="chip chip--filter" type="button" id="stockMotChip" hidden aria-pressed="false"></button>
     <div class="msg" id="stockMsg" role="status"></div>
     <p class="list-summary" id="stockSummary"></p>
     <div id="stockList"></div>
@@ -345,6 +346,7 @@
         <div class="f">
           <label for="fMot">MOT expires</label>
           <input class="in" id="fMot" type="date">
+          <button class="linkish f-help" type="button" id="fMotGov">Look it up on GOV.UK</button>
         </div>
       </div>
       <div class="f" style="margin-top:16px">
@@ -470,13 +472,21 @@
   <!-- ---------------------------------------------- INSIGHTS -->
   <section class="view is-hidden" id="dataView">
     <div class="segment" id="dataTabs">
-      <button data-tab="cars" class="is-on">Cars</button>
-      <button data-tab="sold">Sold</button>
-      <button data-tab="ageing">Ageing</button>
-      <button data-tab="demand">Demand</button>
+      <button data-tab="summary" class="is-on">Summary</button>
+      <button data-tab="cars">Cars</button>
+      <button data-tab="web">Website</button>
+      <button data-tab="money">Money</button>
     </div>
     <div class="msg" id="dataMsg" role="status"></div>
     <div id="dataBody"></div>
+  </section>
+
+  <!-- One car's figures, and two or three side by side (Insights → Cars) -->
+  <section class="view is-hidden" id="carfigView">
+    <div id="carfigBody"></div>
+  </section>
+  <section class="view is-hidden" id="carcmpView">
+    <div id="carcmpBody"></div>
   </section>
 
   <!-- ---------------------------------------------- INVOICES
@@ -580,6 +590,13 @@
       <h2>Signed in as</h2>
       <p style="font-size:17px;font-weight:700" id="whoami"></p>
       <button class="btn btn--outline btn--block" id="signOutBtn" style="margin-top:16px">Sign out</button>
+    </div>
+
+    <div class="section-card">
+      <h2>Your own visits</h2>
+      <p class="hint" style="margin:-6px 0 14px">Looking at your own cars on the website counts as a visitor, which matters on a quiet week. Do this once on each phone, in the browser you look at the website with, and those visits are left out of Insights. Nothing is stored on customers’ phones.</p>
+      <button class="btn btn--outline btn--block" id="staffBtn" type="button">Don’t count this phone</button>
+      <button class="btn btn--ghost btn--block" id="staffCopy" type="button" style="margin-top:8px">Copy the link, to open in Safari or Chrome</button>
     </div>
 
     <div class="section-card">

@@ -14,7 +14,7 @@
    makes phones throw the old files away.
    ========================================================================== */
 
-const CACHE = 'mbu-admin-v13';
+const CACHE = 'mbu-admin-v14';
 const SHELL = [
   './',
   './index.html',

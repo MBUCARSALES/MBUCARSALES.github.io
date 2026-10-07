@@ -1071,3 +1071,17 @@ p  { text-wrap: pretty; }
   font-weight: 700; color: var(--accent-600); font-size: var(--fs-sm);
 }
 .finance-line svg { width: 18px; height: 18px; }
+
+/* Staff phone notice: only after the admin app's "Don't count this phone" link */
+.staff-note {
+  position: fixed; left: 12px; right: 12px; bottom: 16px; z-index: 200;
+  max-width: 520px; margin: 0 auto; padding: 14px 44px 14px 16px;
+  background: var(--navy-900); color: #E8EDF5; border-radius: 14px;
+  font-size: 14px; line-height: 1.5; box-shadow: 0 10px 30px rgba(10, 24, 48, .3);
+}
+.staff-note a { color: #8FB4EA; text-decoration: underline; margin-left: 4px; }
+.staff-note button {
+  position: absolute; top: 8px; right: 8px; width: 32px; height: 32px;
+  display: grid; place-items: center; border: 0; background: none; color: inherit; cursor: pointer;
+}
+.staff-note button svg { width: 18px; height: 18px; }

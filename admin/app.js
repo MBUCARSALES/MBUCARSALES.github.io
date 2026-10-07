@@ -78,6 +78,7 @@
     print:    `<path ${P} d="M6 9V3.5h12V9"/><rect ${P} x="3" y="9" width="18" height="8" rx="2"/><path ${P} d="M6 14h12v6.5H6Z"/>`,
     share:    `<path ${P} d="M12 15V3.5"/><polyline ${P} points="7.5 8 12 3.5 16.5 8"/><path ${P} d="M5 12v7.5a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5V12"/>`,
     plus:     `<line ${P} x1="12" y1="5" x2="12" y2="19"/><line ${P} x1="5" y1="12" x2="19" y2="12"/>`,
+    clock:    `<circle ${P} cx="12" cy="12" r="9"/><polyline ${P} points="12 7 12 12 15.5 14"/>`,
     open:     `<path ${P} d="M14 4h6v6"/><line ${P} x1="20" y1="4" x2="11" y2="13"/><path ${P} d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>`
   };
   const icon = n => ICONS[n] ? `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>` : '';
@@ -134,12 +135,19 @@
     tab: 'available',
     stockSort: remembered('mbu_stock_sort', 'newest'),
     stockQuery: '',
-    interestSort: remembered('mbu_interest_sort', 'interest'),
+    carSort: remembered('mbu_car_sort', 'views'),       // Insights → Cars
+    carPeriod: remembered('mbu_car_period', '30'),
+    webScale: remembered('mbu_web_scale', 'week'),      // Insights → Website
+    webPick: null,                                      // the bar tapped on the Website chart
+    carFig: null,                                       // the car whose figures are open
+    compare: [],                                        // cars being compared
+    motTab: 'cal', motMonth: null, motDay: null,        // the MOTs screen
+    stockMot: false,                                    // Stock: only cars with an MOT to see to
     enqTab: 'new',
-    dataTab: 'cars',
+    dataTab: 'summary',
     soldMonth: 'all',        // 'all' or 'YYYY-MM', for the Sold tab
     marginOpen: false,       // per-car breakdown under the margin figure
-    schema: { v6: null, v7: null, v8: null, v10: null },   // optional upgrades: true, false, or null = not checked yet
+    schema: { v6: null, v7: null, v8: null, v10: null, v14: null },   // optional upgrades: true, false, or null = not checked yet
 
     view: 'home',
     trail: [],           // the screens Back steps through, newest last (see NAV)
@@ -382,6 +390,11 @@
     $('#loginView').style.display = 'none';
     $('#app').classList.remove('is-hidden');
     $('#whoami').textContent = session.user.email;
+    // The website is on the same address, so it shares this storage: visits
+    // to it from this browser are left out of the figures (data.js, isStaff).
+    // An iPhone's home-screen app keeps its own storage apart from Safari,
+    // which is what gear → Don't count this phone is for.
+    try { localStorage.setItem('mbu_staff', '1'); } catch { /* private mode */ }
 
     buildFormControls();
     buildStockTools();
@@ -429,14 +442,23 @@
         return !(error && /does not exist|schema cache|not find the table/i.test(error.message));
       } catch { return false; }
     };
-    const [v6, v7, v8, v10, v11] = await Promise.all([
+    // Edge Functions: 404 means not deployed; anything else means it's there
+    const deployed = async (name, method) => {
+      try { return (await fetch(CFG.supabase.url.replace(/\/$/, '') + '/functions/v1/' + name, { method, cache: 'no-store' })).status !== 404; }
+      catch { return null; }
+    };
+    const [v6, v7, v8, v10, v11, v14, track, motFn] = await Promise.all([
       has(() => sb.from('tracking_status').select('v2_since').limit(1)),
       has(() => sb.from('insight_actions').select('id').limit(1)),
       has(() => sb.from('cars').select('px_sale').limit(1)),
       has(() => sb.from('invoices').select('id').limit(1)),
-      has(() => sb.from('instagram_posts').select('id').limit(1))
+      has(() => sb.from('instagram_posts').select('id').limit(1)),
+      has(() => sb.rpc('site_stats', { p_from: new Date().toISOString(), p_to: new Date().toISOString(), p_car: null })),
+      deployed('track', 'OPTIONS'),
+      deployed('mot-calendar', 'GET')
     ]);
-    state.schema = { v6, v7, v8, v10, v11 };
+    state.schema = Object.assign(state.schema, { v6, v7, v8, v10, v11, v14 });
+    state.fns = { track, motCalendar: motFn };
     renderUpgrades();
 
     if (!missing.length) return;
@@ -461,12 +483,21 @@
     const items = [];
     const via = (CFG.tracking && CFG.tracking.via) || 'rest';
 
+    const fns = state.fns || {};
+    if (state.schema.v14 === false) {
+      items.push(['Every page and every tap counted',
+        'Run <strong>schema-v14-site-analytics.sql</strong> in Supabase → SQL Editor (after v6). Then Insights → Website, the week’s summary and “Who tapped what” have their figures.']);
+    }
     if (state.schema.v6 === false) {
       items.push(['Count people, not page loads',
-        'Run <strong>schema-v6-tracking.sql</strong> in Supabase → SQL Editor. Then deploy the <strong>track</strong> function. HANDOVER 9f has the steps.']);
+        'Run <strong>schema-v6-tracking.sql</strong> in Supabase → SQL Editor. Then deploy the <strong>track</strong> function. HANDOVER 9f and 9s have the steps.']);
     } else if (state.schema.v6 && via !== 'function') {
       items.push(['Switch the website to the new tracking',
-        'The database is ready. Deploy the <strong>track</strong> function with JWT verification off, then set <strong>tracking: { via: \'function\' }</strong> in config.js.']);
+        `${fns.track ? 'The <strong>track</strong> function is there: paste in the latest copy (7 Oct)' : 'Deploy the <strong>track</strong> function'} with JWT verification off, then set <strong>tracking: { via: \'function\' }</strong> in config.js. People get counted once a day each, bots are left out.`]);
+    }
+    if (fns.motCalendar === false) {
+      items.push(['MOT dates on your phone’s calendar, kept up to date',
+        'Deploy the <strong>mot-calendar</strong> function with JWT verification off (HANDOVER 9s). Then Tools → MOTs → Set up the calendar link. Needs v10 too.']);
     }
     if (state.schema.v7 === false) {
       items.push(['"Price is right" and "Remind me" on insights',
@@ -492,6 +523,18 @@
         <span class="hint" style="display:block;margin-top:3px;font-size:14px;line-height:1.5">${how}</span>
       </div>`).join('');
   }
+
+  /* ---- Settings → Your own visits -------------------------------------------
+     Opens the website once with ?staff=1, which leaves the one marker data.js
+     looks for (MBU.isStaff), so this phone's visits aren't counted. An
+     iPhone's home-screen app keeps its storage apart from Safari, so the link
+     can also be copied and opened in the browser you actually use. */
+  const staffUrl = () => (CFG.options.siteUrl || location.origin).replace(/\/$/, '') + '/?staff=1';
+  $('#staffBtn').onclick = () => window.open(staffUrl(), '_blank', 'noopener');
+  $('#staffCopy').onclick = async () => {
+    try { await navigator.clipboard.writeText(staffUrl()); toast('Copied. Paste it into Safari or Chrome and open it once', 'ok'); }
+    catch { prompt('Open this once in the browser you use:', staffUrl()); }
+  };
 
   /* ---- Settings → Auto Trader ----------------------------------------- */
   function atIntro() {
@@ -632,13 +675,13 @@
      once saved there's nothing to return to. */
   const TABS = ['home', 'stock', 'enq', 'data', 'tools'];
   const VIEWS = ['home','stock','quick','form','value','enq','msg','data','tools','settings',
-                 'invoices','invoice','invprev','pricebook','motcal','motcheck','photos'];
+                 'invoices','invoice','invprev','pricebook','motcal','motcheck','photos','carfig','carcmp'];
   const NO_RETURN = ['form', 'quick'];
   const TITLES = {
     home: 'Home', stock: 'Your stock', quick: 'Quick add', enq: 'Inbox', msg: 'Message',
     value: 'Before you bid', data: 'Insights', tools: 'Tools', settings: 'Settings',
-    invoices: 'Invoices', invoice: 'Invoice', invprev: 'Check and send', pricebook: 'Price book', motcal: 'MOT calendar',
-    motcheck: 'MOT checker', photos: 'Photo guide'
+    invoices: 'Invoices', invoice: 'Invoice', invprev: 'Check and send', pricebook: 'Price book', motcal: 'MOTs',
+    motcheck: 'MOT checker', photos: 'Photo guide', carfig: 'Car figures', carcmp: 'Compare cars'
   };
   // Screens that redraw themselves each time they're shown (coming back
   // from a sub-screen included), so a saved invoice is in the list at once
@@ -820,21 +863,23 @@
     if (insightsAt) analysis = runEngine();
 
     const sections = homeSections();
-    const SHOWN = 7;
     const act = run => homeActs.push(run) - 1;
 
     /* One kind of thing per row. Tap it and the cars (or messages) it covers
        drop down underneath, each one tapping through to its fix. A section
-       with only one thing in it skips the drop-down and goes straight there. */
+       with only one thing in it skips the drop-down and goes straight there.
+       Anything about one car can be hidden (the clock): for a week, or until
+       it changes (HOME HIDDEN, below). */
+    const hideBtn = it => it.hid ? `<button class="alert-hide" type="button" data-hide="${esc(it.hid)}" data-what="${esc(it.title + (it.sub ? ' · ' + it.sub : ''))}" aria-label="Hide this for now">${icon('clock')}</button>` : '';
     const section = s => {
       if (s.items.length === 1) {
         const it = s.items[0];
         const [title, sub] = s.single === 'item' ? [it.title, it.sub] : [s.title, it.title];
-        return `<button class="alert alert--${s.level}" type="button" data-home="${act(it.run)}">
+        return `<div class="alert-wrap"><button class="alert alert--${s.level}" type="button" data-home="${act(it.run)}">
           <span class="alert-ic">${icon(s.icon)}</span>
           <span class="alert-txt"><strong>${esc(title)}</strong><small>${esc(sub)}</small></span>
           ${icon('right')}
-        </button>`;
+        </button>${hideBtn(Object.assign({}, it, { title, sub }))}</div>`;
       }
       return `<details class="alert-group" data-key="${s.key}"${state.homeOpen.has(s.key) ? ' open' : ''}>
         <summary class="alert alert--${s.level}">
@@ -842,15 +887,26 @@
           <span class="alert-txt"><strong>${esc(s.title)}</strong><small>${esc(s.sub)}</small></span>
           <span class="alert-count">${s.items.length}</span>${icon('down')}
         </summary>
-        <div class="alert-items">${s.items.map(it => `
+        <div class="alert-items">${s.items.map(it => `<div class="alert-wrap">
           <button class="alert-item" type="button" data-home="${act(it.run)}">
             <i class="dot dot--${it.level || s.level}"></i>
             <span class="alert-txt"><strong>${esc(it.title)}</strong><small>${esc(it.sub)}</small></span>
             ${icon('right')}
-          </button>`).join('')}
+          </button>${hideBtn(it)}</div>`).join('')}
         </div>
       </details>`;
     };
+
+    /* Today, this week, and the tidying-up that can wait (folded away) */
+    const when = { today: [], week: [], later: [] };
+    sections.forEach(x => when[homeWhen(x)].push(x));
+    const group = (key, label, list, folded) => !list.length ? '' : folded
+      ? `<details class="alerts-more alerts-when" data-key="when:${key}"${state.homeOpen.has('when:' + key) ? ' open' : ''}>
+           <summary><span>${esc(label)}</span><span class="home-n">${list.length}</span>${icon('down')}</summary>
+           ${list.map(section).join('')}
+         </details>`
+      : `<div class="alerts-when-h">${esc(label)} <span class="home-n">${list.length}</span></div>${list.map(section).join('')}`;
+    const hidden = homeHidden.count;
 
     body.innerHTML = `
       ${verseCard(null, { dated: true })}
@@ -867,15 +923,16 @@
         </button>
       </div>
 
+      ${weekCard(true)}
+
       <h2 class="home-h">Needs you${sections.length ? ` <span class="home-n">${sections.length}</span>` : ''}</h2>
       ${sections.length ? `<div class="card alerts">
-          ${sections.slice(0, SHOWN).map(section).join('')}
-          ${sections.length > SHOWN ? `<details class="alerts-more">
-            <summary>Show ${sections.length - SHOWN} more</summary>
-            ${sections.slice(SHOWN).map(section).join('')}
-          </details>` : ''}
+          ${group('today', 'Today', when.today)}
+          ${group('week', 'This week', when.week)}
+          ${group('later', when.today.length || when.week.length ? 'When you have a minute' : 'Tidying up, when you have a minute', when.later, true)}
         </div>`
       : `<div class="card alert-none alert-none--ok">${icon('checkCirc')}<span>Nothing needs you right now.</span></div>`}
+      ${hidden ? `<button class="home-hidden" type="button" id="hHidden">${icon('clock')} ${plural(hidden, 'thing')} hidden for now · Show</button>` : ''}
       ${!insightsAt && insightsBusy ? '<p class="note home-note">Checking prices and interest…</p>' : ''}
 
       ${homeMoney()}
@@ -889,20 +946,84 @@
     $$('#homeBody [data-home]').forEach(b => { b.onclick = () => homeActs[+b.dataset.home](); });
     // Remember which sections are open, so a redraw (a message read, a price
     // changed) doesn't snap them shut
-    $$('#homeBody details.alert-group').forEach(d => {
+    $$('#homeBody details.alert-group, #homeBody details.alerts-when').forEach(d => {
       d.addEventListener('toggle', () => { d.open ? state.homeOpen.add(d.dataset.key) : state.homeOpen.delete(d.dataset.key); });
     });
+    $$('#homeBody [data-hide]').forEach(b => b.onclick = e => { e.stopPropagation(); hideSheet(b.dataset.hide, b.dataset.what); });
+    const hh = $('#hHidden');
+    if (hh) hh.onclick = hiddenSheet;
+    wireSiteBits(body);
     $$('#homeBody [data-go]').forEach(b => {
       b.onclick = () => {
         const [view, tab] = b.dataset.go.split(':');
         if (view === 'stock') { setStockTab(tab || 'available'); go('stock'); }
-        else if (view === 'data') openDataTab(tab || 'cars');
+        else if (view === 'data') openDataTab(tab || 'summary');
         else if (view === 'enq') { setEnqTab(tab || 'new'); go('enq'); }
       };
     });
     wireFigureButtons(body);
     wireCharts(body);
     wireMashallah(body);
+  }
+
+  /* ---- Which group a Needs you row goes in ------------------------------- */
+  function homeWhen(x) {
+    if (['deliveries', 'messages', 'photos'].includes(x.key)) return 'today';
+    if (x.key === 'mot' || x.key === 'recs') return x.level === 'red' ? 'today' : x.level === 'grey' ? 'later' : 'week';
+    if (['cat', 'unmargined', 'pxcar', 'drafts'].includes(x.key)) return 'week';
+    return 'later';
+  }
+
+  /* ---- HOME HIDDEN --------------------------------------------------------
+     Things about one car hidden from Needs you, as { key: until | 'always' }.
+     A key carries what the item is about (an MOT row includes its date), so
+     "for good" lasts until that changes, then it can come back. Shared by
+     both phones in app_settings ('home_hidden', schema v10), else kept on
+     this phone. */
+  const homeHidden = { map: null, loading: false, count: 0, list: [] };
+  function hiddenMap() {
+    if (homeHidden.map) return homeHidden.map;
+    try { homeHidden.map = JSON.parse(localStorage.getItem('mbu_home_hidden') || '{}') || {}; } catch { homeHidden.map = {}; }
+    if (state.schema.v10 !== false && !homeHidden.loading) {
+      homeHidden.loading = true;
+      Promise.resolve(sb.from('app_settings').select('value').eq('key', 'home_hidden').maybeSingle()).then(({ data, error }) => {
+        if (error || !data || !data.value) return;
+        homeHidden.map = Object.assign({}, data.value.items || {});
+        if (state.view === 'home') renderHome();
+      }).catch(() => {});
+    }
+    return homeHidden.map;
+  }
+  const isHidden = key => { const v = hiddenMap()[key]; return v === 'always' || (!!v && new Date(v) > new Date()); };
+
+  async function setHidden(key, value) {
+    const m = hiddenMap();
+    if (value) m[key] = value; else delete m[key];
+    Object.keys(m).forEach(k => { if (m[k] !== 'always' && !(new Date(m[k]) > new Date())) delete m[k]; });
+    try { localStorage.setItem('mbu_home_hidden', JSON.stringify(m)); } catch { /* fine */ }
+    renderHome();
+    if (state.schema.v10) {
+      const { error } = await sb.from('app_settings').upsert({ key: 'home_hidden', value: { items: m }, updated_at: new Date().toISOString() });
+      if (error) toast('Hidden on this phone only: ' + error.message);
+    }
+  }
+
+  function hideSheet(key, what) {
+    sheet('Hide this for now?', what, [
+      { label: 'Hide it for a week', icon: 'clock', sub: 'It comes back on ' + shortDay(addDays(new Date(), 7)),
+        run: () => { setHidden(key, addDays(new Date(), 7).toISOString()); toast('Hidden for a week', 'ok'); } },
+      { label: 'Hide it until something changes', icon: 'check', sub: 'A new date, a price, a fix: then it can come back',
+        run: () => { setHidden(key, 'always'); toast('Hidden', 'ok'); } }
+    ]);
+  }
+
+  function hiddenSheet() {
+    const list = homeHidden.list;
+    if (!list.length) return;
+    sheet('Hidden for now', 'Tap one to put it back on Home', list.map(h => ({
+      label: h.title, sub: [h.sub, hiddenMap()[h.key] === 'always' ? 'until it changes' : 'until ' + shortDay(hiddenMap()[h.key])].filter(Boolean).join(' · '),
+      icon: 'clock', run: () => { setHidden(h.key, null); toast('Back on Home', 'ok'); }
+    })));
   }
 
   /**
@@ -920,6 +1041,15 @@
   function homeSections() {
     const out = [];
     const cars = state.cars;
+    homeHidden.count = 0;
+    homeHidden.list = [];
+    // Leave out what's been hidden, and remember it for "N hidden · Show"
+    const keep = (key, title, sub) => {
+      if (!isHidden(key)) return true;
+      homeHidden.count++;
+      homeHidden.list.push({ key, title, sub });
+      return false;
+    };
     const held = cars.filter(c => inStock(c) || c.status === 'draft');   // cars you still own
     const live = cars.filter(inStock);
     const sold = cars.filter(c => c.status === 'sold');
@@ -944,17 +1074,17 @@
       title: counted(drops.length, 'delivery to do', 'deliveries to do'), sub: 'Mark each one delivered, then send the updated invoice', items: drops });
 
     /* MOTs: run out, running out, and cars with no date, in one place */
-    const mots = held.filter(c => motLevel(c) || !c.mot_expiry)
+    const motHid = c => 'mot:' + c.id + ':' + (c.mot_expiry ? String(c.mot_expiry).slice(0, 10) : 'none');
+    const mots = held.filter(c => (motLevel(c) || !c.mot_expiry) && keep(motHid(c), carTitle(c), c.mot_expiry ? motWords(c) : 'No MOT date'))
       .sort((a, b) => (motDays(a) ?? Infinity) - (motDays(b) ?? Infinity))
       .map(c => {
         const lvl = motLevel(c) || 'grey';
         return { level: lvl, days: motDays(c), title: c.mot_expiry ? motWords(c) : 'No MOT date', sub: carSub(c),
-          run: () => c.mot_expiry
-            ? sheet(motWords(c), carTitle(c) + ' · ' + new Date(c.mot_expiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), [
-                { label: 'Put in the new MOT date', icon: 'calendar', sub: 'Once it’s been tested', run: () => openForm(c, '#fMot') },
-                { label: 'See the car', icon: 'car', run: () => carActions(c) }])
-            : openForm(c, '#fMot') };
+          hid: motHid(c), run: () => motSheet(c) };
       });
+    const noDate = mots.filter(m => m.days == null).length;
+    if (mots.length) mots.push({ level: 'grey', title: noDate > 1 ? `Fill in all ${noDate} missing dates on one screen` : 'See every MOT on the calendar',
+      sub: 'Tools → MOTs', run: () => { state.motTab = noDate > 1 ? 'dates' : 'cal'; go('motcal'); } });
     if (mots.length) {
       const ran = mots.filter(m => m.days != null && m.days < 0).length;
       const month = mots.filter(m => m.level === 'red').length - ran;
@@ -1014,11 +1144,12 @@
     }
 
     /* Gaps in the admin, one section each */
-    const gap = (list, o) => {
+    const gap = (all, o) => {
+      const list = all.filter(c => keep(o.key + ':' + c.id, carTitle(c), o.one.replace(/^1 /, '')));
       if (!list.length) return;
       out.push(Object.assign({ level: 'grey', rank: 8, single: 'section' }, o, {
         title: list.length === 1 ? o.one : `${list.length} ${o.many}`,
-        items: list.map(c => ({ title: carTitle(c),
+        items: list.map(c => ({ title: carTitle(c), hid: o.key + ':' + c.id,
           sub: o.itemSub ? o.itemSub(c) : [c.registration ? fmtReg(c.registration) : null,
             c.status === 'sold' ? 'sold' : c.status === 'draft' ? 'draft' : money(c.price)].filter(Boolean).join(' · '),
           run: () => o.fix(c) }))
@@ -1160,7 +1291,7 @@
           ${t.px ? `<span class="pill pill--blue">${t.px} part exchange${t.px === 1 ? '' : 's'}, profit on their car</span>` : ''}
         </div>` : ''}
         ${months.length > 1 ? `<div class="hm-chart">${barChart(months, { compact: true, action: 'open', height: 76 })}</div>` : ''}
-        <button class="btn btn--outline btn--sm btn--block" type="button" data-go="data:sold">See every sale and the charts</button>
+        <button class="btn btn--outline btn--sm btn--block" type="button" data-go="data:money">See every sale and the charts</button>
       </div>`;
   }
 
@@ -1303,6 +1434,18 @@
 
     const search = $('#stockSearch');
     search.addEventListener('input', () => { state.stockQuery = search.value; renderStock(); });
+    $('#stockMotChip').onclick = () => {
+      state.stockMot = !state.stockMot;
+      $('#stockMotChip').setAttribute('aria-pressed', String(state.stockMot));
+      if (state.stockMot) { state.stockSort = 'mot'; sel.value = 'mot'; }
+      renderStock();
+    };
+    // The car form's MOT box: look the date up from the plate typed above it
+    $('#fMotGov').onclick = () => {
+      const plate = cleanPlate($('#fReg').value);
+      if (plate.length < 2) return toast('Type the number plate first');
+      window.open(govMot(plate), '_blank', 'noopener');
+    };
   }
 
   /** Everything you might type to find a car: make, model, trim, plate, year, colour. */
@@ -1359,18 +1502,27 @@
 
     const all = byTab[state.tab];
     const q = state.stockQuery.trim();
-    const cars = all.filter(c => matchesQuery(c, q)).sort(SORTS[state.stockSort][1]);
+    // "MOT due": run out, due within 90 days, or no date, on cars you still own
+    const motDue = c => c.status !== 'sold' && (!!motLevel(c) || !c.mot_expiry);
+    const dueN = all.filter(motDue).length;
+    if (state.tab === 'sold' || !dueN) state.stockMot = false;
+    const chip = $('#stockMotChip');
+    chip.hidden = state.tab === 'sold' || !dueN;
+    chip.classList.toggle('is-on', state.stockMot);
+    chip.innerHTML = `${icon('calendar')} MOT due <b>${dueN}</b>`;
+    const cars = all.filter(c => matchesQuery(c, q) && (!state.stockMot || motDue(c))).sort(SORTS[state.stockSort][1]);
 
     // One line saying what you're looking at, and on In stock what it's worth
     const priced = cars.filter(c => c.price != null);
     const worth = state.tab === 'available' && priced.length
       ? ` · ${money(priced.reduce((n, c) => n + c.price, 0))} at asking` : '';
     const summary = !all.length ? ''
+      : state.stockMot ? `${plural(cars.length, 'car')} with an MOT to see to (run out, due in 90 days, or no date)`
       : q ? `${cars.length} of ${all.length} match “${q}”${worth}`
       : `${plural(all.length, state.tab === 'sold' ? 'car sold' : state.tab === 'draft' ? 'draft' : 'car', state.tab === 'sold' ? 'cars sold' : undefined)}${worth}`;
     // Mashallah beside what the stock is worth, as it is beside the money on Home
     const box = $('#stockSummary');
-    box.innerHTML = summary ? `<span>${esc(summary)}</span>${worth ? mashallah() : ''}` : '';
+    box.innerHTML = summary ? `<span>${esc(summary)}</span>${worth && !state.stockMot ? mashallah() : ''}` : '';
     wireMashallah(box);
 
     if (state.view === 'home') renderHome();
@@ -1409,8 +1561,9 @@
         c.featured ? '<span class="pill pill--blue">Featured</span>' : '';
 
       const mot = motLevel(c);
-      const motPill = mot ? `<span class="pill pill--${mot}">${icon('calendar')}${
-        motDays(c) < 0 ? 'MOT ran out' : 'MOT ' + shortDay(c.mot_expiry)}</span>` : '';
+      const motPill = mot ? `<button type="button" class="pill pill--${mot} pill-btn" data-motpill="${esc(c.id)}">${icon('calendar')}${
+        motDays(c) < 0 ? 'MOT ran out' : 'MOT ' + shortDay(c.mot_expiry)}</button>`
+        : state.stockMot && !c.mot_expiry && !sold ? `<button type="button" class="pill pill--grey pill-btn" data-motpill="${esc(c.id)}">${icon('calendar')}No MOT date</button>` : '';
 
       // On a sold car the useful number is what you made, and whether it's complete
       const mg = sold ? carMargin(c) : null;
@@ -1447,6 +1600,11 @@
     $$('#stockList .stock-row').forEach(row => {
       row.onclick = () => carActions(state.cars.find(c => String(c.id) === row.dataset.id));
     });
+    $$('#stockList [data-motpill]').forEach(b => b.onclick = e => {
+      e.stopPropagation();
+      const car = carById(b.dataset.motpill);
+      if (car) motSheet(car);
+    });
   }
 
   function carActions(car) {
@@ -1482,6 +1640,15 @@
         run: () => carActions(pxFrom) });
     }
     acts.push({ label: 'Edit details', icon: 'edit', run: () => openForm(car) });
+    if (car.status !== 'sold') {
+      acts.push({ label: car.mot_expiry ? motWords(car) : 'MOT: no date yet', icon: 'calendar',
+        sub: car.mot_expiry ? `${longDate(motDate(car))}. Change it, or it’s passed` : 'Put the date in, or look it up on GOV.UK',
+        run: () => motSheet(car) });
+    }
+    if (car.status !== 'draft') {
+      acts.push({ label: 'Its figures', icon: 'gauge', sub: 'Views, taps and messages, and how it compares',
+        run: () => openCarFigures(car.id) });
+    }
     if (car.status !== 'sold') {
       acts.push({ label: 'What it cost you', icon: 'pound',
         sub: car.purchase_price == null ? 'Nothing entered yet' : `Paid ${money(car.purchase_price)}${car.prep_cost != null ? ' + ' + money(car.prep_cost) + ' prep' : ', no prep entered'}`,
@@ -1540,7 +1707,7 @@
 
     if (car.status !== 'draft') {
       acts.push({ label: 'View on the website', icon: 'eye',
-        run: () => window.open(`../car?id=${encodeURIComponent(car.id)}`, '_blank') });
+        run: () => window.open(`../car?id=${encodeURIComponent(car.id)}&staff=auto`, '_blank') });
     }
     acts.push({ label: 'Delete this car', icon: 'trash', danger: true,
       sub: 'Permanent. No undo.',
@@ -1557,7 +1724,7 @@
     if (status === 'sold' && !extra) return figuresSheet(car, { markSold: true });
 
     const patch = Object.assign({ status, updated_at: new Date().toISOString() }, extra || {});
-    if (status === 'sold') patch.sold_at = new Date().toISOString();
+    if (status === 'sold' && !patch.sold_at) patch.sold_at = new Date().toISOString();
     if (status === 'available' && car.status === 'sold') {
       patch.sold_at = null;
       if (car.px_sale) Object.assign(patch, { px_sale: false, px_cash: null });   // back in stock, so not sold in a part exchange either
@@ -1587,10 +1754,10 @@
     const sold = markSold || car.status === 'sold';
     const title = carTitle(car);
     const from = pxSaleOf(car);          // this car came in part exchange
-    let px = !!car.px_sale;              // this car went out in one
+    let px = opts.pxCash != null || !!car.px_sale;   // this car went out in one (an invoice can say so)
 
     sheet(markSold ? 'Mark as sold' : 'Your figures', title + ' · never shown on the website', []);
-    const saleStart = car.sale_price != null ? car.sale_price : markSold && car.price != null ? car.price : '';
+    const saleStart = opts.sale != null ? opts.sale : car.sale_price != null ? car.sale_price : markSold && car.price != null ? car.price : '';
     $('#sheetActions').innerHTML = `
       <div class="card figs">
         ${from ? `<p class="figs-px-note">Taken in part exchange on the ${esc(carTitle(from))}. What you paid is
@@ -1605,7 +1772,7 @@
         <div class="figs-px-box" id="fgPxBox" hidden>
           <div class="f">
             <label for="fgCash">Cash they paid on top of their car</label>
-            <div class="money"><input class="in" id="fgCash" type="number" inputmode="numeric" placeholder="0" value="${esc(car.px_cash ?? '')}"></div>
+            <div class="money"><input class="in" id="fgCash" type="number" inputmode="numeric" placeholder="0" value="${esc(opts.pxCash ?? car.px_cash ?? '')}"></div>
             <span class="hint">Their car goes in at what this one cost you minus this, so the profit shows when it sells.</span>
           </div>
         </div>
@@ -1721,6 +1888,7 @@
 
       if (markSold) {
         closeSheet();
+        if (opts.soldAt) patch.sold_at = new Date(String(opts.soldAt).slice(0, 10) + 'T12:00:00').toISOString();   // the invoice's sale date
         await setStatus(car, 'sold', patch);
         if (car.status !== 'sold') return;             // didn't save; setStatus has said why
         if (car.px_sale && !pxCarOf(car)) return addPxCar(car);
@@ -3171,7 +3339,6 @@
     $$('#dataTabs button').forEach(x => x.classList.toggle('is-on', x === b));
     renderInsights();
   });
-  state.dataTab = 'cars';
 
   async function loadInsights() {
     // Show what we already have straight away and refresh underneath it;
@@ -3255,127 +3422,1057 @@
   function renderInsights() {
     if (!stats) return;
     analysis = runEngine();
+    const tab = INSIGHT_TABS.includes(state.dataTab) ? state.dataTab : 'summary';
     $('#dataBody').innerHTML =
-      state.dataTab === 'sold'   ? soldInsights()
-      : state.dataTab === 'ageing' ? ageingInsights()
-      : state.dataTab === 'demand' ? demandInsights()
-      : carInsights();
+      tab === 'money' ? soldInsights()
+      : tab === 'cars' ? carsTab()
+      : tab === 'web' ? webTab()
+      : summaryTab();
     wireInsightActions();
+    wireSiteBits($('#dataBody'));
   }
 
-  /* ---- Ageing: the price review worklist ---------------------------------
-     The app already flagged cars that were sitting. This turns that into
-     something you can act on: how long, what it's cost you in looks, what
-     you actually got for the last one, and a button to change the price. */
-  function ageingInsights() {
-    if (ageing === null) {
-      return `<div class="msg msg--warn is-shown">
-        Run <strong>schema-v4-pricing-video.sql</strong> in Supabase to switch this on.
-      </div>`;
+  /* ==========================================================================
+     INSIGHTS, IN PLAIN WORDS (7 Oct 2026)
+     --------------------------------------------------------------------------
+     Four tabs: Summary (the last 7 days in sentences, the decisions, who
+     tapped what, what people ask for), Cars (one sentence per car, and each
+     car's own screen), Website (views by day, week or month, and where they
+     came from), Money (the Sold tab as it was).
+
+     Every number comes with a sentence, and the ⓘ beside it says what it
+     means and where it comes from (EXPLAIN). Taps are "taps", never
+     "contacts": a WhatsApp tap opens WhatsApp, and whether they sent anything
+     the website can't know.
+
+     The website figures come from schema-v14-site-analytics.sql (site_stats
+     and contact_feed, added up in the database). Without it the tabs say so
+     and fall back to the per-car page views the app always had.
+     ========================================================================== */
+  const INSIGHT_TABS = ['summary', 'cars', 'web', 'money'];
+
+  /* ---- Dates, in the phone's own time (UK) ------------------------------- */
+  const pad2 = n => String(n).padStart(2, '0');
+  const dayKey = d => { const t = new Date(d); return t.getFullYear() + '-' + pad2(t.getMonth() + 1) + '-' + pad2(t.getDate()); };
+  const fromKey = k => { const [y, m, d] = String(k).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d); };
+  const startDay = d => { const t = new Date(d); t.setHours(0, 0, 0, 0); return t; };
+  const addDays = (d, n) => { const t = new Date(d); t.setDate(t.getDate() + n); return t; };
+  const weekStart = d => addDays(startDay(d), -((new Date(d).getDay() + 6) % 7));   // Monday
+  const monthStart = d => { const t = new Date(d); return new Date(t.getFullYear(), t.getMonth(), 1); };
+  const sumOf = (rows, k) => (rows || []).reduce((n, r) => n + (r[k] || 0), 0);
+  const dayWords = d => new Date(d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+
+  /* ---- Fetching, once, then from memory for two minutes -------------------
+     need(key, fetch) gives back what's already here (undefined the first
+     time, while it loads) and redraws the screen when the answer lands.
+     A failed fetch is remembered as null for the same two minutes, so a
+     missing function can't set off a loop. */
+  const siteGot = new Map(), sitePending = new Map();
+  function need(key, fetcher, maxAge) {
+    const hit = siteGot.get(key);
+    const fresh = hit && Date.now() - hit.at < (maxAge || 120000);
+    if (!fresh && !sitePending.has(key)) {
+      sitePending.set(key, Promise.resolve().then(fetcher)
+        .then(data => { siteGot.set(key, { at: Date.now(), data }); })
+        .catch(err => { console.warn('Insights: ' + key, err); siteGot.set(key, { at: Date.now(), data: null }); })
+        .finally(() => { sitePending.delete(key); redrawSoon(); }));
     }
-    if (!ageing.length) {
-      return `<div class="empty">${icon('checkCirc')}<h3>Nothing hanging about</h3>
-        <p>No cars in stock, or none of them old enough to worry about yet.</p></div>`;
+    return hit ? hit.data : undefined;
+  }
+  let redrawQueued = false;
+  function redrawSoon() {
+    if (redrawQueued) return;
+    redrawQueued = true;
+    setTimeout(() => {
+      redrawQueued = false;
+      if (state.view === 'data') renderInsights();
+      else if (state.view === 'carfig') renderCarFigures();
+      else if (state.view === 'carcmp') renderCompare();
+      else if (state.view === 'motcal') renderMotCal();
+      else if (state.view === 'home') renderHome();
+    }, 30);
+  }
+
+  /** site_stats for a stretch of time (and one car's days). null = v14 not run. */
+  async function siteStats(from, to, car) {
+    if (state.schema.v14 === false) return null;
+    const { data, error } = await sb.rpc('site_stats', {
+      p_from: new Date(from).toISOString(),
+      p_to: (to ? new Date(to) : new Date()).toISOString(),
+      p_car: car || null
+    });
+    if (error) {
+      if (/PGRST202|could not find the function|site_stats|schema cache/i.test((error.code || '') + ' ' + (error.message || ''))) state.schema.v14 = false;
+      throw error;
+    }
+    state.schema.v14 = true;
+    return data;
+  }
+
+  /** The latest taps (v14), newest first. */
+  async function contactFeed() {
+    if (state.schema.v14 === false) return null;
+    const { data, error } = await sb.rpc('contact_feed', {
+      p_since: addDays(startDay(new Date()), -30).toISOString(), p_limit: 120 });
+    if (error) {
+      if (/PGRST202|could not find the function|contact_feed|schema cache/i.test((error.code || '') + ' ' + (error.message || ''))) state.schema.v14 = false;
+      throw error;
+    }
+    return data || [];
+  }
+
+  /** Every form and car request in the last 60 days, archived ones too:
+      the Inbox only loads what isn't archived, and a week's count shouldn't
+      drop because a message was dealt with. */
+  async function recentMessages() {
+    const since = addDays(startDay(new Date()), -60).toISOString();
+    const [e, r] = await Promise.all([
+      sb.from('enquiries').select('id,created_at,kind,car_id,car_title,name,part_ex,finance_interest,details,is_read,archived')
+        .gte('created_at', since).order('created_at', { ascending: false }).limit(400),
+      sb.from('wanted_requests').select('id,created_at,kind,car_id,name,make,model,transmission,fuel,budget_max,is_read,archived')
+        .gte('created_at', since).order('created_at', { ascending: false }).limit(400)
+    ]);
+    return { enquiries: e.error ? [] : (e.data || []), requests: r.error ? [] : (r.data || []) };
+  }
+
+  /* The windows the summary compares: the last 7 days up to now, and the 7
+     days before up to the same time of day, so a morning isn't set against
+     a whole day. Boundaries sit on the minute so they can be remembered. */
+  function weekWindows() {
+    const now = Math.floor(Date.now() / 60000) * 60000;
+    const from = addDays(startDay(new Date()), -6);
+    return { from, prevFrom: addDays(from, -7), prevTo: new Date(now - 7 * DAY), now };
+  }
+  function weekFigures() {
+    const w = weekWindows();
+    const cur = need('w7', () => siteStats(w.from));
+    const prev = need('p7', () => siteStats(w.prevFrom, w.prevTo));
+    const msgs = need('msgs', recentMessages);
+    return { w, cur, prev, msgs };
+  }
+
+  /* ---- Words ---------------------------------------------------------------- */
+  const PAGE_NAME = {
+    home: 'Homepage', stock: 'Stock list', car: 'Car pages', contact: 'Contact', sell: 'Sell your car',
+    wanted: 'Car finder', 'find-us': 'Find us', privacy: 'Privacy', terms: 'Terms', '404': 'Page not found', other: 'Other pages'
+  };
+  const PAGE_WORDS = {
+    home: 'the homepage', stock: 'the stock list', car: 'a car’s page', contact: 'the contact page',
+    sell: 'the sell your car page', wanted: 'the car finder', 'find-us': 'the Find us page', privacy: 'the privacy page',
+    terms: 'the terms page', '404': 'a page that doesn’t exist', other: 'another page'
+  };
+  const PLACE_WORDS = {
+    header: 'in the top bar', menu: 'in the menu', bar: 'in the bottom bar', footer: 'at the foot of the page',
+    buy: 'in the price box', hero: 'at the top of the homepage', 'sell-cta': 'under “Sell your car”',
+    card: 'on the page', 'about-car': 'next to the car', 'after-form': 'after sending the form', page: 'on the page'
+  };
+  const KIND_WORDS = { whatsapp_click: 'WhatsApp', phone_click: 'Call', email_click: 'Email' };
+  const KIND_ICON = { whatsapp_click: 'whatsapp', phone_click: 'phone', email_click: 'mail' };
+  const SOURCE_WORDS = {
+    direct: 'Typed in, saved, or a link in a message', search: 'Google or another search engine',
+    facebook: 'Facebook', instagram: 'Instagram', tiktok: 'TikTok', twitter: 'X (Twitter)', whatsapp: 'WhatsApp',
+    autotrader: 'Autotrader', gumtree: 'Gumtree', share: 'A car someone shared from the website',
+    referral: 'Another website', stock: 'Your stock list', home: 'Your homepage', internal: 'Another of your pages'
+  };
+  const sourceWords = s => SOURCE_WORDS[s] || (s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Not known');
+  const DEVICE_WORDS = { mobile: 'Phones', tablet: 'Tablets', desktop: 'Computers' };
+
+  /** "up 18% on", "about the same as", "against 4" (small numbers get no %). */
+  function trendWords(a, b) {
+    if (b == null) return '';
+    if (b < 10 || a < 10) return a === b ? `the same as the ${nf(b)}` : `against ${nf(b)}`;
+    const change = Math.round((a - b) / b * 100);
+    if (Math.abs(change) < 5) return `about the same as the ${nf(b)}`;
+    return `${change > 0 ? 'up' : 'down'} ${Math.abs(change)}% on the ${nf(b)}`;
+  }
+  const times = (n, one, many) => n === 1 ? '1 ' + one : nf(n) + ' ' + (many || one + 's');
+
+  /* What each figure means, behind the ⓘ beside it */
+  const EXPLAIN = {
+    views: ['Page views', 'Every time a page of the website is opened. One person looking at three cars is three views, and opening the same page again counts again. Your own phones are left out once they’re marked (gear → Don’t count this phone).'],
+    people: ['People', 'Each visitor counted once a day, however many pages they open. There are no cookies: a code is made from their connection and phone that changes every day, so nobody can be followed, and the same person on two different days counts twice. Bots are left out. Needs the visitor counter switched on (gear → Ready to switch on).'],
+    taps: ['Taps to get in touch', 'Someone tapped WhatsApp, Call or Email on the website. A tap opens WhatsApp or the phone’s dialler: whether they then sent a message or rang, the website can’t know. Forms that did arrive are in your Inbox, and are shown alongside.'],
+    photos: ['Opened the photos', 'Tapped into the big photo viewer on a car’s page. Someone who does that is looking properly, not just passing.'],
+    messages: ['Messages', 'Forms sent from the website: questions about a car, part exchanges, sell your car, finance. They’re in your Inbox. Messages sent straight on WhatsApp, and phone calls, never pass through the website, so they can’t be counted here.'],
+    sources: ['Where they came from', 'Worked out from the page someone was on just before (Google, Facebook, Autotrader…). WhatsApp, texts, emails and most apps don’t pass that on, so anyone who tapped a link in a message, typed the address or used a bookmark shows as “Typed in, saved, or a link in a message”. Cars shared with the Share button on the website show as “shared”. Moving between your own pages isn’t counted as coming from somewhere.'],
+    busy: ['Busier than most', 'Compared with the typical car in stock over the same days: the one in the middle when they’re put in order of views. Twice the views or more is one of your busiest; half or less is quieter than most.'],
+    funnel: ['From looking to buying', 'How far people got with this car. Each step is out of the views at the top. Lots of views but few photo opens usually means the first photo or the price in the list isn’t pulling people in; lots of photo opens but no taps points at the price or something in the details.'],
+    places: ['Which button', 'Where the WhatsApp, Call or Email button was: the top bar and bottom bar are on every page, the price box is on each car’s page.'],
+    counting: ['How the website is counted', 'No cookies and nothing stored on customers’ phones. Page views count every time a page opens. Once the visitor counter is on, people are counted once a day each and bots are left out. Your own phones are left out once marked.']
+  };
+  const info = key => `<button class="info" type="button" data-explain="${key}" aria-label="What this means">i</button>`;
+  function explain(key) {
+    const e = EXPLAIN[key];
+    if (!e) return;
+    sheetHtml(e[0], '', `<p class="explain">${esc(e[1])}</p>`);
+  }
+
+  /* ---- Messages for a car or a stretch of time --------------------------- */
+  const messagesFor = (msgs, carId) => ((msgs && msgs.enquiries) || []).filter(e => String(e.car_id || '') === String(carId));
+  const inWindow = (list, from, to) => (list || []).filter(x => { const t = new Date(x.created_at); return t >= from && (!to || t < to); });
+
+  /* ==========================================================================
+     SUMMARY: the last 7 days in sentences, then the decisions, who tapped
+     what, and what people ask for that isn't in stock
+     ========================================================================== */
+  function summaryTab() {
+    return `
+      ${weekCard(false)}
+      ${decisionsHtml()}
+      ${feedCard()}
+      ${askedForCard()}
+      ${countingNote()}`;
+  }
+
+  /**
+   * The last 7 days, in sentences, with one thing to do. Used on Home too
+   * (compact: fewer sentences, the button goes to Insights).
+   */
+  function weekFacts() {
+    const { w, cur, prev, msgs } = weekFigures();
+    const facts = [];
+    const now = new Date();
+
+    if (cur) {
+      const views = sumOf(cur.days, 'views'), carViews = sumOf(cur.days, 'car_views');
+      const pagesSince = cur.pages_since ? new Date(cur.pages_since) : null;
+      const fair = prev && pagesSince && pagesSince <= w.prevFrom;           // every page counted in both weeks
+      const people = cur.days.every(d => d.people != null) ? sumOf(cur.days, 'people') : null;
+      if (pagesSince && pagesSince <= now) {
+        facts.push({ key: 'views', text: `The website had <b>${times(views, 'page view')}</b> in the last 7 days${
+          people != null ? ` from about ${times(people, 'person', 'people')}` : ''}${
+          fair ? `, ${trendWords(views, sumOf(prev.days, 'views'))} the week before` : ''}.` });
+      }
+      if (!fair || !pagesSince) {
+        facts.push({ key: 'views', text: `Car pages were opened <b>${times(carViews, 'time')}</b> in the last 7 days${
+          prev ? `, ${trendWords(carViews, sumOf(prev.days, 'car_views'))} the week before` : ''}.` });
+      }
+
+      const top = (cur.cars || []).map(r => ({ r, c: state.cars.find(c => String(c.id) === String(r.car_id)) }))
+        .filter(x => x.c && x.r.views).sort((a, b) => b.r.views - a.r.views)[0];
+      if (top) facts.push({ car: top.c.id, text: `The {car} was looked at most (${times(top.r.views, 'view')}${
+        top.r.taps ? `, ${times(top.r.taps, 'tap')} to get in touch` : ''}).` });
+
+      const taps = sumOf(cur.days, 'taps');
+      const onCars = sumOf((cur.places || []).filter(p => p.with_car), 'taps');
+      facts.push({ key: 'taps', text: taps
+        ? `<b>${times(taps, 'tap')}</b> on WhatsApp, Call or Email${onCars && onCars < taps ? `: ${nf(onCars)} about a car, ${nf(taps - onCars)} from other pages` : onCars ? ', all about a car' : ', none about a particular car'}.`
+        : `Nobody tapped WhatsApp, Call or Email on the website.` });
     }
 
-    /* The bands follow how fast YOUR cars sell once there's enough history
-       (the insight engine works it out, counting unsold cars too). Until
-       then, the original 45 / 60 / 90 days. */
-    const speed = (analysis && analysis.speed) || { own: false, watchDays: 45, actDays: 60 };
-    const watchD = speed.watchDays, actD = speed.actDays, critD = Math.round(actD * 1.5);
-    const bandOf = c => c.days_in_stock >= critD ? 'critical'
-      : c.days_in_stock >= actD ? 'overdue'
-      : c.days_in_stock >= watchD ? 'watch' : 'fine';
+    if (msgs) {
+      const forms = inWindow(msgs.enquiries, w.from);
+      const reqs = inWindow(msgs.requests, w.from);
+      const aboutCar = forms.filter(e => e.car_id).length;
+      facts.push({ key: 'messages', text: forms.length || reqs.length
+        ? `${forms.length ? `<b>${times(forms.length, 'message')}</b> came through the website${aboutCar ? ` (${nf(aboutCar)} about a car)` : ''}` : 'No messages came through the website'}${
+          reqs.length ? `${forms.length ? ', and' : ', but'} ${times(reqs.length, 'person', 'people')} asked you to find a car` : ''}.`
+        : 'No messages came through the website’s forms.' });
+    }
 
-    const bands = [
-      ['critical', `Over ${critD} days and losing you money`, 'var(--red-600)'],
-      ['overdue',  `${actD} to ${critD} days, worth a price review`, 'var(--amber-600)'],
-      ['watch',    `${watchD} to ${actD} days, keep an eye on it`, 'var(--ink-2)'],
-      ['fine',     'Fresh stock', 'var(--green-600)']
-    ];
+    const sold = state.cars.filter(c => c.status === 'sold' && c.sold_at && new Date(c.sold_at) >= w.from);
+    if (sold.length) {
+      const counted = sold.filter(c => carMargin(c) != null);
+      facts.push({ text: `${times(sold.length, 'car')} sold${counted.length ? `, making <b>${signed(counted.reduce((n, c) => n + carMargin(c), 0))}</b>${counted.length < sold.length ? ' on the ones with figures in' : ''}` : ''}.` });
+    }
+    return { facts, loading: cur === undefined || msgs === undefined, v14: state.schema.v14 !== false };
+  }
 
-    const counts = bands.map(([k]) => ageing.filter(c => bandOf(c) === k).length);
-    const needsAction = counts[0] + counts[1];
-    const haggle = analysis && analysis.haggle;
+  /** The one thing worth doing first, from what's waiting. */
+  function weekAction() {
+    const unread = state.enquiries.filter(e => !e.is_read).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))[0];
+    if (unread) {
+      const about = unread.car_title ? 'the ' + unread.car_title : unread.kind === 'sell' ? 'their car' : ((unread.details && unread.details.subject) || '').toLowerCase();
+      return { label: `Reply to ${unread.name || 'a message'}${about ? ' about ' + about : ''}`, run: () => openMessage('e', unread.id) };
+    }
+    const act = analysis && analysis.findings.find(f => f.severity === 'act');
+    if (act) {
+      const car = state.cars.find(c => String(c.id) === String(act.carId));
+      return { label: `${CAUSE_DO[act.cause] || 'Look at'}: ${car ? carTitle(car) : act.title}`, run: () => insightSheet(analysis.findings.indexOf(act)) };
+    }
+    return null;
+  }
 
-    const row = c => {
-      const title = [c.year, c.make, c.model].filter(Boolean).join(' ') || 'Untitled';
-      const lastChange = c.last_price_change
-        ? Math.round((Date.now() - new Date(c.last_price_change)) / 86400000) : null;
-      // What you've sold these for, spelling ignored, from the cars themselves
-      const soldSame = soldLike(c);
-      const achieved = averageAchieved(soldSame);
-      // Sale prices have the haggle taken off; compare like with like
-      const askingEquivalent = achieved != null && haggle && haggle.pct
-        ? Math.round(achieved / (1 - haggle.pct / 100) / 10) * 10 : achieved;
-      const gapToAvg = (askingEquivalent != null && c.price != null) ? c.price - askingEquivalent : null;
+  let weekActs = [];
+  function weekCard(home) {
+    const { facts, loading, v14 } = weekFacts();
+    const act = weekAction();
+    weekActs = [];
+    const shown = home ? facts.slice(0, 3) : facts;
+    const lines = shown.map(f => {
+      if (f.car) {
+        const i = weekActs.push(() => openCarFigures(f.car)) - 1;
+        return `<p>${f.text.replace('{car}', `<button class="linkish" type="button" data-week="${i}">${esc(carTitle(carById(f.car)))}</button>`)}</p>`;
+      }
+      return `<p>${f.text}${!home && f.key ? ' ' + info(f.key) : ''}</p>`;
+    }).join('');
+    const go = act ? weekActs.push(act.run) - 1 : -1;
+    const more = home ? weekActs.push(() => openDataTab('summary')) - 1 : -1;
+    return `<div class="section-card week-card${home ? ' week-card--home' : ''}">
+      <div class="card-head"><h2>Last 7 days</h2>${home ? `<button class="home-link" type="button" data-week="${more}">More</button>` : ''}</div>
+      ${lines || (loading ? '<div class="skel" style="height:60px"></div>' : '<p class="note">Nothing to report yet.</p>')}
+      ${loading && lines ? '<p class="note">Adding up the website…</p>' : ''}
+      ${!v14 && !home ? '<p class="note">Website figures need <b>schema-v14-site-analytics.sql</b> run in Supabase (gear → Ready to switch on).</p>' : ''}
+      ${act ? `<button class="btn btn--accent btn--sm btn--block week-go" type="button" data-week="${go}">${esc(act.label)} ${icon('right')}</button>` : ''}
+    </div>`;
+  }
 
-      return `<div class="card" style="margin-bottom:10px"><div style="padding:14px">
-        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
-          <div style="min-width:0;flex:1">
-            <h3 style="font-size:16px;font-weight:700">${esc(title)}</h3>
-            <div style="font-size:13.5px;color:var(--ink-3);margin-top:2px">
-              ${money(c.price)} · ${nf(c.days_in_stock)} days
-              ${c.previous_price ? ' · already reduced from ' + money(c.previous_price) : ''}
-            </div>
-          </div>
-          <span class="pill ${bandOf(c) === 'critical' ? 'pill--red'
-                            : bandOf(c) === 'overdue' ? 'pill--amber' : 'pill--grey'}">
-            ${c.days_in_stock}d
-          </span>
-        </div>
+  /* ---- Who tapped what ------------------------------------------------------
+     Taps (from the website) and messages (forms that arrived) in one list,
+     newest first. Taps from one visit, one button, one car within half an
+     hour fold into one line ("3 times"). A tap about a car that a message
+     about the same car followed within two days says so. */
+  function feedItems() {
+    const feed = need('feed', contactFeed);
+    const msgs = need('msgs', recentMessages);
+    const since = addDays(startDay(new Date()), -30);
+    const items = [];
 
-        <div style="font-size:14px;color:var(--ink-2);margin-top:10px;line-height:1.6">
-          ${achieved != null
-            ? `You've sold ${soldSame.length === 1 ? 'one of these' : soldSame.length + ' of these'} for <strong>${money(achieved)}</strong>${soldSame.length === 1 ? '' : ' on average'}${
-                haggle && haggle.pct && askingEquivalent !== achieved ? `, about ${money(askingEquivalent)} before your usual ${haggle.pct}% haggle` : ''}.
-               ${gapToAvg > 200 ? `This one is <strong style="color:var(--amber-600)">${money(gapToAvg)} above</strong> that.` : ''}`
-            : `No history on this model to compare against.`}
-          <br>
-          ${ageingInterestLine(c)}
-          ${lastChange != null ? `<br>Price last changed ${lastChange} days ago.` : '<br>Price never changed.'}
-        </div>
+    const taps = (feed || []).slice().sort((a, b) => new Date(b.at) - new Date(a.at));
+    for (const t of taps) {
+      const last = items[items.length - 1];
+      if (last && last.type === 'tap' && last.who === t.who && last.kind === t.kind && String(last.car_id) === String(t.car_id)
+          && new Date(last.first) - new Date(t.at) < 30 * 60000) {
+        last.n++; last.first = t.at; continue;
+      }
+      items.push(Object.assign({ type: 'tap', n: 1, first: t.at }, t));
+    }
+    const enq = inWindow(msgs && msgs.enquiries, since);
+    enq.forEach(e => items.push({ type: 'form', at: e.created_at, e }));
+    inWindow(msgs && msgs.requests, since).forEach(r => items.push({ type: 'request', at: r.created_at, r }));
+    items.sort((a, b) => new Date(b.at) - new Date(a.at));
 
-        <button class="btn btn--outline btn--sm btn--block" data-reprice="${esc(c.id)}" style="margin-top:12px">
-          Change the price
-        </button>
-      </div></div>`;
-    };
+    // A message about the same car within two days of the tap
+    items.forEach(it => {
+      if (it.type !== 'tap' || !it.car_id) return;
+      const t = new Date(it.at);
+      it.followed = enq.find(e => String(e.car_id) === String(it.car_id) && new Date(e.created_at) >= t && new Date(e.created_at) - t < 2 * DAY) || null;
+    });
+    return { items, loading: feed === undefined || msgs === undefined, taps: feed };
+  }
 
-    const sections = bands.map(([key, label, colour], i) => {
-      const list = ageing.filter(c => bandOf(c) === key);
-      if (!list.length || key === 'fine') return '';
-      return `<div class="section-card">
-        <h2 style="color:${colour}">${label} · ${list.length}</h2>
-        ${list.map(row).join('')}
-      </div>`;
+  const whenWords = d => {
+    const t = new Date(d), mins = (Date.now() - t) / 60000;
+    if (mins < 60) return Math.max(1, Math.round(mins)) + ' min ago';
+    const time = t.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    if (startDay(t).getTime() === startDay(new Date()).getTime()) return 'Today ' + time;
+    if (startDay(t).getTime() === addDays(startDay(new Date()), -1).getTime()) return 'Yesterday ' + time;
+    return t.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + time;
+  };
+  const carById = id => state.cars.find(c => String(c.id) === String(id)) || null;
+
+  let feedActs = [];
+  function feedLine(it) {
+    let ic, text, sub = [], tail = '', run = null;
+    if (it.type === 'tap') {
+      const car = it.car_id && carById(it.car_id);
+      ic = KIND_ICON[it.kind] || 'phone';
+      const where = car
+        ? (it.page === 'car' ? `on the <b>${esc(carTitle(car))}</b>’s page` : `on ${PAGE_WORDS[it.page] || 'the website'} about the <b>${esc(carTitle(car))}</b>`)
+        : `on ${PAGE_WORDS[it.page] || 'the website'}`;
+      text = `Someone tapped <b>${KIND_WORDS[it.kind] || 'contact'}</b>${it.n > 1 ? ` (${it.n} times)` : ''} ${where} ${PLACE_WORDS[it.place] && it.place !== 'page' && it.place !== 'card' ? PLACE_WORDS[it.place] : ''}`.trim();
+      if (it.source && !['stock', 'home', 'internal'].includes(it.source)) sub.push('came from ' + sourceWords(it.source).replace(/^Typed in, saved, or a link in a message$/, 'a link, a bookmark or typed in'));
+      if (it.device) sub.push(it.device === 'mobile' ? 'on a phone' : it.device === 'tablet' ? 'on a tablet' : 'on a computer');
+      const looked = (it.journey || []).filter(j => !(j.car_id && String(j.car_id) === String(it.car_id)))
+        .map(j => j.car_id ? (carById(j.car_id) ? carTitle(carById(j.car_id)) : 'a car that’s gone') : PAGE_NAME[j.page] && j.page !== 'car' ? (PAGE_NAME[j.page]).toLowerCase() : null)
+        .filter(Boolean);
+      if (looked.length) tail = `<span class="feed-more">Had looked at: ${esc([...new Set(looked)].slice(-4).join(', '))}</span>`;
+      if (it.followed) tail += `<span class="feed-more feed-more--ok">${icon('check')} A message about this car came in after</span>`;
+      if (car) run = () => openCarFigures(car.id);
+    } else if (it.type === 'form') {
+      const e = it.e;
+      ic = 'inbox';
+      const about = e.kind === 'sell' ? (e.car_id ? 'a part exchange against the ' + (e.car_title || 'a car') : 'selling their car')
+        : e.car_title ? 'the ' + e.car_title : ((e.details && e.details.subject) || 'a general question');
+      text = `<b>${esc(e.name || 'Someone')}</b> sent a message about ${esc(about)}`;
+      if (e.finance_interest) sub.push('asked about finance');
+      if (e.archived) sub.push('archived');
+      run = () => openMessage('e', e.id);
+    } else {
+      const r = it.r;
+      ic = 'search';
+      const what = [r.make, r.model].filter(Boolean).join(' ') || 'a car';
+      text = `<b>${esc(r.name || 'Someone')}</b> asked you to find ${esc(r.kind === 'sold_interest' ? 'one like a car you sold' : what)}`;
+      if (r.budget_max) sub.push('up to ' + money(r.budget_max));
+      if (r.transmission) sub.push(r.transmission);
+      run = () => openMessage('r', r.id);
+    }
+    const i = run ? feedActs.push(run) - 1 : -1;
+    const tag = run ? 'button' : 'div';
+    return `<${tag} class="feed-row feed-row--${it.type}"${run ? ` type="button" data-feed="${i}"` : ''}>
+      <span class="feed-ic">${icon(ic)}</span>
+      <span class="feed-txt">
+        <span class="feed-what">${text}</span>
+        <small>${esc([whenWords(it.at)].concat(sub).join(' · '))}</small>
+        ${tail}
+      </span>
+    </${tag}>`;
+  }
+
+  function feedCard() {
+    feedActs = [];
+    const { items, loading, taps } = feedItems();
+    const SHOWN = 8;
+    const rows = items.slice(0, 60).map(feedLine);
+    return `<div class="section-card feed">
+      <div class="card-head"><h2>Who tapped what</h2>${info('taps')}</div>
+      <p class="note" style="margin:-4px 0 10px">The last 30 days. A tap opens WhatsApp or the phone; messages are forms that arrived.</p>
+      ${rows.length ? rows.slice(0, SHOWN).join('') : loading ? '<div class="skel" style="height:120px"></div>' : '<p class="hint">Nothing in the last 30 days.</p>'}
+      ${rows.length > SHOWN ? `<details class="more-insights"><summary>Show ${rows.length - SHOWN} more</summary>${rows.slice(SHOWN).join('')}</details>` : ''}
+      ${taps === null && state.schema.v14 === false ? '<p class="note" style="margin-top:10px">Taps show here once <b>schema-v14-site-analytics.sql</b> is run. Until then, only messages.</p>' : ''}
+    </div>`;
+  }
+
+  /* ---- Asked for, not in stock --------------------------------------------- */
+  function askedForCard() {
+    if (!demand || !demand.length) return '';
+    const inStockCount = d => state.cars.filter(c => inStock(c) && keyOf(c.make) === keyOf(d.make)
+      && (!d.model || d.model === 'Any' || modelKeyOf(c.model) === modelKeyOf(d.model))).length;
+    const rows = demand.slice().map(d => ({ d, have: inStockCount(d) }))
+      .sort((a, b) => (a.have > 0) - (b.have > 0) || b.d.requests - a.d.requests).slice(0, 6);
+    return `<div class="section-card">
+      <div class="card-head"><h2>What people ask you to find</h2></div>
+      <p class="note" style="margin:-4px 0 10px">From the Car Finder and “want one like this” on sold cars. Worth looking out for at the next auction.</p>
+      ${rows.map(({ d, have }) => `<div class="ask-row">
+        <div><strong>${esc(d.make)}${d.model && d.model !== 'Any' ? ' ' + esc(d.model) : ''}</strong>
+          <small>${[d.avg_budget ? 'budget about ' + money(d.avg_budget) : 'no budget given', d.still_open ? d.still_open + ' still looking' : '', have ? `you have ${have} in stock` : 'none in stock'].filter(Boolean).join(' · ')}</small></div>
+        <span class="pill ${d.requests >= 3 ? 'pill--green' : 'pill--grey'}">${times(d.requests, 'person', 'people')}</span>
+      </div>`).join('')}
+      <button class="btn btn--outline btn--sm btn--block" id="exportDemand" type="button" style="margin-top:10px">Export requests (CSV)</button>
+    </div>`;
+  }
+
+  /** How the website is being counted, and what would make it better. */
+  function countingNote() {
+    if (state.schema.v14 === false) {
+      return `<p class="note counting">${info('counting')} Only car pages are counted so far. Run <b>schema-v14-site-analytics.sql</b> to count every page and every tap.</p>`;
+    }
+    const s = [...siteGot.values()].map(x => x.data).find(d => d && d.days);
+    if (!s) return '';
+    const bits = [];
+    if (!s.v2_since) bits.push('Counting page views. Switch on the visitor counter (gear → Ready to switch on) to count people and leave bots out.');
+    else bits.push(`Counting people since ${shortDay(s.v2_since)}${s.bots ? `, with ${nf(s.bots)} bot visit${s.bots === 1 ? '' : 's'} left out` : ''}.`);
+    if (s.pages_since) bits.push(`Every page counted since ${shortDay(s.pages_since)}; before that, car pages only.`);
+    return `<p class="note counting">${info('counting')} ${esc(bits.join(' '))}</p>`;
+  }
+
+  /* ==========================================================================
+     CARS: one sentence each, then each car's own screen
+     ========================================================================== */
+  const CAR_PERIODS = { 7: 'Last 7 days', 30: 'Last 30 days', all: 'Since listed' };
+  const CAR_SORTS = {
+    views: 'Most viewed', quiet: 'Least viewed', taps: 'Most taps', oldest: 'Longest in',
+    newest: 'Newest in', price_high: 'Dearest', price_low: 'Cheapest'
+  };
+
+  function periodFrom(p) {
+    return p === 'all' ? addDays(startDay(new Date()), -399) : addDays(startDay(new Date()), -(+p - 1));
+  }
+  function carPeriodData(p) {
+    const key = 'cars:' + p;
+    return need(key, () => siteStats(periodFrom(p)));
+  }
+  const periodWords = (p, car) => p === 'all' ? (car ? 'since it went on' : 'since each went on') : `in the last ${p} days`;
+
+  /** Views of the typical (median) live car, for "busier than most". */
+  function medianViews(rows, live) {
+    const v = live.map(c => ((rows || []).find(r => String(r.car_id) === String(c.id)) || {}).views || 0).sort((a, b) => a - b);
+    if (v.length < 3) return null;
+    const m = Math.floor(v.length / 2);
+    return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+  }
+
+  /** People are only worth quoting if the visitor counter was on for the whole stretch. */
+  const peopleFrom = (data, from) => !!(data && data.v2_since && new Date(data.v2_since) <= from);
+
+  /** One car's figures as one sentence. `people`: quote people, not just views. */
+  function carSentence(c, r, p, median, msgs, people) {
+    if (!r) r = {};
+    const parts = [];
+    const views = r.views || 0;
+    parts.push(`<b>${times(views, 'view')}</b>${people && r.people ? ` (${times(r.people, 'person', 'people')})` : ''} ${periodWords(p, true)}`);
+    if (views) {
+      parts.push(people && r.photo_people ? `${times(r.photo_people, 'person', 'people')} opened the photos`
+        : r.photos ? `the photos were opened ${r.photos === 1 ? 'once' : nf(r.photos) + ' times'}`
+        : 'nobody opened the photos');
+    }
+    const kinds = [r.wa ? times(r.wa, 'WhatsApp', 'WhatsApp') : '', r.phone ? times(r.phone, 'call') : '', r.email ? times(r.email, 'email') : ''].filter(Boolean);
+    parts.push(r.taps ? `${times(r.taps, 'tap')} to get in touch (${kinds.join(', ')})` : 'no taps to get in touch');
+    const from = p === 'all' ? new Date(listedAt(c)) : periodFrom(p);
+    const m = inWindow(messagesFor(msgs, c.id), from).length;
+    if (m) parts.push(times(m, 'message'));
+    let s = (parts.length > 1 ? parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1] : parts[0]) + '.';
+    if (median != null && median > 0 && views >= 5 && views >= median * 2) s += ' One of your busiest.';
+    else if (median != null && median >= 4 && views <= median / 2) s += ' Quieter than most of your stock.';
+    return s;
+  }
+
+  function carsTab() {
+    const p = CAR_PERIODS[state.carPeriod] ? state.carPeriod : '30';
+    const sort = CAR_SORTS[state.carSort] ? state.carSort : 'views';
+    const data = carPeriodData(p);
+    const msgs = need('msgs', recentMessages);
+    const live = state.cars.filter(inStock);
+    const rowOf = c => data ? (data.cars || []).find(r => String(r.car_id) === String(c.id)) || {} : legacyRowOf(c);
+    const loading = data === undefined;
+    const median = data ? medianViews(data.cars, live) : null;
+    const speed = (analysis && analysis.speed) || { watchDays: 45, actDays: 60 };
+
+    const cmp = {
+      views: (a, b) => (rowOf(b).views || 0) - (rowOf(a).views || 0) || (rowOf(b).taps || 0) - (rowOf(a).taps || 0),
+      quiet: (a, b) => (rowOf(a).views || 0) - (rowOf(b).views || 0),
+      taps: (a, b) => (rowOf(b).taps || 0) - (rowOf(a).taps || 0) || (rowOf(b).views || 0) - (rowOf(a).views || 0),
+      oldest: (a, b) => listedAt(a) - listedAt(b),
+      newest: (a, b) => listedAt(b) - listedAt(a),
+      price_high: (a, b) => (b.price || 0) - (a.price || 0),
+      price_low: (a, b) => (a.price || 0) - (b.price || 0)
+    }[sort];
+
+    const rows = loading ? '' : live.slice().sort(cmp).map(c => {
+      const r = rowOf(c);
+      const d = daysIn(c);
+      const f = analysis && analysis.findings.find(x => String(x.carId) === String(c.id));
+      const imgs = Array.isArray(c.images) ? c.images : [];
+      const sentence = data ? carSentence(c, r, p, median, msgs, peopleFrom(data, p === 'all' ? new Date(listedAt(c)) : periodFrom(p)))
+        : `<b>${times(r.views || 0, 'page view')}</b> and ${times(r.taps || 0, 'tap')} to get in touch since it went on.`;
+      return `<button class="carline" type="button" data-carfig="${esc(c.id)}">
+        <img src="${imgs.length ? imgUrl(imgs[0], 160) : ''}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+        <span class="carline-txt">
+          <span class="carline-top"><strong>${esc(carTitle(c))}</strong>
+            <span class="pill ${d >= speed.actDays ? 'pill--red' : d >= speed.watchDays ? 'pill--amber' : 'pill--grey'}" title="Days in stock">${d}d</span></span>
+          <small>${[money(c.price), c.registration ? fmtReg(c.registration) : '', c.status === 'reserved' ? 'reserved' : ''].filter(Boolean).join(' · ')}</small>
+          <span class="carline-say">${sentence}</span>
+          ${f && CAUSE_LABEL[f.cause] ? `<span class="carline-flag carline-flag--${f.severity}">${esc(f.severity === 'good' ? 'Lots of interest: hold the price' : CAUSE_LABEL[f.cause])}</span>` : ''}
+        </span>
+      </button>`;
     }).join('');
 
     return `
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
-        ${statTile(counts[0], `Over ${critD} days`, counts[0] ? 'var(--red-600)' : null)}
-        ${statTile(counts[1], `${actD} to ${critD} days`, counts[1] ? 'var(--amber-600)' : null)}
-        ${statTile(counts[3], 'Fresh', 'var(--green-600)')}
+      <div class="segment segment--sm" id="carPeriod" role="tablist">
+        ${Object.entries(CAR_PERIODS).map(([k, label]) => `<button type="button" data-p="${k}" class="${k === p ? 'is-on' : ''}">${label}</button>`).join('')}
+      </div>
+      <div class="section-card">
+        <div class="card-head">
+          <h2>In stock · ${live.length}</h2>
+          <select class="sel sel--sm" id="carSort" aria-label="Order the cars by">
+            ${Object.entries(CAR_SORTS).map(([k, label]) => `<option value="${k}"${k === sort ? ' selected' : ''}>${label}</option>`).join('')}
+          </select>
+        </div>
+        ${data === undefined ? '<div class="skel" style="height:160px"></div>' : ''}
+        ${data === null && state.schema.v14 === false ? '<p class="note" style="margin-bottom:10px">Showing page views since each car went on. Run <b>schema-v14-site-analytics.sql</b> for the last 7 or 30 days, and every tap.</p>' : ''}
+        ${rows || (loading ? '' : '<p class="hint">No cars in stock at the moment.</p>')}
+        ${median != null ? `<p class="note" style="margin-top:10px">The typical car had ${times(Math.round(median), 'view')} ${periodWords(p)}. ${info('busy')}</p>` : ''}
+      </div>
+      <div class="btn-pair">
+        <button class="btn btn--outline btn--block" type="button" id="compareCars">${icon('gauge')} Compare cars</button>
+        <button class="btn btn--outline btn--block" type="button" id="exportCars">Export (CSV)</button>
+      </div>
+      ${countingNote()}`;
+  }
+
+  /** Before v14: the old all-time page views and taps per car (car_stats). */
+  function legacyRowOf(c) {
+    const s = (stats || []).find(r => String(r.car_id) === String(c.id)) || {};
+    return { views: s.views || 0, taps: (s.whatsapp_clicks || 0) + (s.phone_clicks || 0), photos: s.gallery_opens || 0,
+      wa: s.whatsapp_clicks || 0, phone: s.phone_clicks || 0 };
+  }
+
+  /* ---- One car's own screen -------------------------------------------------- */
+  function openCarFigures(id) {
+    const car = carById(id);
+    if (!car) return toast('Couldn’t find that car');
+    state.carFig = String(car.id);
+    go('carfig', { title: carTitle(car) });
+  }
+
+  const carSince = car => {
+    const from = startDay(new Date(listedAt(car) || Date.now()));
+    const floor = addDays(startDay(new Date()), -399);
+    return from < floor ? floor : from;
+  };
+  const carUntil = car => car.status === 'sold' && car.sold_at ? addDays(startDay(new Date(car.sold_at)), 1) : null;
+
+  function carFigData(car) {
+    return need('car:' + car.id, () => siteStats(carSince(car), carUntil(car), car.id));
+  }
+  function priceHistory(car) {
+    return need('ph:' + car.id, async () => {
+      const { data, error } = await sb.from('price_history').select('*').eq('car_id', car.id).order('changed_at', { ascending: true });
+      return error ? [] : (data || []);
+    }, 600000);
+  }
+
+  ON_SHOW.carfig = () => renderCarFigures();
+
+  function renderCarFigures() {
+    const car = carById(state.carFig);
+    const box = $('#carfigBody');
+    if (!car) { box.innerHTML = '<p class="hint">That car isn’t in your list any more.</p>'; return; }
+    const d = carFigData(car);
+    const ph = priceHistory(car) || [];
+    const msgs = need('msgs', recentMessages);
+    const month = carPeriodData('30');
+    const r = d ? ((d.cars || []).find(x => String(x.car_id) === String(car.id)) || {}) : legacyRowOf(car);
+    const imgs = Array.isArray(car.images) ? car.images : [];
+    const f = analysis && analysis.findings.find(x => String(x.carId) === String(car.id));
+    const fi = f ? analysis.findings.indexOf(f) : -1;
+    const sold = car.status === 'sold';
+    const ci = interest && countingPeople() ? interestFor(car.id) : null;
+
+    // Rank among live cars over the last 30 days
+    let rank = '';
+    if (month && !sold) {
+      const live = state.cars.filter(inStock);
+      const order = live.map(c => ({ c, v: ((month.cars || []).find(x => String(x.car_id) === String(c.id)) || {}).views || 0 }))
+        .sort((a, b) => b.v - a.v);
+      const at = order.findIndex(x => String(x.c.id) === String(car.id));
+      if (at >= 0 && live.length > 2) rank = `The ${at ? ordinal(at + 1) + ' ' : ''}most looked-at of your ${live.length} cars over the last 30 days.`;
+    }
+
+    const since = new Date(listedAt(car));
+    const enqs = messagesFor(msgs, car.id).concat(state.enquiries.filter(e => String(e.car_id) === String(car.id)))
+      .filter((e, i, all) => all.findIndex(x => x.id === e.id) === i)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const soldSame = soldLike(car), achieved = averageAchieved(soldSame);
+
+    box.innerHTML = `
+      <div class="section-card cf-head">
+        <div class="cf-top">
+        ${imgs.length ? `<img src="${imgUrl(imgs[0], 240)}" alt="" onerror="this.remove()">` : ''}
+        <div>
+          <h2>${esc(carTitle(car))}</h2>
+          <p>${sold ? `Sold ${shortDay(car.sold_at)} after ${Math.max(0, Math.round((new Date(car.sold_at) - since) / DAY))} days` : `${money(car.price)} · ${daysIn(car)} days in stock`}${car.registration ? ' · ' + esc(fmtReg(car.registration)) : ''}</p>
+        </div>
+        </div>
+        <div class="btn-pair">
+          ${!sold ? `<button class="btn btn--outline btn--sm" type="button" id="cfPrice">Change price</button>` : ''}
+          <button class="btn btn--outline btn--sm" type="button" id="cfMenu">Car menu</button>
+        </div>
       </div>
 
-      <p class="note" style="margin:0 0 12px">
-        ${speed.own
-          ? `Three in four of your cars sell within ${watchD} days, so that's where "keep an eye on it" starts.`
-          : `Using 45, 60 and 90 days until there's enough selling history to use your own${
-              speed.soFar ? ` (so far, ${speed.soFar.soldPct}% of cars sell within ${speed.soFar.days} days)` : ''}.`}
-      </p>
+      <div class="section-card">
+        <div class="card-head"><h2>${sold ? 'While it was for sale' : 'Since it went on'}</h2>${info('views')}</div>
+        <p class="cf-say">${d === undefined ? 'Adding it up…' : carSentence(car, r, 'all', null, msgs, peopleFrom(d, carSince(car)))}</p>
+        ${rank ? `<p class="note">${esc(rank)}</p>` : ''}
+        ${d && d.car_days ? carDaysChart(d.car_days, ph) : ''}
+        ${ph.length ? `<p class="note" style="margin-top:8px">${ph.map(x => `${shortDay(x.changed_at)}: ${money(x.old_price)} → ${money(x.new_price)}`).join(' · ')}</p>` : ''}
+      </div>
 
-      ${needsAction
-        ? `<div class="msg msg--warn is-shown" style="margin-bottom:14px">
-             <strong>${needsAction} car${needsAction === 1 ? '' : 's'} need${needsAction === 1 ? 's' : ''} a decision.</strong>
-             Every week a car sits is money tied up that could be in the next one.
-           </div>`
-        : `<div class="msg msg--ok is-shown" style="margin-bottom:14px">
-             Nothing sitting too long. Stock is moving.
-           </div>`}
+      ${f ? insightCard(f, fi) : ''}
 
-      ${sections || `<div class="empty">${icon('checkCirc')}<h3>All fresh</h3>
-        <p>Nothing has been here long enough to worry about.</p></div>`}`;
+      <div class="section-card">
+        <div class="card-head"><h2>From looking to buying</h2>${info('funnel')}</div>
+        ${funnelHtml(car, r, enqs, peopleFrom(d, carSince(car)))}
+        ${ci && ci.measured_people ? `<p class="note" style="margin-top:10px">${esc([
+          ci.median_seconds != null ? `A typical visit lasts ${ci.median_seconds < 60 ? ci.median_seconds + ' seconds' : Math.round(ci.median_seconds / 60) + ' min'}` : '',
+          ci.avg_photos_seen != null && imgs.length ? `people see ${Math.round(ci.avg_photos_seen)} of its ${imgs.length} photos on average` : '',
+          ci.quick_exits ? `${ci.quick_exits} of ${ci.measured_people} left within 10 seconds` : ''].filter(Boolean).join(', '))}.</p>` : ''}
+      </div>
+
+      ${d && d.car_sources && d.car_sources.length ? `<div class="section-card">
+        <div class="card-head"><h2>How people found it</h2>${info('sources')}</div>
+        ${listBars(d.car_sources.map(s => ({ label: sourceWords(s.source), n: s.views })))}
+      </div>` : ''}
+
+      ${d && d.car_places && d.car_places.length ? `<div class="section-card">
+        <div class="card-head"><h2>Which button they tapped</h2>${info('places')}</div>
+        ${listBars(d.car_places.map(p => ({ label: `${KIND_WORDS[p.kind]} ${PLACE_WORDS[p.at] && p.at !== 'page' ? PLACE_WORDS[p.at] : ''}${p.page !== 'car' ? ' (' + (PAGE_NAME[p.page] || p.page).toLowerCase() + ')' : ''}`.trim(), n: p.taps })))}
+      </div>` : ''}
+
+      ${enqs.length ? `<div class="section-card">
+        <div class="card-head"><h2>Messages about it · ${enqs.length}</h2>${info('messages')}</div>
+        ${enqs.slice(0, 8).map(e => `<button class="feed-row" type="button" data-msg="${esc(e.id)}">
+          <span class="feed-ic">${icon('inbox')}</span>
+          <span class="feed-txt"><span class="feed-what"><b>${esc(e.name || 'Someone')}</b>${e.kind === 'sell' ? ' (part exchange)' : ''}</span><small>${esc(whenWords(e.created_at))}</small></span>
+        </button>`).join('')}
+      </div>` : ''}
+
+      ${!sold ? `<div class="section-card">
+        <h2>What you’ve sold these for</h2>
+        <p class="cf-say">${achieved != null
+          ? `${soldSame.length === 1 ? 'One' : soldSame.length} sold for <b>${money(achieved)}</b>${soldSame.length === 1 ? '' : ' on average'}.${car.price != null && car.price - achieved > 200 ? ` This one is ${money(car.price - achieved)} above that.` : ''}`
+          : 'You haven’t sold one of these before, so there’s nothing of your own to compare with.'}</p>
+      </div>` : ''}
+
+      ${countingNote()}`;
+
+    $('#cfMenu').onclick = () => carActions(car);
+    if ($('#cfPrice')) $('#cfPrice').onclick = () => repriceCar(car.id);
+    box.querySelectorAll('[data-msg]').forEach(b => b.onclick = () => openMessage('e', b.dataset.msg));
+    wireInsightButtons(box);
+    wireSiteBits(box);
+    wireCharts(box);
+  }
+
+  /** Viewed → opened photos → tapped → message → sold, as bars out of the views. */
+  function funnelHtml(car, r, enqs, people) {
+    const steps = [
+      ['Opened its page', (people ? r.people : r.views) || 0],
+      ['Opened the photos', (people ? r.photo_people : r.photos) || 0],
+      ['Tapped WhatsApp, Call or Email', (people ? r.tap_people : r.taps) || 0],
+      ['Sent a message', enqs.length],
+      ['Sold', car.status === 'sold' ? 1 : 0]
+    ];
+    const top = Math.max(1, steps[0][1]);
+    return `<div class="funnel">${steps.map(([label, n], i) => `
+      <div class="funnel-row">
+        <span>${esc(label)}</span>
+        <b>${nf(n)}</b>
+        <i style="width:${Math.max(n ? 3 : 0, Math.min(100, n / top * 100))}%"></i>
+      </div>`).join('')}</div>
+      <p class="note" style="margin-top:6px">${people ? 'Counted in people, each once a day.' : 'Counted in page views and taps, so one person can count more than once.'}</p>`;
+  }
+
+  /** A short ranked list with a bar each, biggest first. */
+  function listBars(items) {
+    items = items.slice().sort((a, b) => b.n - a.n);
+    const max = Math.max(1, ...items.map(x => x.n));
+    return `<div class="lbars">${items.slice(0, 8).map(x => `
+      <div class="lbar"><span>${esc(x.label)}</span><b>${nf(x.n)}</b><i style="width:${Math.max(2, x.n / max * 100)}%"></i></div>`).join('')}</div>`;
+  }
+
+  /** A car's views per day (per week after ten weeks), price changes marked. */
+  function carDaysChart(days, ph) {
+    if (!days.length) return '';
+    let cols = days.map(x => ({ key: x.d, short: shortDay(fromKey(x.d)), views: x.views, photos: x.photos, taps: x.taps, label: dayWords(fromKey(x.d)) }));
+    if (cols.length > 70) {
+      const weeks = [];
+      cols.forEach(c => {
+        const k = dayKey(weekStart(fromKey(c.key)));
+        let w = weeks[weeks.length - 1];
+        if (!w || w.key !== k) { w = { key: k, views: 0, photos: 0, taps: 0, label: 'Week of ' + shortDay(fromKey(k)), short: shortDay(fromKey(k)) }; weeks.push(w); }
+        w.views += c.views; w.photos += c.photos; w.taps += c.taps;
+      });
+      cols = weeks;
+    }
+    const changed = new Set(ph.map(x => cols.length > 70 ? dayKey(weekStart(new Date(x.changed_at))) : dayKey(new Date(x.changed_at))));
+    return viewBars(cols.map(c => ({
+      key: c.key, value: c.views, current: false, mark: changed.has(c.key), short: c.short,
+      tip: `${c.label}: ${times(c.views, 'view')}${c.photos ? ', photos opened ' + nf(c.photos) + '×' : ''}${c.taps ? ', ' + times(c.taps, 'tap') : ''}${changed.has(c.key) ? ' · price changed' : ''}`
+    })), { height: 110, labels: 'ends' });
+  }
+
+  /** Gridlines for counts (views, taps): about three, on whole numbers. */
+  function countScale(max) {
+    const step = Math.max(1, niceStep(Math.max(max, 3)));
+    const top = Math.ceil(max / step) * step || step;
+    const ticks = [];
+    for (let v = 0; v <= top + step / 2; v += step) ticks.push(v);
+    return { top, bottom: 0, span: top, ticks };
+  }
+
+  /**
+   * Bars for a count over time: one series, the app's blue, the current
+   * (unfinished) period paler. Tooltip on hover and tap; tapping can pick.
+   * @param {object[]} cols  { key, value, tip, current, selected, mark, short }
+   * @param {object} opts    { height, pick: true to make bars selectable, labels: 'all'|'ends' }
+   */
+  function viewBars(cols, opts) {
+    opts = opts || {};
+    const sc = countScale(Math.max(...cols.map(c => c.value), 1));
+    const n = cols.length;
+    const label = (c, i) => opts.labels === 'all' ? (c.short || '')
+      : (i === 0 || i === n - 1 || (n > 10 && i === Math.floor(n / 2))) ? (c.short || '') : '';
+    return `<div class="chart" data-chart="bars" data-action="${opts.pick ? 'pick' : 'none'}">
+      <div class="chart-plot" style="height:${opts.height || 140}px">
+        ${sc.ticks.map(v => `<div class="grid${v === 0 ? ' grid--zero' : ''}" style="top:${(sc.top - v) / sc.span * 100}%"><span>${nf(v)}</span></div>`).join('')}
+        <div class="bar-cols${n > 40 ? ' bar-cols--tight' : ''}">${cols.map(c => `
+          <button class="bar-col${c.selected ? ' is-selected' : ''}" type="button" data-key="${esc(c.key)}" data-tip="${esc(c.tip)}" aria-label="${esc(c.tip)}">
+            <span class="bar${c.current ? ' bar--now' : ''}" style="bottom:0;height:${c.value / sc.top * 100}%"></span>
+            ${c.mark ? '<span class="bar-mark" aria-hidden="true"></span>' : ''}
+          </button>`).join('')}</div>
+        <div class="chart-tip" hidden></div>
+      </div>
+      ${opts.labels === 'ends'
+        ? `<div class="chart-x chart-x--days">${cols.map((c, i) => label(c, i) ? `<span style="left:${(i + .5) / n * 100}%">${esc(label(c, i))}</span>` : '').join('')}</div>`
+        : `<div class="chart-x">${cols.map((c, i) => `<span${c.current ? ' class="is-now"' : ''}>${esc(String(label(c, i)))}</span>`).join('')}</div>`}
+    </div>`;
+  }
+
+  /* ---- Compare two or three cars ------------------------------------------
+     Views added up day by day from the day each went on, so a car listed a
+     month ago and one listed last week start from the same place. */
+  const CMP_COLOURS = ['#2A62B4', '#EB6834', '#1BAF7A'];   // validated together (dataviz), with labels and a table
+
+  function compareCars() {
+    const cars = state.cars.filter(c => inStock(c) || (c.status === 'sold' && c.sold_at && Date.now() - new Date(c.sold_at) < 120 * DAY))
+      .sort((a, b) => (inStock(b) - inStock(a)) || listedAt(b) - listedAt(a));
+    const picked = new Set((state.compare || []).filter(id => cars.some(c => String(c.id) === id)));
+    const box = sheetHtml('Compare cars', 'Pick two or three', `
+      <div class="pick-list">${cars.map(c => `<label class="tickrow">
+        <input type="checkbox" value="${esc(c.id)}"${picked.has(String(c.id)) ? ' checked' : ''}>
+        <span><strong>${esc(carTitle(c))}</strong><small>${c.status === 'sold' ? 'Sold ' + shortDay(c.sold_at) : money(c.price) + ' · ' + daysIn(c) + ' days'}</small></span>
+      </label>`).join('')}</div>
+      <button class="btn btn--accent btn--block" id="cmpGo" type="button" disabled>Pick two or three</button>`);
+    const boxes = [...box.querySelectorAll('input[type=checkbox]')];
+    const sync = () => {
+      const on = boxes.filter(b => b.checked);
+      boxes.forEach(b => { b.disabled = !b.checked && on.length >= 3; });
+      $('#cmpGo').disabled = on.length < 2;
+      $('#cmpGo').textContent = on.length < 2 ? 'Pick two or three' : `Compare ${on.length} cars`;
+    };
+    boxes.forEach(b => b.onchange = sync);
+    sync();
+    $('#cmpGo').onclick = () => {
+      state.compare = boxes.filter(b => b.checked).map(b => b.value);
+      closeSheet();
+      go('carcmp', { title: 'Compare cars' });
+    };
+  }
+
+  ON_SHOW.carcmp = () => renderCompare();
+
+  function renderCompare() {
+    const cars = (state.compare || []).map(carById).filter(Boolean);
+    const box = $('#carcmpBody');
+    if (cars.length < 2) { box.innerHTML = '<p class="hint">Pick two or three cars to compare.</p>'; return; }
+    const data = cars.map(c => carFigData(c));
+    const msgs = need('msgs', recentMessages);
+    if (data.some(x => x === undefined)) { box.innerHTML = '<div class="section-card"><div class="skel" style="height:200px"></div></div>'; return; }
+    if (data.some(x => x === null)) {
+      box.innerHTML = `<div class="msg msg--warn is-shown">Comparing needs <b>schema-v14-site-analytics.sql</b> run in Supabase.</div>`;
+      return;
+    }
+
+    // Running total of views by days since listed
+    const series = cars.map((c, i) => {
+      const days = data[i].car_days || [];
+      let run = 0;
+      return { c, colour: CMP_COLOURS[i], points: days.map(x => (run += x.views)), r: (data[i].cars || []).find(x => String(x.car_id) === String(c.id)) || {} };
+    });
+    const N = Math.max(2, ...series.map(s => s.points.length));
+    const top = countScale(Math.max(1, ...series.flatMap(s => s.points)));
+    const x = d => d / (N - 1) * 100;
+    const y = v => (top.top - v) / top.span * 100;
+
+    const enqCount = c => messagesFor(msgs, c.id).length;
+    const rows = [
+      ['Price', s => s.c.status === 'sold' ? 'Sold' : money(s.c.price)],
+      ['Days on sale', s => nf(s.c.status === 'sold' && s.c.sold_at ? Math.round((new Date(s.c.sold_at) - listedAt(s.c)) / DAY) : daysIn(s.c))],
+      ['Views', s => nf(s.r.views || 0)],
+      ['Views a day', s => (Math.round((s.r.views || 0) / Math.max(1, s.points.length) * 10) / 10).toString()],
+      ['Opened the photos', s => nf(s.r.photos || 0)],
+      ['Taps to get in touch', s => nf(s.r.taps || 0)],
+      ['Messages', s => nf(enqCount(s.c))]
+    ];
+
+    box.innerHTML = `
+      <div class="section-card">
+        <h2>Views since each went on</h2>
+        <div class="legend">${series.map(s => `<span><i class="key" style="background:${s.colour}"></i><span>${esc(carTitle(s.c))} <b>${nf(s.points[s.points.length - 1] || 0)}</b></span></span>`).join('')}</div>
+        <div class="chart" data-chart="cmp">
+          <div class="chart-plot" style="height:170px">
+            ${top.ticks.map(v => `<div class="grid${v === 0 ? ' grid--zero' : ''}" style="top:${y(v)}%"><span>${nf(v)}</span></div>`).join('')}
+            <svg class="pace-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              ${series.map(s => `<polyline points="${s.points.map((v, d) => `${x(d).toFixed(2)},${y(v).toFixed(2)}`).join(' ')}" stroke="${s.colour}"/>`).join('')}
+            </svg>
+            ${series.map(s => s.points.length ? `<span class="pace-dot" style="left:${x(s.points.length - 1)}%;top:${y(s.points[s.points.length - 1])}%;background:${s.colour}"></span>` : '').join('')}
+            <div class="crosshair" hidden></div>
+            <div class="chart-tip" hidden></div>
+            <div class="pace-hit" role="img" tabindex="0" aria-label="${esc(series.map(s => `${carTitle(s.c)}: ${nf(s.points[s.points.length - 1] || 0)} views`).join('; '))}"></div>
+          </div>
+          <div class="chart-x chart-x--days">${[0, Math.round((N - 1) / 2), N - 1].map(d => `<span style="left:${x(d)}%">day ${d + 1}</span>`).join('')}</div>
+        </div>
+        <p class="note chart-note">Each line starts the day that car went on the website, so they can be compared fairly.</p>
+      </div>
+      <div class="section-card">
+        <h2>Side by side</h2>
+        <table class="cmp-table">
+          <thead><tr><th></th>${series.map(s => `<th><i class="key" style="background:${s.colour}"></i>${esc([s.c.year, s.c.model].filter(Boolean).join(' '))}</th>`).join('')}</tr></thead>
+          <tbody>${rows.map(([label, fn]) => `<tr><td>${label}</td>${series.map(s => `<td>${fn(s)}</td>`).join('')}</tr>`).join('')}</tbody>
+        </table>
+      </div>
+      <button class="btn btn--outline btn--block" type="button" id="cmpAgain">Pick other cars</button>`;
+    $('#cmpAgain').onclick = compareCars;
+
+    // Touch or hover anywhere on the chart: each car's total by that day
+    const plot = box.querySelector('[data-chart="cmp"] .chart-plot');
+    const hit = plot.querySelector('.pace-hit'), cross = plot.querySelector('.crosshair'), tip = plot.querySelector('.chart-tip');
+    const showDay = d => {
+      cross.hidden = false; cross.style.left = x(d) + '%';
+      tip.hidden = false; tip.style.left = Math.min(74, Math.max(26, x(d))) + '%';
+      tip.replaceChildren();
+      const head = document.createElement('div');
+      head.className = 'tip-head'; head.textContent = 'By day ' + (d + 1);
+      tip.append(head);
+      series.forEach(s => {
+        const row = document.createElement('div');
+        row.className = 'tip-row';
+        const key = document.createElement('i'); key.className = 'key'; key.style.background = s.colour;
+        const val = document.createElement('b'); val.textContent = d < s.points.length ? nf(s.points[d]) : 'not yet';
+        row.append(key, val, document.createTextNode(' ' + [s.c.year, s.c.model].filter(Boolean).join(' ')));
+        tip.append(row);
+      });
+    };
+    const fromPointer = e => {
+      const r = hit.getBoundingClientRect();
+      showDay(Math.min(N - 1, Math.max(0, Math.round((e.clientX - r.left) / r.width * (N - 1)))));
+    };
+    const hide = () => { cross.hidden = true; tip.hidden = true; };
+    hit.addEventListener('pointermove', fromPointer);
+    hit.addEventListener('pointerdown', fromPointer);
+    hit.addEventListener('pointerleave', hide);
+    hit.addEventListener('focus', () => showDay(N - 1));
+    hit.addEventListener('blur', hide);
+  }
+
+  /* ==========================================================================
+     WEBSITE: views by day, week or month, the one before beside it, and
+     what's behind any bar you tap
+     ========================================================================== */
+  const WEB_SCALES = { day: 'Days', week: 'Weeks', month: 'Months' };
+
+  function webRange(scale) {
+    const today = startDay(new Date());
+    if (scale === 'day') return addDays(today, -13);
+    if (scale === 'week') return addDays(weekStart(today), -77);
+    const m = monthStart(today);
+    return new Date(m.getFullYear(), m.getMonth() - 11, 1);
+  }
+
+  /** The days grouped into the scale's periods, oldest first. */
+  function webBuckets(days, scale) {
+    const out = [];
+    const today = dayKey(new Date());
+    days.forEach(x => {
+      const t = fromKey(x.d);
+      const start = scale === 'day' ? t : scale === 'week' ? weekStart(t) : monthStart(t);
+      const key = dayKey(start);
+      let b = out[out.length - 1];
+      if (!b || b.key !== key) {
+        b = { key, start, days: [], views: 0, people: 0, peopleKnown: true, taps: 0, car_views: 0 };
+        b.end = scale === 'day' ? addDays(start, 1) : scale === 'week' ? addDays(start, 7) : new Date(start.getFullYear(), start.getMonth() + 1, 1);
+        b.short = scale === 'day' ? String(t.getDate()) : scale === 'week' ? String(start.getDate()) : start.toLocaleDateString('en-GB', { month: 'short' });
+        b.label = scale === 'day' ? t.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+          : scale === 'week' ? 'Week of ' + start.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })
+          : start.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+        out.push(b);
+      }
+      b.days.push(x);
+      b.views += x.views; b.taps += x.taps; b.car_views += x.car_views;
+      if (x.people == null) b.peopleKnown = false; else b.people += x.people;
+      if (x.d === today) b.current = true;
+    });
+    if (out.length) out[out.length - 1].current = out[out.length - 1].current || scale !== 'day';
+    return out;
+  }
+
+  function webTab() {
+    const scale = WEB_SCALES[state.webScale] ? state.webScale : 'week';
+    const data = need('web:' + scale, () => siteStats(webRange(scale)));
+    const head = `<div class="segment segment--sm" id="webScale">
+      ${Object.entries(WEB_SCALES).map(([k, label]) => `<button type="button" data-s="${k}" class="${k === scale ? 'is-on' : ''}">${label}</button>`).join('')}
+    </div>`;
+    if (data === undefined) return head + '<div class="section-card"><div class="skel" style="height:220px"></div></div>';
+    if (data === null) {
+      return head + `<div class="msg msg--warn is-shown">Website figures need <b>schema-v14-site-analytics.sql</b> run in Supabase (gear → Ready to switch on). It adds every page and every tap, and the totals by day, week and month.</div>`;
+    }
+
+    const buckets = webBuckets(data.days || [], scale);
+    const cur = buckets[buckets.length - 1], prev = buckets[buckets.length - 2], before = buckets[buckets.length - 3];
+    const pick = buckets.find(b => b.key === state.webPick) || cur;
+    const unit = { day: 'day', week: 'week', month: 'month' }[scale];
+    const pagesSince = data.pages_since ? new Date(data.pages_since) : null;
+
+    /* The headline: the last whole period against the one before (fair),
+       then the one under way, set against the same days of the last one.
+       A period from before every page was counted (pages_since) is only
+       compared on car pages, which were counted all along. */
+    const full = b => !!b && !!pagesSince && b.start >= pagesSince;
+    const vs = (a, b, aDays, bDays) => {
+      if (!b) return '';
+      const fair = full(a) && full(b);
+      const av = fair ? (aDays ? sumOf(aDays, 'views') : a.views) : (aDays ? sumOf(aDays, 'car_views') : a.car_views);
+      const bv = fair ? (bDays ? sumOf(bDays, 'views') : b.views) : (bDays ? sumOf(bDays, 'car_views') : b.car_views);
+      return fair ? ', ' + trendWords(av, bv) : `. Car pages alone: ${times(av, 'view')}, ${trendWords(av, bv)}`;
+    };
+    const lines = [];
+    if (scale === 'day') {
+      lines.push(`Today so far: <b>${times(cur.views, 'page view')}</b>${cur.peopleKnown && cur.people ? ` from ${times(cur.people, 'person', 'people')}` : ''}.`);
+      if (prev) lines.push(`Yesterday: ${times(prev.views, 'page view')}${before ? `${vs(prev, before)} the day before` : ''}.`);
+    } else {
+      if (prev) lines.push(`${scale === 'week' ? 'Last week' : prev.start.toLocaleDateString('en-GB', { month: 'long' })}: <b>${times(prev.views, 'page view')}</b>${
+        prev.peopleKnown && prev.people ? ` from about ${times(prev.people, 'person', 'people')}` : ''}${before ? `${vs(prev, before)} the ${unit} before` : ''}.`);
+      const k = cur.days.length;
+      lines.push(`This ${unit} so far: ${times(cur.views, 'page view')}${prev ? `${vs(cur, prev, cur.days, prev.days.slice(0, k))} by the same day last ${unit}` : ''}.`);
+    }
+    if (pagesSince && buckets.length && buckets[0].start < pagesSince) {
+      lines.push(`<span class="note">Before ${shortDay(pagesSince)} only car pages were counted, so earlier ${unit}s look quieter than they were, and they’re compared on car pages only.</span>`);
+    }
+
+    const detail = need(`webb:${scale}:${pick.key}`, () => siteStats(pick.start, pick.end < new Date() ? pick.end : null));
+
+    return `${head}
+      <div class="section-card">
+        <div class="card-head"><h2>Page views</h2>${info('views')}</div>
+        ${lines.map(l => `<p class="cf-say">${l}</p>`).join('')}
+        ${viewBars(buckets.map(b => ({ key: b.key, value: b.views, current: b.current,
+          selected: b.key === pick.key, short: b.short,
+          tip: `${b.label}${b.current ? ' so far' : ''}: ${times(b.views, 'page view')}${b.peopleKnown && b.people ? `, ${times(b.people, 'person', 'people')}` : ''}, ${times(b.taps, 'tap')}` })),
+          { height: 150, pick: true, labels: 'all' })}
+        <p class="note chart-note">Tap a bar to see what’s behind it. The last bar is still going.</p>
+        <details class="chart-table">
+          <summary>See these as a table</summary>
+          <table><thead><tr><th>${WEB_SCALES[scale].replace(/s$/, '')}</th><th>Views</th><th>Taps</th></tr></thead>
+          <tbody>${buckets.slice().reverse().map(b => `<tr><td>${esc(b.label)}${b.current ? ' (so far)' : ''}</td><td>${nf(b.views)}${b.peopleKnown && b.people ? `<small>${times(b.people, 'person', 'people')}</small>` : ''}</td><td>${nf(b.taps)}</td></tr>`).join('')}</tbody></table>
+        </details>
+      </div>
+
+      <h2 class="home-h">${esc(pick.label)}${pick.current && scale !== 'day' ? ' so far' : ''}</h2>
+      ${detail === undefined ? '<div class="section-card"><div class="skel" style="height:160px"></div></div>' : detail ? webDetail(detail) : ''}
+      ${countingNote()}`;
+  }
+
+  function webDetail(s) {
+    const views = sumOf(s.days, 'views');
+    if (!views && !sumOf(s.days, 'taps')) return '<div class="section-card"><p class="hint">Nobody opened the website in this stretch.</p></div>';
+    const topCars = (s.cars || []).map(r => ({ r, c: carById(r.car_id) })).filter(x => x.c && x.r.views)
+      .sort((a, b) => b.r.views - a.r.views).slice(0, 6);
+    const tapsBy = (s.places || []).map(p => ({
+      label: `${KIND_WORDS[p.kind]} ${PLACE_WORDS[p.at] && p.at !== 'page' && p.at !== 'card' ? PLACE_WORDS[p.at] : ''} on ${p.page === 'car' ? 'car pages' : PAGE_WORDS[p.page] || 'the website'}`.replace(/\s+/g, ' '),
+      n: p.taps }));
+    return `
+      <div class="section-card">
+        <div class="card-head"><h2>Pages opened</h2>${info('views')}</div>
+        ${listBars((s.pages || []).filter(p => p.views).map(p => ({ label: PAGE_NAME[p.page] || p.page, n: p.views })))}
+      </div>
+      ${topCars.length ? `<div class="section-card">
+        <h2>Cars looked at most</h2>
+        ${topCars.map(({ r, c }) => `<button class="lbar lbar--btn" type="button" data-carfig="${esc(c.id)}"><span>${esc(carTitle(c))}</span><b>${nf(r.views)}</b>
+          <i style="width:${Math.max(2, r.views / topCars[0].r.views * 100)}%"></i>
+          <small>${[r.photos ? 'photos opened ' + nf(r.photos) + '×' : '', r.taps ? times(r.taps, 'tap') : ''].filter(Boolean).join(' · ') || '&nbsp;'}</small></button>`).join('')}
+      </div>` : ''}
+      ${s.sources && s.sources.length ? `<div class="section-card">
+        <div class="card-head"><h2>Where they came from</h2>${info('sources')}</div>
+        ${listBars(s.sources.map(x => ({ label: sourceWords(x.source), n: x.views })))}
+      </div>` : ''}
+      <div class="section-card">
+        <div class="card-head"><h2>Taps to get in touch · ${nf(sumOf(s.days, 'taps'))}</h2>${info('taps')}</div>
+        ${tapsBy.length ? listBars(tapsBy) : '<p class="hint">No taps on WhatsApp, Call or Email.</p>'}
+      </div>
+      ${s.devices && s.devices.length ? `<div class="section-card">
+        <h2>Phones and computers</h2>
+        ${listBars(s.devices.map(d => ({ label: DEVICE_WORDS[d.device] || d.device, n: d.people })))}
+        <p class="note" style="margin-top:6px">People, not views.</p>
+      </div>` : ''}`;
+  }
+
+  /** Buttons the new screens share: ⓘ, a car's figures, periods, sorts, compare. */
+  function wireSiteBits(root) {
+    if (!root) return;
+    root.querySelectorAll('[data-explain]').forEach(b => b.onclick = e => { e.stopPropagation(); explain(b.dataset.explain); });
+    root.querySelectorAll('[data-carfig]').forEach(b => b.onclick = () => openCarFigures(b.dataset.carfig));
+    root.querySelectorAll('[data-week]').forEach(b => b.onclick = () => { const f = weekActs[+b.dataset.week]; if (f) f(); });
+    root.querySelectorAll('[data-feed]').forEach(b => b.onclick = () => { const f = feedActs[+b.dataset.feed]; if (f) f(); });
+    root.querySelectorAll('#carPeriod [data-p]').forEach(b => b.onclick = () => { state.carPeriod = b.dataset.p; remember('mbu_car_period', b.dataset.p); renderInsights(); });
+    root.querySelectorAll('#webScale [data-s]').forEach(b => b.onclick = () => { state.webScale = b.dataset.s; state.webPick = null; remember('mbu_web_scale', b.dataset.s); renderInsights(); });
+    const cs = root.querySelector('#carSort');
+    if (cs) cs.onchange = () => { state.carSort = cs.value; remember('mbu_car_sort', cs.value); renderInsights(); };
+    const cc = root.querySelector('#compareCars');
+    if (cc) cc.onclick = compareCars;
+    root.querySelectorAll('.chart[data-action="pick"] .bar-col').forEach(b => b.addEventListener('click', () => {
+      state.webPick = b.dataset.key; renderInsights();
+    }));
   }
 
   /**
@@ -3389,27 +4486,6 @@
   }
   const averageAchieved = list => list.length
     ? Math.round(list.reduce((n, s) => n + (s.sale_price != null ? s.sale_price : s.price), 0) / list.length) : null;
-
-  /**
-   * Interest on an ageing car. People and contacts from the new tracking when
-   * it's live, the old page-view counts otherwise. The cause, if any, comes
-   * from the insight engine rather than a blanket "that's a price problem".
-   */
-  function ageingInterestLine(c) {
-    const f = analysis && analysis.findings.find(x => String(x.carId) === String(c.id));
-    const cause = f && CAUSE_LABEL[f.cause]
-      ? ` <strong style="color:${f.severity === 'act' ? 'var(--red-600)' : 'var(--amber-600)'}">${CAUSE_LABEL[f.cause]}.</strong> See the Cars tab.`
-      : '';
-
-    if (countingPeople()) {
-      const i = interestFor(c.id);
-      if (i) {
-        const got = Math.max(i.contacted || 0, i.enquiries_since_tracking || 0);
-        return `${nf(i.visitors)} ${i.visitors === 1 ? 'person' : 'people'} looked, ${nf(got)} got in touch since ${shortDay(trackStatus.v2_since)}.${cause}`;
-      }
-    }
-    return `${nf(c.views)} page views, ${nf(c.contacts)} taps to get in touch.${cause}`;
-  }
 
   const CAUSE_LABEL = {
     price: 'Priced above the market',
@@ -3477,93 +4553,6 @@
       <div style="font-size:26px;font-weight:800;letter-spacing:-.03em;color:${tone || 'var(--navy-900)'}">${value}</div>
       <div style="font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-top:3px">${label}</div>
     </div>`;
-  }
-
-  const INTEREST_SORTS = {
-    interest: 'Most interest first', least: 'Least interest first', contact: 'Most contact first',
-    oldest: 'Longest in stock', newest: 'Newest in', price_high: 'Price, high to low', price_low: 'Price, low to high'
-  };
-
-  function carInsights() {
-    const live = stats.filter(c => c.status === 'available' || c.status === 'reserved');
-    const sold = stats.filter(c => c.status === 'sold');
-    const people = countingPeople();
-
-    const soldWithDays = sold.filter(c => c.days_in_stock != null);
-    const avgDays = soldWithDays.length
-      ? Math.round(soldWithDays.reduce((n, c) => n + c.days_in_stock, 0) / soldWithDays.length)
-      : null;
-
-    if (!stats.length) {
-      return `<div class="empty">${icon('car')}<h3>Nothing to show yet</h3>
-        <p>Once the website has had a few visitors you'll see which cars people
-        are actually looking at.</p></div>`;
-    }
-
-    /* Tiles: this week in people once that's being counted, else the old totals */
-    let tiles;
-    if (people) {
-      const liveIds = new Set(live.map(c => String(c.car_id)));
-      const liveInterest = interest.filter(r => liveIds.has(String(r.car_id)));
-      const week = liveInterest.reduce((n, r) => n + (r.visitors_7d || 0), 0);
-      const got = liveInterest.reduce((n, r) => n + (r.contacted_7d || 0), 0);
-      tiles = `
-        ${statTile(nf(week), 'People this week')}
-        ${statTile(nf(got), 'Got in touch', 'var(--green-600)')}
-        ${statTile(avgDays != null ? avgDays + 'd' : 'Not yet', 'Avg to sell')}`;
-    } else {
-      const totalViews = stats.reduce((n, c) => n + (c.views || 0), 0);
-      const totalContacts = stats.reduce((n, c) =>
-        n + (c.whatsapp_clicks || 0) + (c.phone_clicks || 0) + (c.enquiries || 0), 0);
-      tiles = `
-        ${statTile(nf(totalViews), 'Page views')}
-        ${statTile(nf(totalContacts), 'Taps to contact', 'var(--green-600)')}
-        ${statTile(avgDays != null ? avgDays + 'd' : 'Not yet', 'Avg to sell')}`;
-    }
-
-    /* Live stock, most interest first unless you've picked another order */
-    const legacyById = Object.fromEntries(stats.map(c => [String(c.car_id), c]));
-    const looked = x => people ? ((x.i && x.i.visitors) || 0) : (x.c.views || 0);
-    const touched = x => people ? ((x.i && Math.max(x.i.contacted || 0, x.i.enquiries_since_tracking || 0)) || 0)
-      : (x.c.whatsapp_clicks || 0) + (x.c.phone_clicks || 0) + (x.c.enquiries || 0);
-    const order = INTEREST_SORTS[state.interestSort] ? state.interestSort : 'interest';
-    const cmp = {
-      interest: (a, b) => looked(b) - looked(a) || touched(b) - touched(a),
-      least:    (a, b) => looked(a) - looked(b) || touched(a) - touched(b),
-      contact:  (a, b) => touched(b) - touched(a) || looked(b) - looked(a),
-      oldest:   (a, b) => (b.c.days_in_stock || 0) - (a.c.days_in_stock || 0),
-      newest:   (a, b) => (a.c.days_in_stock || 0) - (b.c.days_in_stock || 0),
-      price_high: (a, b) => (b.c.price || 0) - (a.c.price || 0),
-      price_low:  (a, b) => (a.c.price || 0) - (b.c.price || 0)
-    }[order];
-    const rows = live.map(c => ({ c, i: people ? interestFor(c.car_id) : null })).sort(cmp)
-      .map(({ c, i }) => people && i ? interestRow(c, i, legacyById) : legacyRow(c)).join('');
-
-    return `
-      ${marginHero()}
-
-      ${trackingNote()}
-
-      ${decisionsHtml()}
-
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0">
-        ${tiles}
-      </div>
-
-      <div class="section-card">
-        <div class="card-head">
-          <h2>In stock</h2>
-          <select class="sel sel--sm" id="interestSort" aria-label="Order the cars by">
-            ${Object.entries(INTEREST_SORTS).map(([k, label]) =>
-              `<option value="${k}"${k === order ? ' selected' : ''}>${label}</option>`).join('')}
-          </select>
-        </div>
-        ${rows || '<p class="hint">No cars in stock at the moment.</p>'}
-      </div>
-
-      <button class="btn btn--outline btn--block" id="exportCars" style="margin-top:14px">
-        Export all car figures (CSV)
-      </button>`;
   }
 
   /* ---- Margin: the number that matters, with last month beside it --------
@@ -3736,22 +4725,6 @@
     </div>`;
   }
 
-  /* ---- Is the new tracking actually counting? ----------------------------- */
-  function trackingNote() {
-    if (countingPeople()) {
-      const bots = trackStatus.v2_bot_events || 0;
-      return `<p class="note" style="margin:0 0 12px">
-        Counting people since ${esc(shortDay(trackStatus.v2_since))}${bots ? `, with ${nf(bots)} bot visit${bots === 1 ? '' : 's'} left out` : ''}.
-      </p>`;
-    }
-    if (interest !== null) {
-      return `<p class="note" style="margin:0 0 12px">
-        The new tracking is installed but hasn’t counted anyone yet. Until it does, figures below are page views.
-      </p>`;
-    }
-    return '';
-  }
-
   /* ---- Needs a decision: the insight engine ------------------------------- */
   function decisionsHtml() {
     if (!analysis) return '';
@@ -3827,7 +4800,11 @@
   }
 
   /** After acting on an insight, redraw wherever it was shown. */
-  const redrawInsights = () => { if (stats) renderInsights(); if (state.view === 'home') renderHome(); };
+  const redrawInsights = () => {
+    if (stats && state.view === 'data') renderInsights();
+    if (state.view === 'home') renderHome();
+    if (state.view === 'carfig') renderCarFigures();
+  };
 
   async function onInsightAction(n, what) {
     const f = analysis && analysis.findings[n];
@@ -3858,76 +4835,6 @@
         ? 'Hidden for 7 days'
         : 'Got it. It won’t mention the price again unless it changes', 'ok');
     }
-  }
-
-  /* ---- One car's interest, counted in people ------------------------------ */
-  function interestRow(c, i, legacyById) {
-    const title = [c.year, c.make, c.model].filter(Boolean).join(' ') || 'Untitled';
-    const got = Math.max(i.contacted || 0, i.enquiries_since_tracking || 0);
-    const car = state.cars.find(x => String(x.id) === String(c.car_id));
-    const photoCount = car && Array.isArray(car.images) ? car.images.length : null;
-    const f = analysis && analysis.findings.find(x => String(x.carId) === String(c.car_id));
-
-    const pill = f && f.severity === 'good' ? '<span class="pill pill--green">Hot</span>'
-      : f && f.rule === 'no_contact' ? '<span class="pill pill--red">No contact</span>'
-      : c.days_in_stock >= 60 ? '<span class="pill pill--amber">Sitting</span>' : '';
-
-    const time = i.median_seconds == null ? 'n/a'
-      : i.median_seconds < 60 ? i.median_seconds + 's' : Math.round(i.median_seconds / 60) + 'm';
-    const rate = i.visitors ? Math.round(100 * Math.min(got, i.visitors) / i.visitors) + '%' : 'n/a';
-
-    const extra = [
-      i.avg_photos_seen != null && photoCount ? `Saw ${Math.round(i.avg_photos_seen)} of ${photoCount} photos on average` : null,
-      i.enquiries_total ? `${i.enquiries_total} enquir${i.enquiries_total === 1 ? 'y' : 'ies'} received` : null,
-      i.played_video ? `${i.played_video} watched the video` : null
-    ].filter(Boolean).join(' · ');
-    const legacy = legacyById[String(c.car_id)];
-    const before = legacy && legacy.views ? ` (${nf(legacy.views)} page views before ${shortDay(i.tracking_since)})` : '';
-
-    return `<div class="card" style="margin-bottom:10px"><div style="padding:14px">
-      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
-        <div style="min-width:0;flex:1">
-          <h3 style="font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title)}</h3>
-          <div style="font-size:13px;color:var(--ink-3);margin-top:2px">
-            ${money(c.price)} · ${nf(c.days_in_stock)} days in stock
-          </div>
-        </div>
-        ${pill}
-      </div>
-      <div class="interest-grid">
-        <div><b>${nf(i.visitors)}</b><span>people</span></div>
-        <div><b>${nf(got)}</b><span>got in touch</span></div>
-        <div><b>${rate}</b><span>rate</span></div>
-        <div><b>${time}</b><span>typical visit</span></div>
-      </div>
-      ${extra || before ? `<div class="interest-extra">${esc(extra)}${esc(before)}</div>` : ''}
-    </div></div>`;
-  }
-
-  /* ---- Before the tracking upgrade: page views, as it always was ---------- */
-  function legacyRow(c) {
-    const title = [c.year, c.make, c.model].filter(Boolean).join(' ') || 'Untitled';
-    const contacts = (c.whatsapp_clicks || 0) + (c.phone_clicks || 0) + (c.enquiries || 0);
-    const stale = c.days_in_stock >= 60;
-
-    return `<div class="card" style="margin-bottom:10px"><div style="padding:14px">
-      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
-        <div style="min-width:0;flex:1">
-          <h3 style="font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title)}</h3>
-          <div style="font-size:13px;color:var(--ink-3);margin-top:2px">
-            ${money(c.price)} · ${nf(c.days_in_stock)} days in stock
-          </div>
-        </div>
-        ${stale ? '<span class="pill pill--amber">Sitting</span>'
-          : contacts >= 3 ? '<span class="pill pill--green">Hot</span>' : ''}
-      </div>
-      <div class="interest-grid">
-        <div><b>${nf(c.views)}</b><span>page views</span></div>
-        <div><b>${nf(c.gallery_opens)}</b><span>photo opens</span></div>
-        <div><b>${nf(contacts)}</b><span>taps</span></div>
-        <div><b>${c.contact_rate_pct != null ? c.contact_rate_pct + '%' : 'n/a'}</b><span>rate</span></div>
-      </div>
-    </div></div>`;
   }
 
   /* ---- Sold: what actually got made ---------------------------------------
@@ -4147,7 +5054,8 @@
         col.addEventListener('pointerleave', () => { tip.hidden = true; });
         col.addEventListener('blur', () => { tip.hidden = true; });
         col.onclick = () => {
-          if (chart.dataset.action === 'open') return openDataTab('sold', col.dataset.month);
+          if (chart.dataset.action === 'open') return openDataTab('money', col.dataset.month);
+          if (chart.dataset.action !== 'filter') return;      // Website and car charts handle their own taps
           state.soldMonth = state.soldMonth === col.dataset.month ? 'all' : col.dataset.month;
           renderInsights();
         };
@@ -4205,6 +5113,8 @@
 
   /** Jump to an Insights tab, optionally with the Sold tab set to a month. */
   function openDataTab(tab, month) {
+    // The old tab names, from before 7 Oct 2026
+    tab = { sold: 'money', ageing: 'cars', demand: 'summary' }[tab] || tab;
     state.dataTab = tab;
     if (month) state.soldMonth = month;
     $$('#dataTabs button').forEach(x => x.classList.toggle('is-on', x.dataset.tab === tab));
@@ -4316,6 +5226,7 @@
 
     return `
       ${verseCard()}
+      ${marginHero()}
       ${byMonth.length ? `<div class="section-card">
         <div class="card-head"><h2>Margin by month</h2>${mashallah()}</div>
         ${barChart(byMonth, { selected: state.soldMonth })}
@@ -4381,59 +5292,6 @@
       </button>`;
   }
 
-  function demandInsights() {
-    if (!demand.length) {
-      return `<div class="empty">${icon('inbox')}<h3>No requests yet</h3>
-        <p>When someone uses the Car Finder, or registers interest in a car that's
-        sold, what they're after shows up here. Over time this tells you what to
-        be buying.</p></div>`;
-    }
-
-    const total = demand.reduce((n, d) => n + d.requests, 0);
-    const fromSold = demand.reduce((n, d) => n + (d.from_sold_cars || 0), 0);
-    const open = demand.reduce((n, d) => n + (d.still_open || 0), 0);
-
-    const rows = demand.map(d => `
-      <div class="card" style="margin-bottom:10px"><div style="padding:14px">
-        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
-          <div style="min-width:0">
-            <h3 style="font-size:16.5px;font-weight:700">${esc(d.make)}${d.model && d.model !== 'Any' ? ' ' + esc(d.model) : ''}</h3>
-            <div style="font-size:13px;color:var(--ink-3);margin-top:2px">
-              ${d.avg_budget ? 'Average budget ' + money(d.avg_budget) : 'No budget given'}
-              ${d.from_sold_cars ? ' · ' + d.from_sold_cars + ' from sold cars' : ''}
-            </div>
-          </div>
-          <span class="pill ${d.requests >= 3 ? 'pill--green' : 'pill--grey'}"
-                style="font-size:15px;padding:6px 13px">${d.requests}</span>
-        </div>
-      </div></div>`).join('');
-
-    const top = demand[0];
-
-    return `
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
-        ${statTile(nf(total), 'Requests')}
-        ${statTile(nf(open), 'Still open', 'var(--amber-600)')}
-        ${statTile(nf(fromSold), 'From sold cars')}
-      </div>
-
-      ${top && top.requests >= 2 ? `
-        <div class="msg msg--info is-shown" style="margin-bottom:14px">
-          <strong>${esc(top.make)}${top.model && top.model !== 'Any' ? ' ' + esc(top.model) : ''}
-          is your most requested car</strong>. ${top.requests} people asked${top.avg_budget ? `, averaging ${money(top.avg_budget)}` : ''}.
-          Worth looking out for at the next auction.
-        </div>` : ''}
-
-      <div class="section-card">
-        <h2>What people are asking for</h2>
-        ${rows}
-      </div>
-
-      <button class="btn btn--outline btn--block" id="exportDemand" style="margin-top:14px">
-        Export requests (CSV)
-      </button>`;
-  }
-
   function wireInsightActions() {
     const ec = $('#exportCars');
     if (ec) ec.onclick = () => downloadCsv('mbu-car-figures', statsWithFigures().map(r => {
@@ -4482,8 +5340,6 @@
     wireFigureButtons($('#dataBody'));
     wireInsightButtons($('#dataBody'));
 
-    const is = $('#interestSort');
-    if (is) is.onchange = () => { state.interestSort = is.value; remember('mbu_interest_sort', is.value); renderInsights(); };
 
     wireCharts($('#dataBody'));
     wireMashallah($('#dataBody'));
@@ -6419,8 +7275,44 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     if (state.view === 'invoice' || state.view === 'invprev') $('#topTitle').textContent = INV.numberLabel(inv.number) || 'Invoice';
     // Now it has a number it can be copied, voided or deleted from here too
     if (wasNew && state.view === 'invoice' && IV.cur === inv) renderInvoiceForm();
-    if (!quiet) toast('Saved as ' + INV.numberLabel(inv.number), 'ok');
+    if (!quiet) { toast('Saved as ' + INV.numberLabel(inv.number), 'ok'); setTimeout(() => offerCarStatus(inv), 700); }
     return true;
+  }
+
+  /* ---- An invoice that sells a car offers to mark it sold (7 Oct 2026) ------
+     The sale typed once, on the invoice. Once an invoice that sells one of
+     your cars is saved or sent, and the car isn't marked sold, this offers to:
+     the usual Mark as sold sheet, filled in from the invoice (the car's price,
+     the sale date, the cash on top of a part exchange), so what you paid and
+     the prep are checked on the way. A deposit receipt offers Reserved
+     instead. Asked once per invoice and kind, on this phone. */
+  const SELLS_A_CAR = ['paid', 'balance', 'instalments', 'trade'];
+  function offerCarStatus(inv) {
+    if (!inv || !inv.car_id || inv.status === 'void' || !INV) return;
+    const car = carById(inv.car_id);
+    if (!car || car.status === 'sold' || car.status === 'draft') return;
+    const asked = IV.askedCar || (IV.askedCar = new Set());
+    const key = (inv.id || inv.number || 'new') + ':' + inv.kind;
+    if (asked.has(key)) return;
+
+    if (SELLS_A_CAR.includes(inv.kind)) {
+      asked.add(key);
+      const price = Number(inv.price) > 0 ? Number(inv.price) : null;
+      const pxOn = inv.px && inv.px.on && Number(inv.px.allowance) > 0;
+      const pxCash = pxOn && price != null ? Math.max(0, price - Number(inv.px.allowance)) : null;
+      sheet(`Mark the ${carTitle(car)} sold?`,
+        `This invoice sells it${price ? ' for ' + money(price) : ''}${inv.sale_date ? ' on ' + longDate(fromKey(inv.sale_date)) : ''}${pxOn ? ', with a part exchange' : ''}. It’s still ${car.status === 'reserved' ? 'reserved' : 'for sale'} on the website.`, [
+          { label: 'Yes, mark it sold', icon: 'sold', sub: 'Check what you paid and the prep on the way',
+            run: () => figuresSheet(car, { markSold: true, sale: price, soldAt: inv.sale_date, pxCash, after: () => {} }) },
+          { label: 'Not yet', icon: 'clock', sub: 'Mark it sold from the car later', run: () => {} }
+        ]);
+    } else if (inv.kind === 'deposit' && car.status === 'available') {
+      asked.add(key);
+      sheet(`Mark the ${carTitle(car)} reserved?`, 'A deposit’s been taken. A reserved car stays on the website with a Reserved badge, so nobody else turns up for it.', [
+        { label: 'Yes, mark it reserved', icon: 'pause', run: () => setStatus(car, 'reserved') },
+        { label: 'Not yet', icon: 'clock', run: () => {} }
+      ]);
+    }
   }
 
   $('#invSaveBtn').onclick = () => saveInvoice();
@@ -6542,6 +7434,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     if (inv.status === 'draft') inv.status = 'issued';
     await saveInvoice(true);
     renderPreview();
+    setTimeout(() => offerCarStatus(inv), 900);
   }
 
   function download(file) {
@@ -6828,55 +7721,370 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
     ]);
   }
 
-  /* ====================================================== MOT CALENDAR
-     Every car you still own (in stock, reserved, drafts), by the month its
-     MOT runs out, the run-out ones first. Add them to the phone's own
-     calendar in one go, each with a reminder two weeks before. */
+  /* ====================================================== MOTs (7 Oct 2026)
+     One place to see, fill in and act on MOT dates, joined up with the rest
+     of the app: every MOT pill, Home alert and car menu line opens the same
+     sheet (motSheet), and that sheet leads here.
+
+       Calendar  a real month grid with a dot on each day an MOT runs out
+                 (red / amber / green as everywhere), swipe or arrows for
+                 the month, tap a day for its cars. Under it: run out,
+                 the next 90 days, and the ones with no date.
+       Dates     every car you still own on one screen, a date box each,
+                 saved as you go, the ones with no date first, a GOV.UK
+                 button per plate to read the date off.
+
+     Passed its MOT: a car tested up to a month (less a day) before its MOT
+     runs out keeps the same date a year on; tested any earlier, or after it
+     ran out, it runs out a year less a day from the test (GOV.UK's rule).
+     Sold cars aren't listed: their MOT is the buyer's (3 Oct, Talha). */
   ON_SHOW.motcal = () => renderMotCal();
+  const heldCars = () => state.cars.filter(c => ['available', 'reserved', 'draft'].includes(c.status));
+  const motDate = c => c.mot_expiry ? new Date(String(c.mot_expiry).slice(0, 10) + 'T00:00:00') : null;
+  const longDate = d => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  const motDot = c => motDays(c) == null ? 'grey' : motLevel(c) || 'green';
+
+  /**
+   * When the MOT runs out after a pass on `tested`.
+   * @param {string} tested     the test date, YYYY-MM-DD
+   * @param {string|null} oldExpiry  the date it was due to run out, if known
+   * @returns {string} YYYY-MM-DD
+   */
+  function motAfterPass(tested, oldExpiry) {
+    const t = fromKey(tested);
+    // The same day in another month, or that month's last day if it's shorter (31 Mar → 28 Feb)
+    const sameDay = (y, m, d) => new Date(y, m, Math.min(d, new Date(y, m + 1, 0).getDate()));
+    if (oldExpiry) {
+      const old = fromKey(oldExpiry);
+      const monthBefore = sameDay(old.getFullYear(), old.getMonth() - 1, old.getDate());
+      const earliest = addDays(monthBefore, 1);                         // a month less a day before: 15 May → 16 Apr
+      if (t >= earliest && t <= old) return dayKey(sameDay(old.getFullYear() + 1, old.getMonth(), old.getDate()));
+    }
+    return dayKey(new Date(t.getFullYear() + 1, t.getMonth(), t.getDate() - 1));
+  }
+
+  /** Save a car's MOT date (or clear it), and redraw whatever shows it. */
+  async function saveMot(car, ymd) {
+    const value = ymd || null;
+    const { error } = await sb.from('cars').update({ mot_expiry: value, updated_at: new Date().toISOString() }).eq('id', car.id);
+    if (error) { toast('Couldn’t save: ' + error.message); return false; }
+    car.mot_expiry = value;
+    renderStock();
+    if (state.view === 'motcal') renderMotCal();
+    if (state.view === 'motcheck') renderMotCheck();
+    return true;
+  }
+
+  /** Everything about one car's MOT: change the date, passed, GOV.UK, the calendar. */
+  function motSheet(car) {
+    const when = car.mot_expiry ? longDate(motDate(car)) : '';
+    const box = sheetHtml(carTitle(car), [car.registration ? fmtReg(car.registration) : '', car.mot_expiry ? motWords(car) : 'No MOT date yet'].filter(Boolean).join(' · '), `
+      <div class="mot-sheet">
+        <label class="lbl" for="msDate">${car.mot_expiry ? 'MOT runs out' : 'When does the MOT run out?'}</label>
+        <div class="mot-sheet-row">
+          <input class="in" id="msDate" type="date" value="${esc(car.mot_expiry ? String(car.mot_expiry).slice(0, 10) : '')}">
+          <button class="btn btn--primary" type="button" id="msSave">Save</button>
+        </div>
+        ${car.registration ? `<button class="sheet-action" type="button" id="msGov">${icon('open')}<div><span>Look it up on GOV.UK</span><small>Its MOT history shows the date it runs out</small></div></button>` : ''}
+        <button class="sheet-action" type="button" id="msPass">${icon('checkCirc')}<div><span>It’s passed its MOT</span><small>${when ? `Works out the new date from the test (now ${esc(when)})` : 'Works out the new date from the test'}</small></div></button>
+        <button class="sheet-action" type="button" id="msCal">${icon('calendar')}<div><span>See every MOT</span><small>The calendar, and every car’s date on one screen</small></div></button>
+        <button class="sheet-action" type="button" id="msCar">${icon('car')}<div><span>The rest of this car</span></div></button>
+      </div>`);
+    box.querySelector('#msSave').onclick = async () => {
+      const v = box.querySelector('#msDate').value;
+      if (await saveMot(car, v)) { closeSheet(); toast(v ? 'MOT date saved' : 'MOT date cleared', 'ok'); }
+    };
+    const gov = box.querySelector('#msGov');
+    if (gov) gov.onclick = () => window.open(govMot(cleanPlate(car.registration)), '_blank', 'noopener');
+    box.querySelector('#msPass').onclick = () => { closeSheet(); setTimeout(() => passedSheet(car), 180); };
+    box.querySelector('#msCal').onclick = () => { closeSheet(); state.motMonth = car.mot_expiry ? String(car.mot_expiry).slice(0, 7) : null; setTimeout(() => go('motcal'), 180); };
+    box.querySelector('#msCar').onclick = () => { closeSheet(); setTimeout(() => carActions(car), 180); };
+  }
+
+  /** "It's passed": the test date in, the new run-out date worked out and shown before saving. */
+  function passedSheet(car) {
+    const today = dayKey(new Date());
+    const old = car.mot_expiry ? String(car.mot_expiry).slice(0, 10) : null;
+    const box = sheetHtml('Passed its MOT', carTitle(car) + (car.registration ? ' · ' + fmtReg(car.registration) : ''), `
+      <div class="mot-sheet">
+        <label class="lbl" for="psTest">Tested on</label>
+        <input class="in" id="psTest" type="date" value="${today}" max="${today}">
+        <p class="mot-new" id="psNew"></p>
+        <button class="btn btn--accent btn--block" type="button" id="psSave">Save the new date</button>
+        <p class="note">Tested up to a month before it ran out, it keeps the same date a year on. Any earlier, or after it ran out, it runs out a year (less a day) from the test. Check it against the certificate or GOV.UK.</p>
+      </div>`);
+    const input = box.querySelector('#psTest');
+    const show = () => {
+      if (!input.value) { box.querySelector('#psNew').textContent = 'Pick the day it was tested.'; return null; }
+      const next = motAfterPass(input.value, old);
+      const kept = old && next.slice(5) === old.slice(5);
+      box.querySelector('#psNew').innerHTML = `New MOT runs out <b>${esc(longDate(fromKey(next)))}</b>${kept ? '<small>Same date as before, a year on</small>' : ''}`;
+      return next;
+    };
+    input.oninput = show;
+    show();
+    box.querySelector('#psSave').onclick = async () => {
+      const next = show();
+      if (!next) return;
+      if (await saveMot(car, next)) { closeSheet(); toast('New MOT date saved: ' + longDate(fromKey(next)), 'ok'); }
+    };
+  }
+
+  /* ---- The MOTs screen ------------------------------------------------------ */
+  const MOT_TABS = { cal: 'Calendar', dates: 'All dates' };
 
   function renderMotCal() {
-    const owned = state.cars.filter(c => ['available', 'reserved', 'draft'].includes(c.status));
-    const dated = owned.filter(c => motDays(c) != null).sort((a, b) => motDays(a) - motDays(b));
-    const none = owned.filter(c => motDays(c) == null);
-    const groups = [];
-    dated.forEach(c => {
-      const d = motDays(c);
-      const key = d < 0 ? 'out' : String(c.mot_expiry).slice(0, 7);
-      let g = groups.find(x => x.key === key);
-      if (!g) {
-        const label = key === 'out' ? 'Run out' : new Date(key + '-01T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-        groups.push(g = { key, label, cars: [] });
-      }
-      g.cars.push(c);
-    });
+    const tab = MOT_TABS[state.motTab] ? state.motTab : 'cal';
+    const held = heldCars();
+    const none = held.filter(c => !c.mot_expiry).length;
+    $('#motcalBody').innerHTML = `
+      <div class="segment segment--sm" id="motTabs">
+        ${Object.entries(MOT_TABS).map(([k, l]) => `<button type="button" data-k="${k}" class="${k === tab ? 'is-on' : ''}">${l}${k === 'dates' && none ? ` <span class="seg-n">${none} to fill in</span>` : ''}</button>`).join('')}
+      </div>
+      ${!held.length ? `<div class="empty">${icon('calendar')}<h3>No cars in stock</h3><p>Their MOT dates show here once they’re in.</p></div>`
+        : tab === 'dates' ? motDatesHtml(held) : motCalHtml(held)}
+      ${tab === 'cal' ? motFeedCard() : ''}
+      <button class="btn btn--ghost btn--block" type="button" id="mcChecker" style="margin-top:12px">Check any plate on GOV.UK ${icon('right')}</button>
+      <p class="note" style="margin:10px 4px 0">Red: under ${MOT_RED_DAYS} days or run out. Amber: under ${MOT_AMBER_DAYS} days. Sold cars aren’t listed: their MOT is the buyer’s.</p>`;
+    wireMotCal();
+  }
+
+  function motCalHtml(held) {
+    const now = new Date();
+    const key = /^\d{4}-\d{2}$/.test(state.motMonth || '') ? state.motMonth : dayKey(now).slice(0, 7);
+    const [y, m] = key.split('-').map(Number);
+    const first = new Date(y, m - 1, 1);
+    const lead = (first.getDay() + 6) % 7;                         // Monday first
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const byDay = {};
+    held.filter(c => c.mot_expiry && String(c.mot_expiry).slice(0, 7) === key)
+      .forEach(c => { const d = +String(c.mot_expiry).slice(8, 10); (byDay[d] = byDay[d] || []).push(c); });
+    const todayKey = dayKey(now);
+    const pick = state.motDay && state.motDay.slice(0, 7) === key ? state.motDay : null;
+
+    const cells = [];
+    for (let i = 0; i < lead; i++) cells.push('<span class="mc-cell mc-cell--blank"></span>');
+    for (let d = 1; d <= daysInMonth; d++) {
+      const k = key + '-' + pad2(d);
+      const cars = byDay[d] || [];
+      cells.push(`<button type="button" class="mc-cell${k === todayKey ? ' is-today' : ''}${k === pick ? ' is-picked' : ''}${cars.length ? ' has-mot' : ''}" data-day="${k}"
+          aria-label="${esc(longDate(fromKey(k)) + (cars.length ? ': ' + cars.map(carTitle).join(', ') : ''))}">
+        <span>${d}</span>${cars.length ? `<i class="mc-dots">${cars.slice(0, 3).map(c => `<b class="dot dot--${motDot(c)}"></b>`).join('')}</i>` : ''}
+        ${cars.length > 1 ? `<small>${cars.length}</small>` : ''}
+      </button>`);
+    }
+
     const row = c => {
-      const d = motDays(c), lvl = d == null ? 'grey' : motLevel(c) || 'green';
-      return `<button class="mot-row" type="button" data-id="${esc(c.id)}">
-        <i class="dot dot--${lvl}"></i>
+      const d = motDays(c);
+      return `<button class="mot-row" type="button" data-mot="${esc(c.id)}">
+        <i class="dot dot--${motDot(c)}"></i>
         <span class="mot-row-txt"><strong>${esc(carTitle(c))}</strong>
           <small>${esc([c.registration ? fmtReg(c.registration) : '', c.status === 'draft' ? 'Draft' : c.status === 'reserved' ? 'Reserved' : ''].filter(Boolean).join(' · '))}</small></span>
-        <span class="mot-row-end"><b>${d == null ? '' : esc(new Date(String(c.mot_expiry).slice(0, 10) + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))}</b>
+        <span class="mot-row-end"><b>${d == null ? '' : esc(motDate(c).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))}</b>
           <small>${esc(d == null ? 'Add the date' : d < 0 ? `${plural(-d, 'day')} ago` : d === 0 ? 'Today' : `in ${plural(d, 'day')}`)}</small></span>
       </button>`;
     };
-    $('#motcalBody').innerHTML = `
-      ${dated.length ? `<button class="btn btn--outline btn--block" type="button" id="mcIcs" style="margin-bottom:14px">${icon('calendar')} Add them to my phone’s calendar</button>` : ''}
-      ${groups.map(g => `<h2 class="home-h">${esc(g.label)} <span class="home-n">${g.cars.length}</span></h2>
-        <div class="card">${g.cars.map(row).join('')}</div>`).join('')}
-      ${none.length ? `<h2 class="home-h">No MOT date <span class="home-n">${none.length}</span></h2>
-        <div class="card">${none.map(row).join('')}</div>` : ''}
-      ${!owned.length ? `<div class="empty">${icon('calendar')}<h3>No cars in stock</h3><p>Their MOT dates show here once they’re in.</p></div>` : ''}
-      <p class="note" style="margin:14px 4px 0">Red: under ${MOT_RED_DAYS} days or run out. Amber: under ${MOT_AMBER_DAYS} days. Sold cars aren’t listed: their MOT is the buyer’s.</p>`;
-    $$('#motcalBody .mot-row').forEach(b => b.onclick = () => {
-      const car = state.cars.find(c => String(c.id) === b.dataset.id);
-      if (!car) return;
-      if (motDays(car) == null) openForm(car, '#fMot'); else carActions(car);
+    const dated = held.filter(c => motDays(c) != null).sort((a, b) => motDays(a) - motDays(b));
+    const out = dated.filter(c => motDays(c) < 0);
+    const soon = dated.filter(c => motDays(c) >= 0 && motDays(c) <= 90);
+    const thisMonth = dated.filter(c => String(c.mot_expiry).slice(0, 7) === key);
+    const none = held.filter(c => !c.mot_expiry);
+    const dayCars = pick ? (byDay[+pick.slice(8, 10)] || []) : null;
+    const monthName = first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    const list = (title, cars, empty) => cars.length || empty
+      ? `<h2 class="home-h">${esc(title)}${cars.length ? ` <span class="home-n">${cars.length}</span>` : ''}</h2>
+         ${cars.length ? `<div class="card">${cars.map(row).join('')}</div>` : `<p class="hint" style="margin:0 4px">${esc(empty)}</p>`}` : '';
+
+    return `
+      <div class="section-card mc">
+        <div class="mc-head">
+          <button type="button" class="topbar-btn mc-nav" id="mcPrev" aria-label="Month before">${icon('left')}</button>
+          <h2>${esc(monthName)}</h2>
+          <button type="button" class="topbar-btn mc-nav" id="mcNext" aria-label="Month after">${icon('right')}</button>
+        </div>
+        <div class="mc-grid mc-grid--head">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<span>${d}</span>`).join('')}</div>
+        <div class="mc-grid" id="mcGrid">${cells.join('')}</div>
+        ${key !== todayKey.slice(0, 7) ? '<button type="button" class="linkish mc-today" id="mcToday">Back to this month</button>' : ''}
+      </div>
+      ${dayCars ? list(longDate(fromKey(pick)), dayCars, 'No MOTs run out that day.') : ''}
+      ${!dayCars ? list('Run out', out) : ''}
+      ${!dayCars ? list('Next 90 days', soon.filter(c => !out.includes(c)), out.length ? '' : 'Nothing runs out in the next 90 days.') : ''}
+      ${!dayCars && key !== todayKey.slice(0, 7) ? list('In ' + first.toLocaleDateString('en-GB', { month: 'long' }), thisMonth, 'Nothing runs out this month.') : ''}
+      ${!dayCars && none.length ? `<h2 class="home-h">No MOT date <span class="home-n">${none.length}</span></h2>
+        <button class="card mc-fill" type="button" id="mcFill">${icon('edit')}<span><strong>Fill them in on one screen</strong><small>${esc(none.slice(0, 3).map(carTitle).join(', '))}${none.length > 3 ? ' and ' + (none.length - 3) + ' more' : ''}</small></span>${icon('right')}</button>` : ''}`;
+  }
+
+  /** Every car you own, a date box each, saved as you go. */
+  function motDatesHtml(held) {
+    const cars = held.slice().sort((a, b) => (!!a.mot_expiry - !!b.mot_expiry) || ((motDays(a) ?? 0) - (motDays(b) ?? 0)));
+    return `<p class="note" style="margin:0 4px 12px">Change a date and it saves. Not sure of one? GOV.UK shows it from the plate.</p>
+      <div class="card">${cars.map(c => `
+        <div class="md-row" data-id="${esc(c.id)}">
+          <i class="dot dot--${motDot(c)}"></i>
+          <div class="md-txt"><strong>${esc(carTitle(c))}</strong><small>${esc([c.registration ? fmtReg(c.registration) : 'No plate', c.status === 'draft' ? 'Draft' : ''].filter(Boolean).join(' · '))}</small></div>
+          <input class="in md-date" type="date" value="${esc(c.mot_expiry ? String(c.mot_expiry).slice(0, 10) : '')}" aria-label="MOT runs out, ${esc(carTitle(c))}">
+          <div class="md-btns">
+            ${c.registration ? `<button class="btn btn--ghost btn--sm" type="button" data-gov="${esc(c.registration)}">GOV.UK</button>` : ''}
+            <button class="btn btn--ghost btn--sm" type="button" data-pass="${esc(c.id)}">Passed</button>
+          </div>
+          <span class="md-state" aria-live="polite"></span>
+        </div>`).join('')}</div>`;
+  }
+
+  function wireMotCal() {
+    const body = $('#motcalBody');
+    body.querySelectorAll('#motTabs [data-k]').forEach(b => b.onclick = () => { state.motTab = b.dataset.k; renderMotCal(); });
+    body.querySelectorAll('[data-mot]').forEach(b => b.onclick = () => { const c = carById(b.dataset.mot); if (c) motSheet(c); });
+    const shift = n => {
+      const key = /^\d{4}-\d{2}$/.test(state.motMonth || '') ? state.motMonth : dayKey(new Date()).slice(0, 7);
+      const [y, m] = key.split('-').map(Number);
+      const t = new Date(y, m - 1 + n, 1);
+      state.motMonth = t.getFullYear() + '-' + pad2(t.getMonth() + 1);
+      state.motDay = null;
+      renderMotCal();
+    };
+    const prev = $('#mcPrev'), next = $('#mcNext');
+    if (prev) prev.onclick = () => shift(-1);
+    if (next) next.onclick = () => shift(1);
+    const today = $('#mcToday');
+    if (today) today.onclick = () => { state.motMonth = null; state.motDay = null; renderMotCal(); };
+    body.querySelectorAll('[data-day]').forEach(b => b.onclick = () => {
+      state.motDay = state.motDay === b.dataset.day ? null : b.dataset.day;
+      renderMotCal();
     });
+    // Swipe the month across
+    const grid = $('#mcGrid');
+    if (grid) {
+      let x0 = null, y0 = null;
+      grid.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+      grid.addEventListener('touchend', e => {
+        if (x0 == null) return;
+        const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+        x0 = null;
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) shift(dx < 0 ? 1 : -1);
+      });
+    }
+    const fill = $('#mcFill');
+    if (fill) fill.onclick = () => { state.motTab = 'dates'; renderMotCal(); };
+    $('#mcChecker').onclick = () => go('motcheck');
+
+    // All dates: save each one as it changes
+    body.querySelectorAll('.md-row').forEach(r => {
+      const car = carById(r.dataset.id);
+      const input = r.querySelector('.md-date'), note = r.querySelector('.md-state');
+      input.onchange = async () => {
+        note.textContent = 'Saving…';
+        const ok = await saveMotQuiet(car, input.value);
+        note.textContent = ok ? 'Saved' : 'Not saved';
+        r.querySelector('.dot').className = 'dot dot--' + motDot(car);
+        setTimeout(() => { if (note.textContent === 'Saved') note.textContent = ''; }, 2500);
+      };
+    });
+    body.querySelectorAll('[data-gov]').forEach(b => b.onclick = () => window.open(govMot(cleanPlate(b.dataset.gov)), '_blank', 'noopener'));
+    body.querySelectorAll('[data-pass]').forEach(b => b.onclick = () => { const c = carById(b.dataset.pass); if (c) passedSheet(c); });
+    wireMotFeed();
+  }
+
+  /** Save without redrawing the screen you're typing on. */
+  async function saveMotQuiet(car, ymd) {
+    const value = ymd || null;
+    const { error } = await sb.from('cars').update({ mot_expiry: value, updated_at: new Date().toISOString() }).eq('id', car.id);
+    if (error) { toast('Couldn’t save: ' + error.message); return false; }
+    car.mot_expiry = value;
+    renderStock();
+    return true;
+  }
+
+  /* ---- The live calendar link -------------------------------------------------
+     The phone's calendar subscribes once to a link served by the mot-calendar
+     Edge Function, and fetches it again by itself every few hours, so new
+     dates, passes and sales show without doing anything. The link carries a
+     long random code kept in app_settings (key 'mot_feed'); without the code
+     the function says nothing. "Make a new link" changes the code, so an old
+     link someone else has stops working. Needs schema v10 (app_settings) and
+     the function deployed (HANDOVER §9s). Until then: the download, as before. */
+  const FEED_FN = () => CFG.supabase.url.replace(/\/$/, '') + '/functions/v1/mot-calendar';
+  const feedUrl = token => FEED_FN() + '?t=' + encodeURIComponent(token);
+
+  async function motFeed() {
+    const out = { token: null, live: null };
+    if (state.schema.v10 !== false) {
+      try {
+        const { data, error } = await sb.from('app_settings').select('value').eq('key', 'mot_feed').maybeSingle();
+        if (!error && data && data.value) out.token = data.value.token || null;
+      } catch { /* not there yet */ }
+    }
+    // Is the function there? It answers 401 without the code, 404 if it isn't deployed
+    try {
+      const r = await fetch(FEED_FN(), { method: 'GET', cache: 'no-store' });
+      out.live = r.status !== 404;
+    } catch { out.live = null; }
+    return out;
+  }
+
+  function motFeedCard() {
+    const f = need('motfeed', motFeed, 600000);
+    if (f === undefined) return '<div class="section-card"><div class="skel" style="height:70px"></div></div>';
+    const dated = heldCars().filter(c => c.mot_expiry);
+    const ready = f && f.live && state.schema.v10 !== false;
+    if (ready && f.token) {
+      const url = feedUrl(f.token);
+      return `<div class="section-card mot-feed">
+        <div class="card-head"><h2>On your phone’s calendar</h2></div>
+        <p class="cf-say">Add it once and it keeps itself up to date: new dates, passes and sold cars show by themselves, each with a reminder two weeks before.</p>
+        <a class="btn btn--accent btn--block" href="${esc(url.replace(/^https:/, 'webcal:'))}" id="mfAdd">${icon('calendar')} Add to my calendar (iPhone)</a>
+        <button class="btn btn--outline btn--block" type="button" id="mfCopy" style="margin-top:10px">${icon('copy')} Copy the link (Google Calendar, Outlook)</button>
+        <details class="chart-table" style="margin-top:10px"><summary>How, and if it doesn’t work</summary>
+          <p class="note" style="margin-top:8px"><b>iPhone:</b> tap Add, then Subscribe. If the reminders don’t show, Settings → Calendar → Accounts → Subscribed Calendars → this one → turn off “Remove Alerts”.<br><br>
+          <b>Android / Google:</b> copy the link, then on a computer open calendar.google.com → Other calendars → + → From URL → paste. It appears on the phone too.<br><br>
+          Calendars fetch it again every few hours, so a change can take that long to show. Anyone with the link can see the cars and dates, so only add it to your own phones.</p>
+          <button class="btn btn--ghost btn--sm" type="button" id="mfNew" style="margin-top:8px">Make a new link (the old one stops working)</button>
+        </details>
+      </div>`;
+    }
+    if (ready) {
+      return `<div class="section-card mot-feed">
+        <div class="card-head"><h2>On your phone’s calendar</h2></div>
+        <p class="cf-say">A link your phone’s calendar keeps up to date by itself: every MOT, with a reminder two weeks before.</p>
+        <button class="btn btn--accent btn--block" type="button" id="mfMake">${icon('calendar')} Set up the calendar link</button>
+      </div>`;
+    }
+    return `<div class="section-card mot-feed">
+      <div class="card-head"><h2>On your phone’s calendar</h2></div>
+      <p class="note" style="margin-bottom:10px">${state.schema.v10 === false
+        ? 'The live calendar link needs schema-v10-invoices.sql run, and the mot-calendar function set up (gear → Ready to switch on).'
+        : 'The live calendar link needs the mot-calendar function set up in Supabase (gear → Ready to switch on). Until then, download the dates: they won’t update by themselves.'}</p>
+      ${dated.length ? `<button class="btn btn--outline btn--block" type="button" id="mcIcs">${icon('calendar')} Download the dates for my calendar</button>` : ''}
+    </div>`;
+  }
+
+  function wireMotFeed() {
     const ics = $('#mcIcs');
     if (ics) ics.onclick = () => {
-      const file = new File([motIcs(dated)], 'mbu-mot-dates.ics', { type: 'text/calendar' });
+      const file = new File([motIcs(heldCars().filter(c => c.mot_expiry))], 'mbu-mot-dates.ics', { type: 'text/calendar' });
       download(file);
       toast('Open the file to add them to your calendar', 'ok');
+    };
+    const make = async () => {
+      const a = new Uint8Array(24);
+      crypto.getRandomValues(a);
+      const token = Array.from(a, b => b.toString(16).padStart(2, '0')).join('');
+      const { error } = await sb.from('app_settings').upsert({ key: 'mot_feed', value: { token, made: new Date().toISOString() }, updated_at: new Date().toISOString() });
+      if (error) return toast('Couldn’t set it up: ' + error.message);
+      siteGot.delete('motfeed');
+      renderMotCal();
+      toast('Calendar link ready', 'ok');
+    };
+    const mk = $('#mfMake');
+    if (mk) mk.onclick = make;
+    const nw = $('#mfNew');
+    if (nw) nw.onclick = () => confirmSheet('Make a new link?', 'Any calendar using the old link stops getting the dates. Add the new one to each phone again.', 'Make a new link', make, true);
+    const cp = $('#mfCopy');
+    if (cp) cp.onclick = async () => {
+      const f = siteGot.get('motfeed');
+      const url = f && f.data && f.data.token ? feedUrl(f.data.token) : '';
+      try { await navigator.clipboard.writeText(url); toast('Link copied', 'ok'); }
+      catch { prompt('Copy this link:', url); }
     };
   }
 
@@ -6931,13 +8139,18 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
       ${recent.length ? `<div class="section-card"><h2>Checked lately</h2><div class="chips">
         ${recent.map(p => `<button class="chip" type="button" data-plate="${esc(p)}">${esc(fmtReg(p))}</button>`).join('')}</div></div>` : ''}
       ${mine.length ? `<h2 class="home-h">Your stock</h2><div class="card">${mine.map(c => `
-        <button class="mot-row" type="button" data-plate="${esc(c.registration)}">
-          <i class="dot dot--${motLevel(c) || (motDays(c) == null ? 'grey' : 'green')}"></i>
-          <span class="mot-row-txt"><strong>${esc(carTitle(c))}</strong><small>${esc(fmtReg(c.registration))} · ${esc(motWords(c))}</small></span>
-          ${icon('open')}
-        </button>`).join('')}</div>` : ''}
+        <div class="mot-row mot-row--split">
+          <button type="button" class="mot-row-main" data-plate="${esc(c.registration)}">
+            <i class="dot dot--${motDot(c)}"></i>
+            <span class="mot-row-txt"><strong>${esc(carTitle(c))}</strong><small>${esc(fmtReg(c.registration))} · ${esc(motWords(c))}</small></span>
+            ${icon('open')}
+          </button>
+          <button type="button" class="btn btn--ghost btn--sm" data-motset="${esc(c.id)}">Use the date</button>
+        </div>`).join('')}</div>
+      <p class="note" style="margin:8px 4px 0">Read the date off GOV.UK, then <b>Use the date</b> to put it on the car.</p>` : ''}
       <button class="btn btn--ghost btn--block" type="button" id="mcBid" style="margin-top:14px">Buying it? The full check before you bid ${icon('right')}</button>`;
     $$('#mcBody [data-plate]').forEach(b => b.onclick = () => motCheck(b.dataset.plate));
+    $$('#mcBody [data-motset]').forEach(b => b.onclick = () => { const c = carById(b.dataset.motset); if (c) motSheet(c); });
     $('#mcBid').onclick = () => {
       const p = cleanPlate($('#mcReg').value);
       go('value');
@@ -7416,7 +8629,7 @@ Viewings by appointment seven days a week in ${B.town}. Call or message to arran
         run: () => go('pricebook') },
       { key: 'motcheck', icon: 'checkCirc', title: 'MOT checker', sub: 'Any plate’s MOT history',
         run: () => go('motcheck') },
-      { key: 'motcal', icon: 'calendar', title: 'MOT calendar', sub: 'When stock MOTs run out',
+      { key: 'motcal', icon: 'calendar', title: 'MOTs', sub: 'Calendar, and every car’s date',
         run: () => go('motcal') },
       { key: 'photos', icon: 'camera', title: 'Photo guide', sub: 'Same angles, every car',
         run: () => go('photos') },

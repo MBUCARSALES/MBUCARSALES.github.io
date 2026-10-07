@@ -693,7 +693,7 @@
   function wireShare(car, title) {
     // Always share the pre-rendered URL. That's the one with a proper
     // preview, even if you're currently on the ?id= version.
-    const url = MBU.carUrl(car);
+    const url = MBU.carUrl(car, 'share');   // a visit from it counts as "shared"
     const data = { title: `${title} | MBU Car Sales`, text: `Have a look at this ${title} at MBU Car Sales`, url };
 
     MBU.qsa('[data-share]').forEach(btn => {
@@ -771,7 +771,7 @@
               We will be in touch shortly. If you would rather not wait, message us on WhatsApp and
               you will usually get a reply within the hour.
             </p>
-            <a class="btn btn--wa" href="${MBU.waCarLink(car)}" target="_blank" rel="noopener">
+            <a class="btn btn--wa" data-at="after-form" href="${MBU.waCarLink(car)}" target="_blank" rel="noopener">
               ${MBU.icon('whatsapp')} Message on WhatsApp instead
             </a>
           </div>`;

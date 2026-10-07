@@ -204,10 +204,10 @@
               Send us the registration and a couple of photos on WhatsApp and we will usually
               come back with a price the same day. Honestly, it is the quickest way.
             </p>
-            <a class="btn btn--wa btn--block" id="sellWa" href="#" target="_blank" rel="noopener">
+            <a class="btn btn--wa btn--block" id="sellWa" data-at="card" href="#" target="_blank" rel="noopener">
               Send us a WhatsApp
             </a>
-            <a class="btn btn--onDark btn--block" id="sellTel" href="#" style="margin-top:10px">
+            <a class="btn btn--onDark btn--block" id="sellTel" data-at="card" href="#" style="margin-top:10px">
               Or give us a ring
             </a>
           </div>
@@ -386,7 +386,7 @@
             number, usually the same day. If you have photos to hand, sending them on WhatsApp
             will help us be more accurate.
           </p>
-          <a class="btn btn--wa" href="${MBU.waLink('Hi, I have just submitted a valuation request for my ' + v('sfMake') + ' ' + v('sfModel') + ' (' + v('sfReg') + '). Here are some photos.')}"
+          <a class="btn btn--wa" data-at="after-form" href="${MBU.waLink('Hi, I have just submitted a valuation request for my ' + v('sfMake') + ' ' + v('sfModel') + ' (' + v('sfReg') + '). Here are some photos.')}"
              target="_blank" rel="noopener">${MBU.icon('whatsapp')} Send photos on WhatsApp</a>
         </div>`;
       form.scrollIntoView({ behavior: 'smooth', block: 'center' });
