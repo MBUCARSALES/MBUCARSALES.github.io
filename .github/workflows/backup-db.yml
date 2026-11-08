@@ -1,16 +1,34 @@
 # ============================================================================
 # NIGHTLY DATABASE BACKUP
 # ----------------------------------------------------------------------------
-# Dumps the `public` schema out of Supabase every night and keeps the file as
-# a GitHub Actions artifact for 30 days.
+# Dumps the `public` schema out of Supabase every night, LOCKS IT with a
+# passphrase, and keeps the locked file as a GitHub Actions artifact for 30 days.
 #
 # Everything the business actually owns lives in `public`: cars, enquiries,
 # wanted_requests, car_events, price_checks, price_history, admins. Restoring
 # this file into an empty Supabase project gets the stock list and the history
 # back.
 #
-# SETUP — one repo secret is required:
-#   SUPABASE_DB_URL   the SESSION POOLER connection string, port 5432
+# 🔒 WHY IT'S LOCKED (8 Nov 2026): this repository is public, and so are its
+#    workflow artifacts: anyone signed in to GitHub can download them. Until
+#    8 Nov the dump went up as it was (customers' names, phone numbers and
+#    emails). Now it's encrypted before it's uploaded (AES-256; the key comes
+#    from the passphrase through PBKDF2-SHA256 at 600,000 rounds), and the job
+#    refuses to run at all without the passphrase, so a plain copy can never
+#    go up again.
+#
+# SETUP — two repo secrets are required:
+#   SUPABASE_DB_URL     the SESSION POOLER connection string, port 5432
+#   BACKUP_PASSPHRASE   a long passphrase (20+ characters, from a password
+#                       manager). Keep it there too: without it no backup can
+#                       ever be opened, by anyone
+#
+# OPENING A BACKUP: download the artifact (a .zip holding
+#   mbu-db-<date>.sql.gz.enc), unzip it, then either
+#     node worker/import.mjs open <file>.sql.gz.enc     (asks for the passphrase)
+#   or, anywhere with OpenSSL 3 / LibreSSL:
+#     openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 \
+#       -in mbu-db-<date>.sql.gz.enc -out mbu-db-<date>.sql.gz
 #
 # ⚠️  It MUST be the session pooler string, not the direct one.
 #     Supabase's direct connection (db.<ref>.supabase.co) is IPv6-only, and
@@ -47,14 +65,22 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Check the secret is set
+      - name: Check the secrets are set
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
           set -euo pipefail
           if [ -z "${DB_URL:-}" ]; then
             echo "::error::SUPABASE_DB_URL is not set. Add it under"
             echo "::error::Settings -> Secrets and variables -> Actions -> New repository secret."
+            exit 1
+          fi
+          # No passphrase, no backup: an unlocked dump must never be uploaded (this repo is public)
+          if [ "${#BACKUP_PASSPHRASE}" -lt 20 ]; then
+            echo "::error::BACKUP_PASSPHRASE is missing or shorter than 20 characters. Add it under"
+            echo "::error::Settings -> Secrets and variables -> Actions -> New repository secret."
+            echo "::error::Nothing was dumped or uploaded."
             exit 1
           fi
           # Catch the two mistakes that actually happen, before wasting a connection.
@@ -198,11 +224,29 @@ jobs:
 
           echo "Backup verified."
 
-      - name: Upload the backup
+      - name: Lock the backup (only the passphrase opens it)
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          # The artifact is downloadable by anyone signed in to GitHub (public repo), so only the
+          # encrypted file is ever uploaded. Same format the Mac opens (worker/import.mjs open).
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 600000 -md sha256 \
+            -pass env:BACKUP_PASSPHRASE -in "$OUT" -out "$OUT.enc"
+
+          # Prove it opens again and is the very same file before the plain one is removed
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 \
+            -pass env:BACKUP_PASSPHRASE -in "$OUT.enc" | cmp - "$OUT"
+
+          rm -f "$OUT"
+          echo "LOCKED=$OUT.enc" >> "$GITHUB_ENV"
+          echo "Locked: $OUT.enc ($(stat -c%s "$OUT.enc") bytes). The plain dump is deleted."
+
+      - name: Upload the locked backup
         uses: actions/upload-artifact@v4
         with:
-          name: mbu-db-backup-${{ env.STAMP }}
-          path: ${{ env.OUT }}
+          name: mbu-db-backup-locked-${{ env.STAMP }}
+          path: ${{ env.LOCKED }}
           retention-days: 30
           if-no-files-found: error
-          compression-level: 0   # already gzipped
+          compression-level: 0   # encrypted: it won't compress
